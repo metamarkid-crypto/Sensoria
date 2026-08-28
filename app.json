@@ -1,0 +1,49 @@
+{
+  "expo": {
+    "name": "Sensoria",
+    "slug": "Sensoria",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.anonymous.Sensoria"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF"
+    },
+    "plugins": [
+      "expo-sqlite",
+      "expo-audio",
+      "expo-secure-store",
+      [
+        "@sentry/react-native/expo",
+        {
+          "organization": "sensoria-org",
+          "project": "sensoria-aac"
+        }
+      ]
+    ],
+    "newArchEnabled": false,
+    "extra": {
+      "eas": {
+        "projectId": "aa1cfb2b-48ce-46c5-8fed-8f170a7cb3d9"
+      }
+    }
+  }
+}

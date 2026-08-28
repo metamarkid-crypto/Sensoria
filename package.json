@@ -1,0 +1,49 @@
+{
+  "name": "sensoria",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "dependencies": {
+    "@expo/vector-icons": "^15.1.1",
+    "@google/genai": "^2.13.0",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-community/slider": "^5.2.1",
+    "@react-navigation/native": "^7.3.13",
+    "@react-navigation/native-stack": "^7.18.5",
+    "@sentry/react-native": "~7.11.0",
+    "@supabase/supabase-js": "^2.110.8",
+    "axios": "^1.18.1",
+    "buffer": "^6.0.3",
+    "expo": "~57.0.8",
+    "expo-audio": "~57.0.3",
+    "expo-dev-client": "~57.0.8",
+    "expo-file-system": "~57.0.1",
+    "expo-haptics": "~57.0.1",
+    "expo-image-picker": "~57.0.6",
+    "expo-linear-gradient": "~57.0.1",
+    "expo-location": "~57.0.6",
+    "expo-secure-store": "~57.0.1",
+    "expo-speech": "~57.0.1",
+    "expo-sqlite": "~57.0.1",
+    "expo-status-bar": "~57.0.1",
+    "react": "19.2.3",
+    "react-native": "0.86.0",
+    "react-native-maps": "1.27.2",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
+    "react-native-toast-message": "^2.4.0",
+    "react-native-url-polyfill": "^4.0.0",
+    "react-native-vision-camera": "^5.1.1",
+    "zustand": "^5.0.14"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.2",
+    "typescript": "~6.0.3"
+  },
+  "scripts": {
+    "start": "node scripts/sync-audio.js && node scripts/sync-images.js && expo start",
+    "android": "node scripts/sync-audio.js && node scripts/sync-images.js && expo run:android",
+    "ios": "node scripts/sync-audio.js && node scripts/sync-images.js && expo run:ios",
+    "web": "expo start --web"
+  },
+  "private": true
+}
