@@ -53,7 +53,7 @@ const seedDefaultARASAACWords = async () => {
         $id: word.id,
         $word_id: word.word_id,
         $word_zh: word.word_zh,
-        $img: word.imageUrl,
+        $img: word.imageUrl || null,
         $cat: word.categoryId
       });
     }
@@ -80,7 +80,7 @@ export const addCustomWord = async (word: AACWord) => {
   if (!db) return;
   await db.runAsync(
     'INSERT INTO aac_words (id, word_id, word_zh, imageUrl, categoryId, isCustom) VALUES (?, ?, ?, ?, ?, 1)',
-    [word.id, word.word_id, word.word_zh, word.imageUrl, word.categoryId]
+    [word.id, word.word_id, word.word_zh, word.imageUrl || null, word.categoryId]
   );
 };
 

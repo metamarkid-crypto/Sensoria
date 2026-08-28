@@ -65,7 +65,7 @@ const ensureCacheLimit = async () => {
   }
 };
 
-export const clearAudioCache = async (text: string, language: 'id' | 'zh', role: 'Child' | 'Parent') => {
+export const clearAudioCache = async (text: string, language: 'id' | 'en' | 'zh', role: 'Child' | 'Parent') => {
   const store = useAACStore.getState();
   const { childVoiceGender, parentVoiceGender } = store;
   let voiceId = '';
@@ -90,7 +90,7 @@ export const clearAudioCache = async (text: string, language: 'id' | 'zh', role:
   }
 };
 
-export const playTTS = async (text: string, language: 'id' | 'zh', role: 'Child' | 'Parent') => {
+export const playTTS = async (text: string, language: 'id' | 'en' | 'zh', role: 'Child' | 'Parent') => {
   const store = useAACStore.getState();
   const { speechRate, childVoiceGender, parentVoiceGender } = store;
 
@@ -140,7 +140,7 @@ export const playTTS = async (text: string, language: 'id' | 'zh', role: 'Child'
           
           // Construct query params
           // Adding 'language' parameter to force correct accent (e.g. 'id' or 'zh')
-          const lmntLang = language === 'id' ? 'id' : 'zh';
+          const lmntLang = language === 'id' ? 'id' : language === 'en' ? 'en' : 'zh';
           
           const downloadRes = await FileSystem.downloadAsync(
             `https://api.lmnt.com/v1/ai/speech?voice=${voiceId}&format=mp3&text=${encodeURIComponent(relaxedText)}&speed=${speechRate}&language=${lmntLang}`,
@@ -193,7 +193,7 @@ export const playTTS = async (text: string, language: 'id' | 'zh', role: 'Child'
   }
 
   Speech.speak(text, { 
-    language: language === 'id' ? 'id-ID' : 'zh-CN',
+    language: language === 'id' ? 'id-ID' : language === 'en' ? 'en-US' : 'zh-CN',
     rate: speechRate,
     pitch: pitch
   });

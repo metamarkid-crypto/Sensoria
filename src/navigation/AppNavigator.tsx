@@ -43,7 +43,16 @@ export default function AppNavigator() {
             </>
           )
         ) : (
-          <Stack.Screen name="ParentDashboard" component={ParentDashboardScreen} />
+          <>
+            <Stack.Screen name="ParentDashboard" component={ParentDashboardScreen} />
+            {/* The Settings sub-screens MUST be registered at the Root Stack level 
+                so they render Full Screen, hiding the Bottom Tabs when pushed */}
+            <Stack.Screen name="UserProfile" component={UserProfileScreen} options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="AppearanceSettings" component={AppearanceSettingsScreen} options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="VoiceSettings" component={VoiceSettingsScreen} options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="AccessibilitySettings" component={AccessibilitySettingsScreen} options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="AboutScreen" component={AboutScreen} options={{ animation: 'slide_from_right' }} />
+          </>
         )}
       </Stack.Navigator>
     </NavigationContainer>

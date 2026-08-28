@@ -50,7 +50,7 @@ const AACCard = React.memo(({ item, onPress, onLongPress }: AACCardProps) => {
     const expectedFilename = `${item.word_id.toLowerCase().replace(/\s+/g, '_')}.png`;
     
     // Attempt to load from local mapped assets
-    imageSource = getLocalImage(expectedFilename, childProfile?.gender);
+    imageSource = getLocalImage(expectedFilename, childProfile?.gender?.toLowerCase() as 'boy' | 'girl');
     if (!imageSource && item.imageUrl) {
       // Fallback if not found in mapping (Remote ARASAAC Community)
       imageSource = { uri: item.imageUrl };
@@ -157,7 +157,6 @@ const AACCard = React.memo(({ item, onPress, onLongPress }: AACCardProps) => {
       delayLongPress={holdDuration > 0 ? holdDuration * 1000 : 500}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
-      delayPressIn={0} // CRITICAL: Ensures 0ms delay before triggering onPressIn visual feedback
     >
       <Animated.View style={[styles.card, { 
         transform: [{ scale: scaleValue }],

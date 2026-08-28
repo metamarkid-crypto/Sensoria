@@ -26,7 +26,7 @@ export default function OnboardingScreen({ navigation }: any) {
 
     try {
       // 1. Simpan ke local store
-      setChildProfile({ fullName: fullName.trim(), nickname: nickname.trim(), gender });
+      setChildProfile({ fullName: fullName.trim(), nickname: nickname.trim(), gender: gender === 'boy' ? 'Boy' : 'Girl' });
       setChildVoiceGender(gender === 'boy' ? 'Boy' : 'Girl');
       
       // 2. Simpan ke Supabase (jika sudah ada koneksi)
