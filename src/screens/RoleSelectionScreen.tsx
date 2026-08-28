@@ -140,6 +140,15 @@ export default function RoleSelectionScreen() {
     }
   };
 
+  const setLanguage = useAACStore((state) => state.setLanguage);
+  const currentLanguage = useAACStore((state) => state.language);
+  const [showLanguageModal, setShowLanguageModal] = useState(false);
+
+  const handleLanguageSelect = (lang: 'id' | 'en' | 'zh') => {
+    setLanguage(lang);
+    setShowLanguageModal(false);
+  };
+
   return (
     <ImageBackground source={require('../../assets/bg-peran.webp')} style={styles.bgContainer} resizeMode="cover">
       <SafeAreaView style={styles.safeArea}>
