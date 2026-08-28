@@ -143,24 +143,21 @@ export default function RoleSelectionScreen() {
   return (
     <ImageBackground source={require('../../assets/bg-peran.webp')} style={styles.bgContainer} resizeMode="cover">
       <SafeAreaView style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          {/* Top Settings Button */}
+        <View style={styles.contentWrapper}>
           <View style={styles.topBar}>
-            <TouchableOpacity style={styles.settingsBtn} onPress={() => setShowSettings(true)}>
-              <FontAwesome5 name="cog" size={24} color="#64748B" />
+            <TouchableOpacity style={styles.settingsBtn} onPress={() => setShowLanguageModal(true)}>
+              <FontAwesome5 name="globe" size={24} color="#64748B" />
             </TouchableOpacity>
           </View>
 
-          {/* Logo & Description */}
           <View style={styles.headerSection}>
-            <Image source={require('../../assets/sensoria.png')} style={styles.logo} resizeMode="contain" />
+            <Image source={require('../../assets/logo.png')} style={styles.logo} resizeMode="contain" />
             <Text style={styles.descText}>
               Aplikasi komunikasi AAC yang dapat disesuaikan{'\n'}
               untuk pengguna <Text style={{color: '#00B5B8', fontWeight: 'bold'}}>Autism</Text>, pengguna dengan{'\n'}
               <Text style={{color: '#FF2A7A', fontWeight: 'bold'}}>gangguan bicara & pendengaran</Text> serta pengguna <Text style={{color: '#9C27B0', fontWeight: 'bold'}}>nonverbal</Text>.
             </Text>
 
-            {/* Features Badge */}
             <View style={styles.featuresBadge}>
               <View style={styles.featureItem}>
                 <View style={[styles.featureIconBox, { backgroundColor: '#EBF4FF' }]}>
@@ -189,13 +186,12 @@ export default function RoleSelectionScreen() {
             </View>
           </View>
 
-          {/* Title */}
           <View style={styles.titleSection}>
+            <Text style={styles.helloText}>Hai!</Text>
             <Text style={styles.titleText}>Pilih peran Anda</Text>
             <Text style={styles.subtitleText}>untuk melanjutkan</Text>
           </View>
 
-          {/* Buttons */}
           <View style={styles.buttonSection}>
             <TouchableOpacity onPress={() => handleSelectRole('Child')} activeOpacity={0.9} style={styles.roleBtn} disabled={isLoading}>
               <Image source={require('../../assets/mode-anak.webp')} style={styles.roleImage} resizeMode="contain" />
@@ -206,7 +202,6 @@ export default function RoleSelectionScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Bottom Recovery Button */}
           <View style={styles.bottomSection}>
             <TouchableOpacity onPress={() => setShowRecovery(true)} style={styles.recoveryBtnBox} disabled={isLoading}>
               <View style={styles.recoveryIconBox}>
@@ -218,17 +213,42 @@ export default function RoleSelectionScreen() {
               </View>
             </TouchableOpacity>
           </View>
-        </ScrollView>
+        </View>
       </SafeAreaView>
 
-      {/* Settings Modal */}
-      <Modal visible={showSettings} transparent animationType="slide">
+      <Modal visible={showLanguageModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <SettingsScreen onClose={() => setShowSettings(false)} />
+          <View style={styles.languageContainer}>
+            <Text style={styles.languageTitle}>Pilih Bahasa Aplikasi</Text>
+            
+            <TouchableOpacity 
+              style={[styles.langBtn, currentLanguage === 'id' && styles.langBtnActive]} 
+              onPress={() => handleLanguageSelect('id')}
+            >
+              <Text style={[styles.langBtnText, currentLanguage === 'id' && styles.langBtnTextActive]}>🇮🇩 Indonesia</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.langBtn, currentLanguage === 'en' && styles.langBtnActive]} 
+              onPress={() => handleLanguageSelect('en')}
+            >
+              <Text style={[styles.langBtnText, currentLanguage === 'en' && styles.langBtnTextActive]}>🇬🇧 English</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.langBtn, currentLanguage === 'zh' && styles.langBtnActive]} 
+              onPress={() => handleLanguageSelect('zh')}
+            >
+              <Text style={[styles.langBtnText, currentLanguage === 'zh' && styles.langBtnTextActive]}>🇨🇳 Mandarin (中文)</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.languageCancel} onPress={() => setShowLanguageModal(false)}>
+              <Text style={styles.languageCancelText}>Batal</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
 
-      {/* Recovery Modal */}
       <Modal visible={showRecovery} transparent animationType="slide">
         <KeyboardAvoidingView 
           style={styles.modalOverlay}
@@ -268,10 +288,11 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
-  scrollContent: {
-    flexGrow: 1,
+  contentWrapper: {
+    flex: 1,
     paddingHorizontal: 20,
-    paddingBottom: 30,
+    paddingBottom: 20,
+    justifyContent: 'space-between',
   },
   topBar: {
     flexDirection: 'row',
@@ -293,35 +314,33 @@ const styles = StyleSheet.create({
   },
   headerSection: {
     alignItems: 'center',
-    marginTop: -10,
   },
   logo: {
     width: '80%',
-    height: 100,
-    marginBottom: 10,
+    height: 90,
+    marginBottom: 5,
   },
   descText: {
     textAlign: 'center',
-    fontSize: 12,
+    fontSize: 11,
     color: '#1E293B',
-    lineHeight: 18,
-    marginBottom: 20,
+    lineHeight: 16,
+    marginBottom: 16,
     paddingHorizontal: 10,
   },
   featuresBadge: {
     flexDirection: 'row',
     backgroundColor: '#FFF',
     borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
     justifyContent: 'space-between',
     width: '100%',
-    elevation: 3,
+    elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
-    shadowRadius: 4,
-    marginBottom: 30,
+    shadowRadius: 3,
   },
   featureItem: {
     flexDirection: 'row',
@@ -330,102 +349,139 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   featureIconBox: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 6,
+    marginRight: 4,
   },
   featureText: {
-    fontSize: 8.5,
+    fontSize: 7.5,
     color: '#334155',
     fontWeight: '700',
   },
   titleSection: {
     alignItems: 'center',
-    marginBottom: 10,
   },
   helloText: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '900',
     color: '#11427B',
   },
   titleText: {
-    fontSize: 22,
+    fontSize: 26,
     fontWeight: '900',
     color: '#11427B',
   },
   subtitleText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: '#94A3B8',
   },
   buttonSection: {
     alignItems: 'center',
-    gap: 16,
+    gap: 0,
   },
   roleBtn: {
     width: '100%',
-    height: 140,
+    height: 130,
     borderRadius: 24,
     overflow: 'hidden',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
+    marginTop: -8,
   },
   roleImage: {
     width: '100%',
     height: '100%',
   },
   bottomSection: {
-    marginTop: 'auto',
-    paddingTop: 20,
     alignItems: 'center',
+    paddingTop: 10,
   },
   recoveryBtnBox: {
     flexDirection: 'row',
     backgroundColor: '#FFF',
-    padding: 16,
+    padding: 14,
     borderRadius: 16,
     width: '100%',
     alignItems: 'center',
-    elevation: 4,
+    elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
   },
   recoveryIconBox: {
     backgroundColor: '#2488FF',
-    width: 48,
-    height: 48,
+    width: 42,
+    height: 42,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 16,
+    marginRight: 12,
   },
   recoveryTextBox: {
     flex: 1,
   },
   recoveryTitleText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: 'bold',
     color: '#00B5B8',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   recoveryDescText: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#64748B',
-    lineHeight: 16,
+    lineHeight: 14,
   },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     paddingHorizontal: 20,
+  },
+  languageContainer: {
+    backgroundColor: '#FFF',
+    padding: 24,
+    borderRadius: 20,
+    elevation: 5,
+  },
+  languageTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#334155',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  langBtn: {
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  langBtnActive: {
+    borderColor: '#2488FF',
+    backgroundColor: '#EFF6FF',
+  },
+  langBtnText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#64748B',
+  },
+  langBtnTextActive: {
+    color: '#2488FF',
+  },
+  languageCancel: {
+    marginTop: 8,
+    alignItems: 'center',
+    padding: 10,
+  },
+  languageCancelText: {
+    color: '#94A3B8',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
   recoveryContainer: {
     backgroundColor: '#FFF',

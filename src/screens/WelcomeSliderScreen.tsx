@@ -73,7 +73,7 @@ export default function WelcomeSliderScreen({ navigation }: any) {
 
   const renderSlide = ({ item }: { item: typeof SLIDES[0] }) => (
     <View style={styles.slideContainer}>
-      <Image source={item.image} style={styles.fullImage} resizeMode="contain" accessible={true} accessibilityLabel={`Ilustrasi: ${item.title}`} />
+      <Image source={item.image} style={styles.fullImage} resizeMode="cover" accessible={true} accessibilityLabel={`Ilustrasi: ${item.title}`} />
     </View>
   );
 
@@ -146,9 +146,6 @@ const styles = StyleSheet.create({
   slideContainer: {
     width,
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingTop: 40,
   },
   fullImage: {
     flex: 1,
@@ -156,12 +153,16 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   footerContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 24,
     paddingTop: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'transparent',
   },
   skipButton: {
     paddingVertical: 12,

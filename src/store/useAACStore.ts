@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type UserRole = 'None' | 'Child' | 'Parent';
-export type AppLanguage = 'id' | 'zh';
+export type AppLanguage = 'id' | 'en' | 'zh';
 export type ChildProfile = { 
   device_id?: string;
   fullName?: string; 
