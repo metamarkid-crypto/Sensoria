@@ -14,6 +14,17 @@ jobs:
       SENTRY_DISABLE_AUTO_UPLOAD: true
 
     steps:
+      - name: 🧹 Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: false # keep android SDK, we need it
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+
       - name: 📥 Checkout Repository
         uses: actions/checkout@v4
 
