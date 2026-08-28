@@ -136,6 +136,7 @@ const styles = StyleSheet.create({
   },
   sliderWrapper: {
     flex: 1,
+	padding: 10px,
   },
   loadingContainer: {
     flex: 1,

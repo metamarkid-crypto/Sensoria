@@ -160,7 +160,7 @@ export default function RoleSelectionScreen() {
           </View>
 
           <View style={styles.headerSection}>
-            <Image source={require('../../assets/logo.png')} style={styles.logo} resizeMode="contain" />
+            <Image source={require('../../assets/sensoria.png')} style={styles.logo} resizeMode="contain" />
             <Text style={styles.descText}>
               Aplikasi komunikasi AAC yang dapat disesuaikan{'\n'}
               untuk pengguna <Text style={{color: '#00B5B8', fontWeight: 'bold'}}>Autism</Text>, pengguna dengan{'\n'}
@@ -196,7 +196,6 @@ export default function RoleSelectionScreen() {
           </View>
 
           <View style={styles.titleSection}>
-            <Text style={styles.helloText}>Hai!</Text>
             <Text style={styles.titleText}>Pilih peran Anda</Text>
             <Text style={styles.subtitleText}>untuk melanjutkan</Text>
           </View>
