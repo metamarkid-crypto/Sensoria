@@ -136,7 +136,6 @@ const styles = StyleSheet.create({
   },
   sliderWrapper: {
     flex: 1,
-	padding: 10px,
   },
   loadingContainer: {
     flex: 1,
@@ -147,11 +146,15 @@ const styles = StyleSheet.create({
   slideContainer: {
     width,
     flex: 1,
+    padding: 16,
+    paddingBottom: 40, // space for buttons
   },
   fullImage: {
     flex: 1,
     width: '100%',
     height: '100%',
+    borderRadius: 24, // nice rounded corners for elegance
+    overflow: 'hidden',
   },
   footerContainer: {
     position: 'absolute',
