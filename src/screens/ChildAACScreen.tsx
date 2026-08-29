@@ -66,13 +66,7 @@ export default function ChildAACScreen() {
           .single();
           
         if (!error && data?.settings) {
-          const localState = useAACStore.getState();
-          if (data.settings.speechRate !== undefined && data.settings.speechRate !== localState.speechRate) {
-            setSpeechRate(data.settings.speechRate);
-          }
-          if (data.settings.childVoiceGender !== undefined && data.settings.childVoiceGender !== localState.childVoiceGender) {
-            setChildVoiceGender(data.settings.childVoiceGender);
-          }
+          useAACStore.setState(data.settings);
         }
       } catch (err) {
         console.warn('Catch-up Sync failed (Offline Mode Active):', err);
@@ -98,9 +92,7 @@ export default function ChildAACScreen() {
         { event: 'UPDATE', schema: 'public', table: 'child_profiles', filter: `device_id=eq.${deviceId}` },
         (payload: any) => {
           if (payload.new && payload.new.settings) {
-            const newSettings = payload.new.settings;
-            if (newSettings.speechRate !== undefined) setSpeechRate(newSettings.speechRate);
-            if (newSettings.childVoiceGender !== undefined) setChildVoiceGender(newSettings.childVoiceGender);
+            useAACStore.setState(payload.new.settings);
           }
         }
       )
@@ -117,6 +109,30 @@ export default function ChildAACScreen() {
     if (status === 'granted') {
       let loc = await Location.getCurrentPositionAsync({});
       setLocation(loc);
+      
+      // The Pusher: Reverse Geocode once and update Supabase
+      if (deviceId) {
+        let addressStr = 'Lokasi tidak diketahui';
+        try {
+          const geocode = await Location.reverseGeocodeAsync({
+            latitude: loc.coords.latitude,
+            longitude: loc.coords.longitude
+          });
+          if (geocode && geocode.length > 0) {
+            addressStr = `${geocode[0].street || geocode[0].name}, ${geocode[0].city || geocode[0].region}`;
+          }
+        } catch (e) {}
+
+        await supabase
+          .from('devices')
+          .update({ 
+            latitude: loc.coords.latitude, 
+            longitude: loc.coords.longitude,
+            last_address: addressStr, // Push raw address string directly to DB
+            last_seen: new Date().toISOString()
+          })
+          .eq('id', deviceId);
+      }
     }
   };
 

@@ -6,7 +6,6 @@ import { supabase, sendAACMessage } from '../../services/db/supabase';
 import { useAACStore } from '../../store/useAACStore';
 import { playTTS } from '../../services/ai/audioManager';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Haptics from 'expo-haptics';
 import Toast from 'react-native-toast-message';
 
 export default function ParentHomeScreen() {
@@ -16,6 +15,10 @@ export default function ParentHomeScreen() {
   const [recentMessage, setRecentMessage] = useState<any>(null);
   const [isOnline, setIsOnline] = useState(false);
   const [lastSeen, setLastSeen] = useState<string | null>(null);
+  
+  // Analytics & Location State
+  const [todayMessageCount, setTodayMessageCount] = useState<number>(0);
+  const [currentAddress, setCurrentAddress] = useState<string>('Memuat...');
 
   useEffect(() => {
     if (!pairingCode) return;
@@ -34,6 +37,25 @@ export default function ParentHomeScreen() {
     };
     fetchRecent();
 
+    // The Activity Analytics Engine: Count messages today
+    const fetchTodayCount = async () => {
+      const startOfDay = new Date();
+      startOfDay.setHours(0,0,0,0);
+      const endOfDay = new Date();
+      endOfDay.setHours(23,59,59,999);
+
+      const { count } = await supabase
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('channel_id', pairingCode)
+        .eq('sender_role', 'Child')
+        .gte('timestamp', startOfDay.getTime())
+        .lte('timestamp', endOfDay.getTime());
+        
+      setTodayMessageCount(count || 0);
+    };
+    fetchTodayCount();
+
     const msgSub = supabase.channel('home_recent_message')
       .on('postgres_changes', {
         event: 'INSERT',
@@ -43,6 +65,7 @@ export default function ParentHomeScreen() {
       }, (payload) => {
         if (payload.new.sender_role === 'Child') {
           setRecentMessage(payload.new);
+          setTodayMessageCount(prev => prev + 1);
         }
       })
       .subscribe();
@@ -67,8 +90,11 @@ export default function ParentHomeScreen() {
       if (!link) return;
 
       const fetchPresence = async () => {
-        const { data } = await supabase.from('devices').select('last_seen').eq('id', link.child_device_id).single();
-        if (data?.last_seen) updateOnlineStatus(data.last_seen);
+        const { data } = await supabase.from('devices').select('last_seen, last_address').eq('id', link.child_device_id).single();
+        if (data) {
+          if (data.last_seen) updateOnlineStatus(data.last_seen);
+          if (data.last_address) setCurrentAddress(data.last_address);
+        }
       };
       await fetchPresence();
 
@@ -78,8 +104,9 @@ export default function ParentHomeScreen() {
           schema: 'public',
           table: 'devices',
           filter: `id=eq.${link.child_device_id}`
-        }, (payload) => {
+        }, async (payload) => {
           if (payload.new.last_seen) updateOnlineStatus(payload.new.last_seen);
+          if (payload.new.last_address) setCurrentAddress(payload.new.last_address);
         }).subscribe();
     };
 
@@ -210,14 +237,16 @@ export default function ParentHomeScreen() {
       {/* WIDGET B: Lokasi & Aktivitas */}
       <View style={styles.row}>
         <View style={[styles.card, styles.halfCard]}>
-          <View style={styles.summaryTop}>
-            <View style={[styles.summaryIconBox, { backgroundColor: '#D1FAE5' }]}>
-              <FontAwesome5 name="map-marker-alt" size={20} color="#059669" />
+          <TouchableOpacity onPress={() => navigation.navigate('Lokasi')} activeOpacity={0.8}>
+            <View style={styles.summaryTop}>
+              <View style={[styles.summaryIconBox, { backgroundColor: '#D1FAE5' }]}>
+                <FontAwesome5 name="map-marker-alt" size={20} color="#059669" />
+              </View>
+              <Text style={styles.summaryTitle}>Lokasi Sekarang</Text>
             </View>
-            <Text style={styles.summaryTitle}>Lokasi Sekarang</Text>
-          </View>
-          <Text style={styles.summaryValue}>Rumah</Text>
-          <Text style={styles.summarySub}>Area aman</Text>
+            <Text style={styles.summaryValue} numberOfLines={1}>{currentAddress}</Text>
+            <Text style={styles.summarySub}>Area aman</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={[styles.card, styles.halfCard]}>
@@ -227,7 +256,7 @@ export default function ParentHomeScreen() {
             </View>
             <Text style={styles.summaryTitle}>Aktivitas Hari Ini</Text>
           </View>
-          <Text style={styles.summaryValueDark}>24</Text>
+          <Text style={styles.summaryValueDark}>{todayMessageCount}</Text>
           <Text style={styles.summarySubDark}>Pesan disampaikan</Text>
         </View>
       </View>
