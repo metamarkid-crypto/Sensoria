@@ -60,6 +60,9 @@ export interface AACState {
 
   // App Content (Offline-First)
   aboutContent: AboutContent | null;
+
+  // Custom Quick Replies
+  customQuickReplies: string[];
   
   // Actions
   setHasSeenOnboarding: (status: boolean) => void;
@@ -88,6 +91,8 @@ export interface AACState {
   setReleaseToSpeak: (status: boolean) => void;
   
   setAboutContent: (content: AboutContent) => void;
+  addCustomQuickReply: (text: string) => void;
+  removeCustomQuickReply: (text: string) => void;
 }
 
 export const useAACStore = create<AACState>()(
@@ -117,6 +122,7 @@ export const useAACStore = create<AACState>()(
       releaseToSpeak: false,
       
       aboutContent: null,
+      customQuickReplies: ['❤️ Mama di sini', '⏳ Tunggu sebentar ya', '🍎 Makan dulu yuk'],
       
       setHasSeenOnboarding: (status) => set({ hasSeenOnboarding: status }),
       setRole: (role) => set({ role }),
@@ -146,6 +152,12 @@ export const useAACStore = create<AACState>()(
       setReleaseToSpeak: (status) => set({ releaseToSpeak: status }),
       
       setAboutContent: (content) => set({ aboutContent: content }),
+      addCustomQuickReply: (text) => set((state) => ({ 
+        customQuickReplies: [...state.customQuickReplies, text] 
+      })),
+      removeCustomQuickReply: (text) => set((state) => ({
+        customQuickReplies: state.customQuickReplies.filter(reply => reply !== text)
+      })),
     }),
     { 
       name: 'aac-storage',

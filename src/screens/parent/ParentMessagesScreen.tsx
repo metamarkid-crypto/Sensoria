@@ -1,258 +1,204 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView, Modal, KeyboardAvoidingView, Platform, TextInput } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, 
+  KeyboardAvoidingView, Platform, ScrollView, Modal, Alert 
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FontAwesome5 } from '@expo/vector-icons';
+import { supabase, sendAACMessage } from '../../services/db/supabase';
 import { useAACStore } from '../../store/useAACStore';
-import { sendAACMessage, subscribeToAACMessages, getAACMessagesHistory, supabase } from '../../services/db/supabase';
-import { playTTS } from '../../services/ai/audioManager';
-import { logger } from '../../utils/logger';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import Toast from 'react-native-toast-message';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function ParentMessagesScreen() {
-  const { language, deviceId, pairingCode, setPairingCode, setSpeechRate, setChildVoiceGender } = useAACStore();
-  const [messages, setMessages] = useState<{ senderRole: string; senderName: string; text: string; time: string; location: any; isSelf: boolean }[]>([]);
-  const [pairingRole, setPairingRole] = useState('Ayah');
-  const [showPairing, setShowPairing] = useState(false);
-  const [pairingCodeInput, setPairingCodeInput] = useState('');
-  const [isLinking, setIsLinking] = useState(false);
+  const insets = useSafeAreaInsets();
+  const { pairingCode, customQuickReplies, addCustomQuickReply, removeCustomQuickReply } = useAACStore();
+  
+  const [messages, setMessages] = useState<any[]>([]);
+  const [inputText, setInputText] = useState('');
+  
+  // Custom Reply Modal State
+  const [isModalVisible, setModalVisible] = useState(false);
+  const [newReplyText, setNewReplyText] = useState('');
+  
+  const flatListRef = useRef<FlatList>(null);
 
+  // 1. Data Fetching and Real-Time Sync (SAFE - NO TTS TRIGGER)
   useEffect(() => {
-    const loadHistoryAndChild = async () => {
-      if (deviceId) {
-        const { data: links } = await supabase
-          .from('family_links')
-          .select('child_device_id')
-          .eq('parent_device_id', deviceId)
-          .single();
-        if (links) {
-          const { data: profile } = await supabase
-            .from('child_profiles')
-            .select('settings')
-            .eq('device_id', links.child_device_id)
-            .single();
-          if (profile?.settings) {
-            setSpeechRate(profile.settings.speechRate || 1.0);
-            setChildVoiceGender(profile.settings.childVoiceGender || 'Boy');
-          }
-          
-          const { data: childDevice } = await supabase
-            .from('devices')
-            .select('pairing_code')
-            .eq('id', links.child_device_id)
-            .single();
-            
-          if (childDevice?.pairing_code) {
-            setPairingCode(childDevice.pairing_code);
-            return childDevice.pairing_code;
-          }
-        }
-      }
-      return pairingCode;
-    };
-
-    const loadData = async () => {
-      const activeChannel = await loadHistoryAndChild();
-      if (!activeChannel) return;
-
-      const historyData = await getAACMessagesHistory(activeChannel);
-      const formattedHistory = historyData.map((msg: any) => ({
-        senderRole: msg.sender_role,
-        senderName: msg.sender_name,
-        text: msg.text_content,
-        time: new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        location: msg.location_lat ? { latitude: msg.location_lat, longitude: msg.location_lng } : null,
-        isSelf: msg.sender_role === 'Parent' && msg.sender_name === pairingRole
-      }));
-      setMessages(formattedHistory);
-    };
-    loadData();
-
     if (!pairingCode) return;
-    
-    logger.setUserContext(pairingRole, pairingCode);
-    
-    const channel = subscribeToAACMessages(pairingCode, (payload) => {
-      try {
-        const timeStr = new Date(payload.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        const isSelf = payload.sender === 'Parent' && payload.senderName === pairingRole;
 
-        setMessages(prev => [{ 
-          senderRole: payload.sender, 
-          senderName: payload.senderName || payload.sender, 
-          text: payload.text, 
-          time: timeStr, 
-          location: payload.location,
-          isSelf
-        }, ...prev]);
+    const fetchMessages = async () => {
+      const { data } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('channel_id', pairingCode)
+        .order('timestamp', { ascending: false }); // Newest to oldest for inverted FlatList
+      if (data) setMessages(data);
+    };
 
-        if (!isSelf) {
-          playTTS(payload.text, language, payload.sender === 'Child' ? 'Child' : 'Parent');
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        }
-      } catch (err) {
-        console.error('Error handling incoming AAC message:', err);
-      }
-    });
+    fetchMessages();
+
+    // Visual localized listener only
+    const msgSub = supabase.channel('parent_messages_screen')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+        filter: `channel_id=eq.${pairingCode}`
+      }, (payload) => {
+        // Only append visually (to the top since inverted), TTS is handled by ParentDashboardScreen
+        setMessages((prev) => [payload.new, ...prev]);
+      })
+      .subscribe();
 
     return () => {
-      channel.unsubscribe();
+      supabase.removeChannel(msgSub);
     };
-  }, [pairingRole, language, deviceId, pairingCode]);
+  }, [pairingCode]);
 
-  const handleQuickReply = async (idText: string, zhText: string) => {
-    if (!pairingCode) {
-      Toast.show({ type: 'error', text1: 'Gagal', text2: 'Anda belum terhubung ke perangkat anak.', position: 'top' });
-      setShowPairing(true);
-      return;
-    }
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    const textToSend = language === 'id' ? idText : zhText;
+  const handleSend = async (text: string) => {
+    if (!text.trim() || !pairingCode) return;
     
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await sendAACMessage(pairingCode, {
       sender: 'Parent',
-      senderName: pairingRole,
-      text: textToSend,
+      senderName: 'Orang Tua',
+      text: text.trim(),
       timestamp: Date.now()
     });
-    Toast.show({ type: 'success', text1: 'Terkirim', text2: `Balasan "${textToSend}" telah dikirim ke obrolan.`, position: 'top' });
+    
+    setInputText('');
   };
 
-  const handleLinkDevice = async () => {
-    if (!pairingCodeInput || pairingCodeInput.length < 6) {
-      Toast.show({ type: 'error', text1: 'Error', text2: 'Masukkan 6 digit kode dari perangkat anak.', position: 'top' });
-      return;
+  const handleSaveQuickReply = () => {
+    if (newReplyText.trim()) {
+      addCustomQuickReply(newReplyText.trim());
+      setNewReplyText('');
+      setModalVisible(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } else {
+      Alert.alert('Kosong', 'Masukkan teks balasan favorit Anda.');
     }
-    
-    if (!deviceId) return;
-    
-    setIsLinking(true);
-    try {
-      const { data, error } = await supabase.rpc('link_device', {
-        p_child_code: pairingCodeInput,
-        p_parent_device_id: deviceId,
-        p_parent_label: pairingRole
-      });
+  };
 
-      if (error) {
-        if (error.message.includes('KODE_TIDAK_VALID')) {
-          Toast.show({ type: 'error', text1: 'Gagal', text2: 'Kode sambung tidak valid atau sudah kadaluarsa.', position: 'top' });
-        } else if (error.message.includes('SLOT_PENUH')) {
-          Toast.show({ type: 'info', text1: '🌟 Upgrade ke Premium', text2: 'Slot keluarga sudah penuh! Akun gratis hanya mendukung 1 perangkat Orang Tua.', position: 'top' });
-        } else {
-          Toast.show({ type: 'error', text1: 'Gagal', text2: 'Terjadi kesalahan sistem.', position: 'top' });
+  const handleLongPressReply = (reply: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Alert.alert(
+      'Hapus Balasan Cepat',
+      `Apakah Anda yakin ingin menghapus "${reply}"?`,
+      [
+        { text: 'Batal', style: 'cancel' },
+        { 
+          text: 'Hapus', 
+          style: 'destructive', 
+          onPress: () => {
+            removeCustomQuickReply(reply);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          }
         }
-      } else {
-        setPairingCode(pairingCodeInput);
-        Toast.show({ type: 'success', text1: 'Berhasil! 🎉', text2: 'Perangkat berhasil terhubung dengan akun Anak.', position: 'top' });
-        setShowPairing(false);
-      }
-    } catch (e) {
-      console.error(e);
-      Toast.show({ type: 'error', text1: 'Error', text2: 'Gagal menyambungkan perangkat.', position: 'top' });
-    } finally {
-      setIsLinking(false);
-    }
+      ]
+    );
+  };
+
+  const renderMessage = ({ item }: { item: any }) => {
+    const isChild = item.sender_role === 'Child';
+    return (
+      <View style={[styles.messageBubbleWrapper, isChild ? styles.wrapperLeft : styles.wrapperRight]}>
+        <View style={[styles.messageBubble, isChild ? styles.bubbleChild : styles.bubbleParent]}>
+          <Text style={[styles.messageText, isChild ? styles.textChild : styles.textParent]}>
+            {item.text_content}
+          </Text>
+          <Text style={[styles.timestamp, isChild ? styles.timeChild : styles.timeParent]}>
+            {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </Text>
+        </View>
+      </View>
+    );
   };
 
   return (
-    <View style={styles.container}>
-      {/* INBOX CHAT */}
-      <View style={styles.chatSection}>
-        {messages.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>Belum ada riwayat obrolan.</Text>
-            {!pairingCode && (
-              <TouchableOpacity style={styles.linkButton} onPress={() => setShowPairing(true)}>
-                <Text style={styles.linkButtonText}>🔗 Sambungkan dengan Anak</Text>
+    <View style={[styles.container, { paddingBottom: insets.bottom }]}>
+      <LinearGradient colors={['#181824', '#11427B']} style={styles.header}>
+        <Text style={styles.headerTitle}>Pesan</Text>
+      </LinearGradient>
+
+      <KeyboardAvoidingView 
+        style={styles.flex1} 
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={renderMessage}
+          contentContainerStyle={styles.listContent}
+          inverted={true}
+          showsVerticalScrollIndicator={false}
+        />
+
+        <View style={styles.inputSection}>
+          {/* Custom Quick Replies */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.quickReplyScroll} contentContainerStyle={styles.quickReplyContent}>
+            {customQuickReplies.map((reply, index) => (
+              <TouchableOpacity 
+                key={index} 
+                style={styles.quickReplyPill} 
+                onPress={() => handleSend(reply)}
+                onLongPress={() => handleLongPressReply(reply)}
+                delayLongPress={500}
+              >
+                <Text style={styles.quickReplyText}>{reply}</Text>
               </TouchableOpacity>
-            )}
+            ))}
+            <TouchableOpacity 
+              style={[styles.quickReplyPill, styles.addPill]} 
+              onPress={() => setModalVisible(true)}
+            >
+              <FontAwesome5 name="plus" size={12} color="#00B5B8" style={{marginRight: 4}} />
+              <Text style={[styles.quickReplyText, { color: '#00B5B8', fontWeight: 'bold' }]}>Tambah</Text>
+            </TouchableOpacity>
+          </ScrollView>
+
+          {/* Main Input Area */}
+          <View style={styles.inputRow}>
+            <TextInput
+              style={styles.textInput}
+              placeholder="Tulis pesan..."
+              placeholderTextColor="#94A3B8"
+              value={inputText}
+              onChangeText={setInputText}
+              onSubmitEditing={() => handleSend(inputText)}
+            />
+            <TouchableOpacity 
+              style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]} 
+              onPress={() => handleSend(inputText)}
+              disabled={!inputText.trim()}
+            >
+              <FontAwesome5 name="paper-plane" size={18} color="#FFF" />
+            </TouchableOpacity>
           </View>
-        ) : (
-          <FlatList
-            data={messages}
-            keyExtractor={(_, index) => index.toString()}
-            inverted
-            contentContainerStyle={{ paddingBottom: 20 }}
-            style={styles.inbox}
-            renderItem={({ item: msg }) => {
-              const bubbleStyle = msg.isSelf ? styles.bubbleSelf : (msg.senderRole === 'Child' ? styles.bubbleChild : styles.bubbleOtherParent);
-              const textStyle = msg.isSelf ? styles.messageTextSelf : styles.messageTextOther;
-              const timeStyle = msg.isSelf ? styles.timeTextSelf : styles.timeTextOther;
-              
-              return (
-                <View style={[styles.messageBubbleContainer, msg.isSelf ? styles.containerSelf : styles.containerOther]}>
-                  <Text style={styles.senderNameText}>
-                    {msg.senderName} {msg.senderRole === 'Child' ? '🧒' : (msg.isSelf ? '(Anda)' : '👩‍👦')}
-                  </Text>
-                  <View style={[styles.messageBubble, bubbleStyle]}>
-                    <Text style={textStyle}>{msg.text}</Text>
-                    <Text style={timeStyle}>{msg.time}</Text>
-                  </View>
-                </View>
-              );
-            }}
-          />
-        )}
-      </View>
+        </View>
+      </KeyboardAvoidingView>
 
-      {/* QUICK REPLIES */}
-      <View style={styles.quickReplyWrapper}>
-        <Text style={styles.replySectionTitle}>Balas Cepat (Quick Reply)</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickReplyScroll}>
-          <TouchableOpacity onPress={() => handleQuickReply('Oke', '好的')} activeOpacity={0.8}>
-            <LinearGradient colors={['#FF9800', '#F57C00']} style={styles.replyChip}>
-              <Text style={styles.replyText}>👍 Oke</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleQuickReply('Ya', '是')} activeOpacity={0.8}>
-            <LinearGradient colors={['#00B5B8', '#008C8F']} style={styles.replyChip}>
-              <Text style={styles.replyText}>✅ Ya</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleQuickReply('Tidak', '不是')} activeOpacity={0.8}>
-            <LinearGradient colors={['#FF6B6B', '#E74C3C']} style={styles.replyChip}>
-              <Text style={styles.replyText}>❌ Tidak</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleQuickReply('Tunggu sebentar', '稍等一下')} activeOpacity={0.8}>
-            <LinearGradient colors={['#11427B', '#2C3E50']} style={styles.replyChip}>
-              <Text style={styles.replyText}>⏳ Tunggu</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </ScrollView>
-      </View>
-
-      {/* PAIRING MODAL */}
-      <Modal visible={showPairing} animationType="slide" transparent>
-        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-          <View style={styles.pairingModalContainer}>
-            <View style={styles.pairingHeader}>
-              <Text style={styles.pairingHeaderTitle}>Tautkan Perangkat</Text>
-              <TouchableOpacity onPress={() => setShowPairing(false)}>
-                <Text style={styles.pairingHeaderClose}>Tutup</Text>
+      {/* Add Custom Quick Reply Modal */}
+      <Modal visible={isModalVisible} transparent animationType="fade">
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Balasan Favorit Baru</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Misal: Kakak sedang di jalan..."
+              value={newReplyText}
+              onChangeText={setNewReplyText}
+              autoFocus
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalBtnCancel} onPress={() => setModalVisible(false)}>
+                <Text style={styles.modalBtnCancelText}>Batal</Text>
               </TouchableOpacity>
-            </View>
-
-            <View style={styles.pairingTopSection}>
-              <Text style={styles.pairingLabel}>1. Siapa Anda?</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.roleScroll}>
-                {['Ayah', 'Ibu', 'Kakek', 'Nenek', 'Kakak'].map(role => (
-                  <TouchableOpacity key={role} style={[styles.roleBtn, pairingRole === role && styles.roleBtnActive]} onPress={() => setPairingRole(role)}>
-                    <Text style={[styles.roleText, pairingRole === role && styles.roleTextActive]}>{role}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-              
-              <Text style={[styles.pairingLabel, { marginTop: 20 }]}>2. Masukkan 6 Digit Kode Anak</Text>
-              <View style={styles.pairingInputWrapper}>
-                <TextInput 
-                  style={styles.pairingInputLarge} placeholder="------" value={pairingCodeInput} onChangeText={setPairingCodeInput}
-                  keyboardType="number-pad" maxLength={6} autoFocus={true} selectionColor="#00B5B8"
-                />
-                <TouchableOpacity style={styles.pairingSubmitLarge} onPress={handleLinkDevice} disabled={isLinking}>
-                  <Text style={styles.pairingSubmitTextLarge}>{isLinking ? 'Menautkan...' : 'Tautkan Sekarang'}</Text>
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity style={styles.modalBtnSave} onPress={handleSaveQuickReply}>
+                <Text style={styles.modalBtnSaveText}>Simpan</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -262,47 +208,184 @@ export default function ParentMessagesScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#ECE5DD' },
-  chatSection: { flex: 1, paddingTop: 16 },
-  inbox: { flex: 1, paddingHorizontal: 16 },
-  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
-  emptyText: { color: '#94A3B8', fontStyle: 'italic', textAlign: 'center', marginBottom: 20 },
-  linkButton: { backgroundColor: '#FF9800', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12 },
-  linkButtonText: { color: '#FFF', fontWeight: 'bold' },
-  
-  messageBubbleContainer: { marginBottom: 12, maxWidth: '85%' },
-  containerSelf: { alignSelf: 'flex-end', alignItems: 'flex-end' },
-  containerOther: { alignSelf: 'flex-start', alignItems: 'flex-start' },
-  senderNameText: { fontSize: 11, fontWeight: 'bold', color: '#11427B', marginBottom: 2, paddingHorizontal: 4 },
-  messageBubble: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16, elevation: 1 },
-  bubbleSelf: { backgroundColor: '#DCF8C6', borderTopRightRadius: 4 },
-  bubbleChild: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 4 },
-  bubbleOtherParent: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 4, borderWidth: 1, borderColor: '#E2E8F0' },
-  messageTextSelf: { fontSize: 16, color: '#303030' },
-  messageTextOther: { fontSize: 16, color: '#303030' },
-  timeTextSelf: { fontSize: 11, color: '#667781', marginTop: 4, textAlign: 'right' },
-  timeTextOther: { fontSize: 11, color: '#667781', marginTop: 4, textAlign: 'right' },
-  
-  quickReplyWrapper: { paddingVertical: 16, backgroundColor: '#FFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, elevation: 10 },
-  replySectionTitle: { fontSize: 14, fontWeight: 'bold', color: '#64748B', paddingHorizontal: 16, paddingBottom: 10 },
-  quickReplyScroll: { paddingHorizontal: 16, gap: 12 },
-  replyChip: { paddingVertical: 12, paddingHorizontal: 20, borderRadius: 24, marginRight: 12 },
-  replyText: { color: '#FFF', fontWeight: 'bold', fontSize: 16 },
-
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  pairingModalContainer: { backgroundColor: '#F8FAFC', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 40 },
-  pairingHeader: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, backgroundColor: '#FFF', borderTopLeftRadius: 24, borderTopRightRadius: 24 },
-  pairingHeaderTitle: { fontSize: 20, fontWeight: 'bold', color: '#11427B' },
-  pairingHeaderClose: { fontSize: 16, color: '#FF6B6B', fontWeight: 'bold' },
-  pairingTopSection: { padding: 20, backgroundColor: '#FFF' },
-  pairingLabel: { fontSize: 16, fontWeight: 'bold', color: '#334155', marginBottom: 12 },
-  pairingInputWrapper: { marginTop: 8 },
-  pairingInputLarge: { borderWidth: 2, borderColor: '#CBD5E1', borderRadius: 12, padding: 16, fontSize: 32, letterSpacing: 8, textAlign: 'center', fontWeight: 'bold', color: '#11427B', backgroundColor: '#F1F5F9', marginBottom: 16 },
-  pairingSubmitLarge: { backgroundColor: '#00B5B8', padding: 16, borderRadius: 12, alignItems: 'center' },
-  pairingSubmitTextLarge: { color: '#FFF', fontWeight: 'bold', fontSize: 18 },
-  roleScroll: { gap: 10, paddingBottom: 8 },
-  roleBtn: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1, borderColor: '#CBD5E1', backgroundColor: '#F8FAFC' },
-  roleBtnActive: { borderColor: '#11427B', backgroundColor: '#E0F2FE' },
-  roleText: { color: '#64748B', fontWeight: 'bold' },
-  roleTextActive: { color: '#11427B' }
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    paddingBottom: 60, // Padding for Tab Bar
+  },
+  header: {
+    paddingTop: 60,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#FFF',
+  },
+  flex1: {
+    flex: 1,
+  },
+  listContent: {
+    padding: 16,
+    paddingBottom: 24,
+  },
+  messageBubbleWrapper: {
+    marginBottom: 12,
+    flexDirection: 'row',
+  },
+  wrapperLeft: {
+    justifyContent: 'flex-start',
+  },
+  wrapperRight: {
+    justifyContent: 'flex-end',
+  },
+  messageBubble: {
+    maxWidth: '75%',
+    padding: 12,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+  },
+  bubbleChild: {
+    backgroundColor: '#E0F2FE', // Soft pastel blue
+    borderBottomLeftRadius: 4,
+  },
+  bubbleParent: {
+    backgroundColor: '#11427B', // Navy Blue
+    borderBottomRightRadius: 4,
+  },
+  messageText: {
+    fontSize: 16,
+    marginBottom: 4,
+  },
+  textChild: {
+    color: '#0F172A',
+  },
+  textParent: {
+    color: '#FFFFFF',
+  },
+  timestamp: {
+    fontSize: 10,
+    alignSelf: 'flex-end',
+  },
+  timeChild: {
+    color: '#64748B',
+  },
+  timeParent: {
+    color: '#93C5FD',
+  },
+  inputSection: {
+    backgroundColor: '#FFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    paddingTop: 12,
+    paddingBottom: 16,
+  },
+  quickReplyScroll: {
+    maxHeight: 40,
+    marginBottom: 12,
+  },
+  quickReplyContent: {
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  quickReplyPill: {
+    backgroundColor: '#F1F5F9',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  addPill: {
+    backgroundColor: '#E0F2FE',
+    borderColor: '#BAE6FD',
+  },
+  quickReplyText: {
+    color: '#334155',
+    fontSize: 14,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  textInput: {
+    flex: 1,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#0F172A',
+    maxHeight: 100,
+  },
+  sendButton: {
+    backgroundColor: '#11427B',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 12,
+  },
+  sendButtonDisabled: {
+    backgroundColor: '#94A3B8',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#FFF',
+    width: '85%',
+    borderRadius: 20,
+    padding: 24,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#11427B',
+    marginBottom: 16,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    marginBottom: 20,
+    backgroundColor: '#F8FAFC',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+  },
+  modalBtnCancel: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  modalBtnCancelText: {
+    color: '#64748B',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  modalBtnSave: {
+    backgroundColor: '#00B5B8',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+  },
+  modalBtnSaveText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 16,
+  }
 });
