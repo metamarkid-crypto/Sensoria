@@ -60,14 +60,35 @@ export default function ParentDashboardScreen() {
               iconName = 'cog';
             }
 
-            return <FontAwesome5 name={iconName} size={size} color={color} />;
+            return (
+              <View style={{ position: 'relative', padding: 4 }}>
+                <FontAwesome5 name={iconName} size={size} color={color} />
+                {route.name === 'Pesan' && (
+                  <View style={{
+                    position: 'absolute', top: -4, right: -4, 
+                    backgroundColor: '#FF3B30', width: 16, height: 16, 
+                    borderRadius: 8, justifyContent: 'center', alignItems: 'center',
+                    borderWidth: 1.5, borderColor: '#FFF'
+                  }}>
+                    <Text style={{ color: '#FFF', fontSize: 9, fontWeight: 'bold' }}>2</Text>
+                  </View>
+                )}
+              </View>
+            );
           },
           tabBarActiveTintColor: '#11427B', // Navy Blue for active
           tabBarInactiveTintColor: '#94A3B8', // Gray for inactive
           tabBarStyle: {
             backgroundColor: '#FFFFFF',
-            borderTopWidth: 1,
-            borderTopColor: '#E2E8F0',
+            borderTopWidth: 0,
+            borderTopLeftRadius: 24,
+            borderTopRightRadius: 24,
+            position: 'absolute', // Needed for border radius on bottom tabs
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: 60,
+            paddingBottom: 8,
             elevation: 8,
             shadowColor: '#000',
             shadowOffset: { width: 0, height: -2 },

@@ -1,136 +1,97 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { supabase } from '../../services/db/supabase';
-import { useAACStore } from '../../store/useAACStore';
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { FontAwesome5 } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import Toast from 'react-native-toast-message';
+
+const { width } = Dimensions.get('window');
 
 export default function DynamicParentHeader() {
-  const { deviceId, childProfile } = useAACStore();
-  const [isOnline, setIsOnline] = useState(false);
-  const [lastSeen, setLastSeen] = useState<string | null>(null);
-
-  useEffect(() => {
-    let subscription: any = null;
-
-    const checkStatus = async () => {
-      if (!deviceId) return;
-      
-      const { data: link } = await supabase
-        .from('family_links')
-        .select('child_device_id')
-        .eq('parent_device_id', deviceId)
-        .single();
-        
-      if (!link) return;
-
-      const fetchPresence = async () => {
-        const { data } = await supabase
-          .from('devices')
-          .select('last_seen')
-          .eq('id', link.child_device_id)
-          .single();
-          
-        if (data?.last_seen) {
-          updateOnlineStatus(data.last_seen);
-        }
-      };
-      
-      await fetchPresence();
-
-      subscription = supabase.channel('public:devices')
-        .on('postgres_changes', {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'devices',
-          filter: `id=eq.${link.child_device_id}`
-        }, (payload) => {
-          if (payload.new.last_seen) {
-            updateOnlineStatus(payload.new.last_seen);
-          }
-        })
-        .subscribe();
-    };
-
-    const updateOnlineStatus = (lastSeenTimestamp: string) => {
-      const lastActive = new Date(lastSeenTimestamp);
-      const diffMins = Math.floor((new Date().getTime() - lastActive.getTime()) / 60000);
-      if (diffMins < 5) {
-        setIsOnline(true);
-      } else {
-        setIsOnline(false);
-        setLastSeen(`${diffMins} menit lalu`);
-      }
-    };
-
-    checkStatus();
-
-    return () => {
-      if (subscription) {
-        supabase.removeChannel(subscription);
-      }
-    };
-  }, [deviceId]);
+  const handleSettingsPress = () => {
+    Toast.show({
+      type: 'info',
+      text1: 'Segera Hadir',
+      text2: 'Pengaturan akun Orang Tua sedang dalam tahap pengembangan.',
+      position: 'top',
+    });
+  };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Sensoria</Text>
-      {childProfile?.fullName ? (
-        <View style={styles.statusContainer}>
-          <Text style={styles.childName}>{childProfile.nickname || childProfile.fullName}</Text>
-          <View style={styles.badgeWrapper}>
-            <View style={[styles.dot, { backgroundColor: isOnline ? '#4CAF50' : '#94A3B8' }]} />
-            <Text style={styles.statusText}>
-              {isOnline ? 'Terhubung sekarang' : `Terakhir aktif ${lastSeen || 'baru saja'}`}
-            </Text>
-          </View>
+    <LinearGradient 
+      colors={['#181824', '#11427B', '#007C92']} 
+      style={styles.container}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+    >
+      <View style={styles.headerTop}>
+        <Text style={styles.title}>Beranda</Text>
+        
+        <View style={styles.iconGroup}>
+          <TouchableOpacity style={styles.iconButton}>
+            <FontAwesome5 name="bell" size={20} color="#FFFFFF" />
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>2</Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.iconButton} onPress={handleSettingsPress}>
+            <FontAwesome5 name="cog" size={22} color="#FFFFFF" />
+          </TouchableOpacity>
         </View>
-      ) : (
-        <Text style={styles.noChild}>Belum menautkan anak</Text>
-      )}
-    </View>
+      </View>
+      
+      {/* Empty space to allow the overlapping card to sit on top of the gradient */}
+      <View style={{ height: 60 }} /> 
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#11427B',
-    padding: 16,
+    width: width,
+    paddingTop: 60, // Accommodate safe area status bar manually for seamless gradient
+    paddingHorizontal: 24,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
     paddingBottom: 20,
+    zIndex: 1, // Keep header below the overlapping card on Android if needed, wait, the card will have zIndex 10.
+  },
+  headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-end',
+    alignItems: 'center',
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: '900',
-    color: '#FFF',
-    letterSpacing: 1,
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
-  statusContainer: {
-    alignItems: 'flex-end',
-  },
-  childName: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  badgeWrapper: {
+  iconGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
+    gap: 16,
   },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
+  iconButton: {
+    position: 'relative',
+    padding: 4,
   },
-  statusText: {
-    color: '#E2E8F0',
-    fontSize: 12,
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#FF3B30',
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#11427B',
   },
-  noChild: {
-    color: '#E2E8F0',
-    fontStyle: 'italic',
-    fontSize: 12,
+  badgeText: {
+    color: '#FFF',
+    fontSize: 10,
+    fontWeight: 'bold',
   }
 });
