@@ -225,8 +225,6 @@ export default function ParentMessagesScreen() {
         </View>
       </KeyboardAvoidingView>
 
-        </KeyboardAvoidingView>
-
         {/* Add Custom Quick Reply Modal */}
         <Modal visible={isModalVisible} transparent animationType="fade">
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
