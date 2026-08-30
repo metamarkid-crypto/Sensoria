@@ -1,5 +1,7 @@
 import React, { useEffect } from 'react';
 import { View, Text } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { supabase } from '../services/db/supabase';
@@ -16,6 +18,7 @@ const Tab = createBottomTabNavigator();
 
 export default function ParentDashboardScreen() {
   const { pairingCode, language } = useAACStore();
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (!pairingCode) return;
@@ -43,6 +46,7 @@ export default function ParentDashboardScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#F5F7FA' }}>
+      <StatusBar style="light" />
       <Tab.Navigator
         screenOptions={({ route }) => ({
           headerShown: false,
@@ -86,8 +90,8 @@ export default function ParentDashboardScreen() {
             bottom: 0,
             left: 0,
             right: 0,
-            height: 60,
-            paddingBottom: 8,
+            height: 60 + insets.bottom,
+            paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
             elevation: 8,
             shadowColor: '#000',
             shadowOffset: { width: 0, height: -2 },

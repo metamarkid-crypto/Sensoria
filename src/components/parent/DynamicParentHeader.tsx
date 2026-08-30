@@ -5,19 +5,18 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Toast from 'react-native-toast-message';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Image } from 'react-native';
 
 const { width } = Dimensions.get('window');
 
-export default function DynamicParentHeader() {
+interface HeaderProps {
+  childProfile: any;
+  isOnline: boolean;
+  lastSeen: string | null;
+}
+
+export default function DynamicParentHeader({ childProfile, isOnline, lastSeen }: HeaderProps) {
   const insets = useSafeAreaInsets();
-  const handleSettingsPress = () => {
-    Toast.show({
-      type: 'info',
-      text1: 'Segera Hadir',
-      text2: 'Pengaturan akun Orang Tua sedang dalam tahap pengembangan.',
-      position: 'top',
-    });
-  };
 
   return (
     <LinearGradient 
@@ -27,7 +26,23 @@ export default function DynamicParentHeader() {
       end={{ x: 1, y: 1 }}
     >
       <View style={styles.headerTop}>
-        <Text style={styles.title}>Beranda</Text>
+        <View style={styles.profileSection}>
+          <View style={styles.avatarContainer}>
+            <Image 
+              source={childProfile?.gender === 'Girl' ? require('../../../assets/icon.png') : require('../../../assets/icon.png')} 
+              style={styles.avatarImage} 
+            />
+          </View>
+          <View style={styles.childInfo}>
+            <Text style={styles.childName}>{childProfile?.nickname || childProfile?.fullName || 'Belum ditautkan'}</Text>
+            <View style={styles.statusRow}>
+              <View style={[styles.dot, { backgroundColor: isOnline ? '#34C759' : '#94A3B8' }]} />
+              <Text style={[styles.statusText, { color: isOnline ? '#34C759' : '#94A3B8' }]}>
+                {isOnline ? 'Online' : 'Offline'}
+              </Text>
+            </View>
+          </View>
+        </View>
         
         <View style={styles.iconGroup}>
           <TouchableOpacity style={styles.iconButton}>
@@ -35,10 +50,6 @@ export default function DynamicParentHeader() {
             <View style={styles.badge}>
               <Text style={styles.badgeText}>2</Text>
             </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.iconButton} onPress={handleSettingsPress}>
-            <FontAwesome5 name="cog" size={22} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
       </View>
@@ -63,11 +74,50 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  title: {
-    fontSize: 28,
-    fontWeight: '900',
+  profileSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  avatarContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    borderWidth: 2,
+    borderColor: '#4F46E5',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    resizeMode: 'cover',
+  },
+  childInfo: {
+    justifyContent: 'center',
+  },
+  childName: {
+    fontSize: 22,
+    fontWeight: 'bold',
     color: '#FFFFFF',
-    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  statusText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
   iconGroup: {
     flexDirection: 'row',

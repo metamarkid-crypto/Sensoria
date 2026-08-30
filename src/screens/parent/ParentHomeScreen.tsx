@@ -149,33 +149,10 @@ export default function ParentHomeScreen() {
 
   return (
     <View style={styles.container}>
-      <DynamicParentHeader />
+      <DynamicParentHeader childProfile={childProfile} isOnline={isOnline} lastSeen={lastSeen} />
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} bounces={false}>
         
-        {/* CHILD STATUS OVERLAPPING CARD */}
-      <View style={styles.overlappingCard}>
-        <View style={styles.avatarContainer}>
-          {/* Fallback to local boy/girl avatar based on childProfile */}
-          <Image 
-            source={childProfile?.gender === 'Girl' ? require('../../../assets/icon.png') : require('../../../assets/icon.png')} 
-            style={styles.avatarImage} 
-          />
-        </View>
-        <View style={styles.childInfo}>
-          <Text style={styles.childName}>{childProfile?.nickname || childProfile?.fullName || 'Belum ditautkan'}</Text>
-          <View style={styles.statusRow}>
-            <View style={[styles.dot, { backgroundColor: isOnline ? '#34C759' : '#94A3B8' }]} />
-            <Text style={[styles.statusText, { color: isOnline ? '#34C759' : '#94A3B8' }]}>
-              {isOnline ? 'Terhubung sekarang' : 'Offline'}
-            </Text>
-          </View>
-          <Text style={styles.lastSeenText}>
-            Terakhir aktif: {isOnline ? 'Sekarang' : (lastSeen || 'Belum diketahui')}
-          </Text>
-        </View>
-      </View>
-
-      {/* WIDGET A: Pesan Terbaru */}
+        {/* WIDGET A: Pesan Terbaru */}
       <View style={styles.card}>
         <View style={styles.messageHeader}>
           <View style={styles.messageTitleRow}>
@@ -241,26 +218,30 @@ export default function ParentHomeScreen() {
       <View style={styles.row}>
         <View style={[styles.card, styles.halfCard]}>
           <TouchableOpacity onPress={() => navigation.navigate('Lokasi')} activeOpacity={0.8}>
-            <View style={styles.summaryTop}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <View style={[styles.summaryIconBox, { backgroundColor: '#D1FAE5' }]}>
-                <FontAwesome5 name="map-marker-alt" size={20} color="#059669" />
+                <FontAwesome5 name="map-marker-alt" size={24} color="#059669" />
               </View>
-              <Text style={styles.summaryTitle}>Lokasi Sekarang</Text>
+              <View style={{ marginLeft: 12, flex: 1 }}>
+                <Text style={styles.summaryTitle} numberOfLines={1} adjustsFontSizeToFit>Lokasi Sekarang</Text>
+                <Text style={styles.summaryValue} numberOfLines={1}>{currentAddress}</Text>
+                <Text style={styles.summarySub} numberOfLines={1}>Area aman</Text>
+              </View>
             </View>
-            <Text style={styles.summaryValue} numberOfLines={1}>{currentAddress}</Text>
-            <Text style={styles.summarySub}>Area aman</Text>
           </TouchableOpacity>
         </View>
 
         <View style={[styles.card, styles.halfCard]}>
-          <View style={styles.summaryTop}>
-            <View style={[styles.summaryIconBox, { backgroundColor: '#E0F2FE', padding: 0 }]}>
-              <FontAwesome5 name="chart-bar" size={20} color="#0284C7" />
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={[styles.summaryIconBox, { backgroundColor: '#E0F2FE' }]}>
+              <FontAwesome5 name="chart-bar" size={24} color="#0284C7" />
             </View>
-            <Text style={styles.summaryTitle}>Aktivitas Hari Ini</Text>
+            <View style={{ marginLeft: 12, flex: 1 }}>
+              <Text style={styles.summaryTitle} numberOfLines={1} adjustsFontSizeToFit>Aktivitas Hari Ini</Text>
+              <Text style={styles.summaryValueDark} numberOfLines={1}>{todayMessageCount}</Text>
+              <Text style={styles.summarySubDark} numberOfLines={1} adjustsFontSizeToFit>Pesan disampaikan</Text>
+            </View>
           </View>
-          <Text style={styles.summaryValueDark}>{todayMessageCount}</Text>
-          <Text style={styles.summarySubDark}>Pesan disampaikan</Text>
         </View>
       </View>
 
@@ -337,60 +318,6 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingTop: 24,
     paddingBottom: 40,
-  },
-  overlappingCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-    // Note: Removed zIndex and elevation from here since they are now on the parent ScrollView
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-  },
-  avatarContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#E2E8F0',
-    marginRight: 16,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: '#F1F5F9',
-  },
-  avatarImage: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  childInfo: {
-    flex: 1,
-  },
-  childName: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: '#11427B',
-    marginBottom: 2,
-  },
-  statusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 2,
-  },
-  dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginRight: 6,
-  },
-  statusText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  lastSeenText: {
-    fontSize: 12,
-    color: '#94A3B8',
   },
   card: {
     backgroundColor: '#FFFFFF',
@@ -514,13 +441,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   summaryTitle: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 'bold',
     color: '#11427B',
     flex: 1,
   },
   summaryValue: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '900',
     color: '#059669',
   },
@@ -535,7 +462,7 @@ const styles = StyleSheet.create({
     color: '#0F172A',
   },
   summarySubDark: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#64748B',
   },
   grid: {
@@ -545,7 +472,7 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   gridItem: {
-    width: '30%',
+    width: '22%',
     alignItems: 'center',
     marginBottom: 8,
   },
@@ -558,8 +485,9 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   gridText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 'bold',
+    textAlign: 'center',
   },
   emptyText: {
     textAlign: 'center',
