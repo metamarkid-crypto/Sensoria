@@ -1,169 +1,335 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Dimensions, ActivityIndicator } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, Dimensions, ScrollView, TouchableOpacity, Image, Modal, TextInput, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import MapView, { Marker, Circle, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { supabase } from '../../services/db/supabase';
 import { useAACStore } from '../../store/useAACStore';
-import * as Location from 'expo-location';
+import * as Haptics from 'expo-haptics';
 
 const { width, height } = Dimensions.get('window');
 
+// 1. Haversine Distance Utility
+function getDistanceFromLatLonInMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371e3; // Radius of the earth in m
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+  const d = R * c; // Distance in m
+  return d;
+}
+
 export default function ParentLocationScreen() {
   const insets = useSafeAreaInsets();
-  const { deviceId, childProfile } = useAACStore();
+  const { childProfile, childStatus } = useAACStore();
   
-  const [childLocation, setChildLocation] = useState<any>(null);
-  const [address, setAddress] = useState<string>('Mencari lokasi...');
-  const [loading, setLoading] = useState(true);
+  // JSONB Global State: Read from childProfile.settings.safeZones
+  const safeZones = childProfile?.settings?.safeZones || [];
+  
+  const [isAddModalVisible, setAddModalVisible] = useState(false);
+  const [newZoneName, setNewZoneName] = useState('');
+  const [newZoneRadius, setNewZoneRadius] = useState('100');
+  
+  // Smart Add Modal auto-fills with current child coordinates
+  const [newZoneLat, setNewZoneLat] = useState(childStatus.lat ? childStatus.lat.toString() : '');
+  const [newZoneLng, setNewZoneLng] = useState(childStatus.lng ? childStatus.lng.toString() : '');
 
-  useEffect(() => {
-    if (!deviceId) return;
+  const childLat = childStatus.lat || -6.200000;
+  const childLng = childStatus.lng || 106.816666;
+  const avatarSource = childProfile?.gender === 'Girl' ? require('../../../assets/icon.png') : require('../../../assets/icon.png');
+  const fullName = childProfile?.fullName || childProfile?.name || childProfile?.nickname || 'Anak';
 
-    const fetchChildLocation = async () => {
-      // Find linked child
-      const { data: link } = await supabase
-        .from('family_links')
-        .select('child_device_id')
-        .eq('parent_device_id', deviceId)
-        .single();
+  // Geofencing Logic
+  let activeZone = null;
+  if (childStatus.lat && childStatus.lng) {
+    for (const zone of safeZones) {
+      const dist = getDistanceFromLatLonInMeters(childStatus.lat, childStatus.lng, zone.lat, zone.lng);
+      if (dist <= zone.radius) {
+        activeZone = zone;
+        break;
+      }
+    }
+  }
+
+  const handleRefreshLocation = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    // In a real app, this would ping the child's device via Supabase Broadcast to force a GPS update.
+    Alert.alert('Permintaan Terkirim', 'Meminta pembaruan lokasi dari perangkat anak...');
+  };
+
+  const openAddModal = () => {
+    Haptics.selectionAsync();
+    // CRITICAL UX: Auto-fill coordinates
+    if (childStatus.lat && childStatus.lng) {
+      setNewZoneLat(childStatus.lat.toString());
+      setNewZoneLng(childStatus.lng.toString());
+    }
+    setNewZoneName('');
+    setNewZoneRadius('100');
+    setAddModalVisible(true);
+  };
+
+  const handleSaveZone = async () => {
+    if (!newZoneName.trim() || !newZoneLat || !newZoneLng || !newZoneRadius) {
+      Alert.alert('Error', 'Harap isi semua kolom.');
+      return;
+    }
+    
+    if (!childProfile?.device_id) {
+      Alert.alert('Error', 'Profil anak tidak ditemukan.');
+      return;
+    }
+
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    
+    const newZone = {
+      id: Date.now().toString(),
+      name: newZoneName.trim(),
+      lat: parseFloat(newZoneLat),
+      lng: parseFloat(newZoneLng),
+      radius: parseFloat(newZoneRadius)
+    };
+
+    const updatedSafeZones = [...safeZones, newZone];
+    const mergedSettings = { ...(childProfile.settings || {}), safeZones: updatedSafeZones };
+
+    // The Universal Sync Mutation (CRUD for Safe Zones)
+    try {
+      const { error } = await supabase
+        .from('child_profiles')
+        .update({ settings: mergedSettings })
+        .eq('device_id', childProfile.device_id);
         
-      if (!link) {
-        setLoading(false);
-        return;
-      }
+      if (error) throw error;
+      
+      // Update local state to reflect immediately before Supabase Postgres Changes kicks in
+      useAACStore.setState({
+        childProfile: { ...childProfile, settings: mergedSettings }
+      });
+      
+    } catch (error) {
+      console.error('Failed to sync Safe Zones:', error);
+      Alert.alert('Gagal', 'Tidak dapat menyimpan Area Aman ke server.');
+    }
+    
+    setAddModalVisible(false);
+  };
 
-      // Fetch location
-      const { data: device } = await supabase
-        .from('devices')
-        .select('latitude, longitude, last_seen')
-        .eq('id', link.child_device_id)
-        .single();
+  const handleDeleteZone = async (zoneId: string) => {
+    Alert.alert(
+      'Hapus Area Aman',
+      'Apakah Anda yakin ingin menghapus area ini?',
+      [
+        { text: 'Batal', style: 'cancel' },
+        { 
+          text: 'Hapus', 
+          style: 'destructive',
+          onPress: async () => {
+            if (!childProfile?.device_id) return;
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-      if (device && device.latitude && device.longitude) {
-        setChildLocation(device);
-        // Reverse geocode
-        try {
-          const geocode = await Location.reverseGeocodeAsync({
-            latitude: device.latitude,
-            longitude: device.longitude
-          });
-          
-          if (geocode && geocode.length > 0) {
-            const addr = geocode[0];
-            setAddress(`${addr.street || addr.name}, ${addr.city || addr.region}`);
-          } else {
-            setAddress('Lokasi ditemukan');
-          }
-        } catch (e) {
-          setAddress('Koordinat GPS tersedia');
-        }
-      }
-      setLoading(false);
-    };
+            const updatedSafeZones = safeZones.filter((z: any) => z.id !== zoneId);
+            const mergedSettings = { ...(childProfile.settings || {}), safeZones: updatedSafeZones };
 
-    fetchChildLocation();
-
-    // Set up real-time listener for location updates
-    let presenceSub: any = null;
-    const setupListener = async () => {
-      const { data: link } = await supabase.from('family_links').select('child_device_id').eq('parent_device_id', deviceId).single();
-      if (!link) return;
-
-      presenceSub = supabase.channel('location_updates')
-        .on('postgres_changes', {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'devices',
-          filter: `id=eq.${link.child_device_id}`
-        }, async (payload) => {
-          if (payload.new.latitude && payload.new.longitude) {
-            setChildLocation(payload.new);
             try {
-              const geocode = await Location.reverseGeocodeAsync({
-                latitude: payload.new.latitude,
-                longitude: payload.new.longitude
+              const { error } = await supabase
+                .from('child_profiles')
+                .update({ settings: mergedSettings })
+                .eq('device_id', childProfile.device_id);
+                
+              if (error) throw error;
+              
+              useAACStore.setState({
+                childProfile: { ...childProfile, settings: mergedSettings }
               });
-              if (geocode && geocode.length > 0) {
-                const addr = geocode[0];
-                setAddress(`${addr.street || addr.name}, ${addr.city || addr.region}`);
-              }
-            } catch (e) {}
+              
+            } catch (error) {
+              console.error('Failed to delete Safe Zone:', error);
+              Alert.alert('Gagal', 'Tidak dapat menghapus Area Aman dari server.');
+            }
           }
-        }).subscribe();
-    };
-
-    setupListener();
-
-    return () => {
-      if (presenceSub) supabase.removeChannel(presenceSub);
-    };
-  }, [deviceId]);
-
-  if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#00B5B8" />
-        <Text style={{ marginTop: 12, color: '#11427B', fontWeight: 'bold' }}>Melacak Perangkat Anak...</Text>
-      </View>
+        }
+      ]
     );
-  }
-
-  if (!childLocation) {
-    return (
-      <View style={styles.center}>
-        <FontAwesome5 name="map-marker-slash" size={48} color="#94A3B8" />
-        <Text style={styles.emptyText}>Data lokasi anak belum tersedia.</Text>
-        <Text style={styles.emptySubText}>Pastikan aplikasi anak sedang aktif.</Text>
-      </View>
-    );
-  }
+  };
 
   return (
     <View style={styles.container}>
-      <MapView
-        style={styles.map}
-        initialRegion={{
-          latitude: childLocation.latitude,
-          longitude: childLocation.longitude,
-          latitudeDelta: 0.005,
-          longitudeDelta: 0.005,
-        }}
-        showsUserLocation={true} // Shows parent's location too
-      >
-        <Marker
-          coordinate={{
-            latitude: childLocation.latitude,
-            longitude: childLocation.longitude,
+      {/* 2. Top Map (Absolute positioned behind ScrollView) */}
+      <View style={styles.mapContainer}>
+        <MapView
+          style={styles.map}
+          initialRegion={{
+            latitude: childLat,
+            longitude: childLng,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
           }}
-          title={childProfile?.nickname || "Anak"}
-          description="Lokasi Terakhir"
+          // Note: Android requires API key in app.json for Google Maps
         >
-          <View style={styles.customMarker}>
-            <Text style={styles.markerEmoji}>{childProfile?.gender === 'Girl' ? '👧🏻' : '👦🏻'}</Text>
-          </View>
-          <View style={styles.markerTriangle} />
-        </Marker>
-      </MapView>
+          {/* Custom Marker */}
+          <Marker coordinate={{ latitude: childLat, longitude: childLng }} zIndex={2}>
+            <View style={styles.customMarker}>
+              <Image source={avatarSource} style={styles.markerAvatar} />
+            </View>
+          </Marker>
 
-      {/* Floating Info Card */}
-      <View style={[styles.infoCard, { bottom: insets.bottom + 80 }]}>
-        <View style={styles.cardHeader}>
-          <FontAwesome5 name="map-marker-alt" size={20} color="#00B5B8" />
-          <Text style={styles.cardTitle}>Lokasi Terakhir</Text>
-        </View>
-        <Text style={styles.addressText}>{address}</Text>
-        
-        <View style={styles.statusRow}>
-          <View style={styles.safeZoneBadge}>
-            <View style={styles.dot} />
-            <Text style={styles.safeZoneText}>Area Aman</Text>
-          </View>
-          <Text style={styles.timeText}>
-            Diperbarui: {new Date(childLocation.last_seen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </Text>
-        </View>
+          {/* Safe Zone Circles */}
+          {safeZones.map(zone => (
+            <Circle
+              key={zone.id}
+              center={{ latitude: zone.lat, longitude: zone.lng }}
+              radius={zone.radius}
+              fillColor="rgba(59, 130, 246, 0.2)"
+              strokeColor="rgba(59, 130, 246, 0.8)"
+              strokeWidth={2}
+              zIndex={1}
+            />
+          ))}
+        </MapView>
       </View>
+
+      {/* Bottom Scrollable Content */}
+      <ScrollView 
+        style={styles.scrollView} 
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Overlapping Card */}
+        <View style={styles.overlappingCard}>
+          <View style={styles.cardTopRow}>
+            <Image source={avatarSource} style={styles.cardAvatar} />
+            <View style={styles.cardHeaderInfo}>
+              <Text style={styles.cardName} numberOfLines={1}>{fullName}</Text>
+              
+              {/* Dynamic Safe Zone Status */}
+              <View style={styles.statusBadgeRow}>
+                {activeZone ? (
+                  <>
+                    <FontAwesome5 name="check-circle" size={14} color="#059669" />
+                    <Text style={styles.statusBadgeTextSafe}>Di area aman: {activeZone.name}</Text>
+                  </>
+                ) : (
+                  <>
+                    <FontAwesome5 name="exclamation-circle" size={14} color="#DC2626" />
+                    <Text style={styles.statusBadgeTextDanger}>Di luar area aman</Text>
+                  </>
+                )}
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.divider} />
+
+          <Text style={styles.locationLabel}>Lokasi Terakhir</Text>
+          <Text style={styles.locationAddress} numberOfLines={2}>
+            {childStatus.lastAddress || 'Belum ada data alamat'}
+          </Text>
+          <Text style={styles.timestamp}>
+            Pembaruan terakhir: {childStatus.lastSeen ? childStatus.lastSeen : 'Belum diketahui'}
+          </Text>
+
+          <TouchableOpacity style={styles.refreshButton} onPress={handleRefreshLocation} activeOpacity={0.8}>
+            <FontAwesome5 name="sync-alt" size={14} color="#FFF" style={{ marginRight: 8 }} />
+            <Text style={styles.refreshButtonText}>Perbarui Lokasi</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Safe Zone List */}
+        <View style={styles.zonesHeaderRow}>
+          <Text style={styles.zonesTitle}>Area Aman</Text>
+          <TouchableOpacity style={styles.manageBtn} onPress={openAddModal}>
+            <Text style={styles.manageBtnText}>Kelola</Text>
+            <FontAwesome5 name="cog" size={12} color="#3B82F6" />
+          </TouchableOpacity>
+        </View>
+
+        {safeZones.map(zone => {
+          const isCurrentlyHere = activeZone?.id === zone.id;
+          return (
+            <View key={zone.id} style={styles.zoneItem}>
+              <View style={styles.zoneIconWrap}>
+                <FontAwesome5 name="shield-alt" size={16} color={isCurrentlyHere ? "#059669" : "#64748B"} />
+              </View>
+              <View style={styles.zoneInfo}>
+                <Text style={styles.zoneName}>{zone.name}</Text>
+                <Text style={styles.zoneRadius}>Radius: {zone.radius} meter</Text>
+              </View>
+              {isCurrentlyHere && (
+                <View style={styles.activeZoneTag}>
+                  <Text style={styles.activeZoneText}>Aktif</Text>
+                </View>
+              )}
+              <TouchableOpacity onPress={() => handleDeleteZone(zone.id)} style={styles.deleteZoneBtn}>
+                <FontAwesome5 name="trash" size={14} color="#EF4444" />
+              </TouchableOpacity>
+            </View>
+          );
+        })}
+      </ScrollView>
+
+      {/* Smart Add Modal */}
+      <Modal visible={isAddModalVisible} transparent animationType="fade">
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Tambah Area Aman</Text>
+              <TouchableOpacity onPress={() => setAddModalVisible(false)}>
+                <FontAwesome5 name="times" size={20} color="#94A3B8" />
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.inputLabel}>Nama Tempat</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Misal: Rumah Nenek"
+              value={newZoneName}
+              onChangeText={setNewZoneName}
+            />
+            
+            <View style={styles.rowInputs}>
+              <View style={styles.flex1}>
+                <Text style={styles.inputLabel}>Latitude</Text>
+                <TextInput
+                  style={[styles.modalInput, styles.inputDisabled]}
+                  value={newZoneLat}
+                  onChangeText={setNewZoneLat}
+                  keyboardType="numeric"
+                  editable={false} // Auto-filled
+                />
+              </View>
+              <View style={{ width: 12 }} />
+              <View style={styles.flex1}>
+                <Text style={styles.inputLabel}>Longitude</Text>
+                <TextInput
+                  style={[styles.modalInput, styles.inputDisabled]}
+                  value={newZoneLng}
+                  onChangeText={setNewZoneLng}
+                  keyboardType="numeric"
+                  editable={false} // Auto-filled
+                />
+              </View>
+            </View>
+
+            <Text style={styles.inputLabel}>Radius (Meter)</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={newZoneRadius}
+              onChangeText={setNewZoneRadius}
+              keyboardType="numeric"
+            />
+
+            <TouchableOpacity style={styles.saveBtn} onPress={handleSaveZone}>
+              <Text style={styles.saveBtnText}>Simpan Area</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
     </View>
   );
 }
@@ -173,119 +339,264 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
-  center: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+  mapContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: height * 0.45,
+    zIndex: 0,
   },
   map: {
-    width: width,
-    height: height,
+    width: '100%',
+    height: '100%',
   },
   customMarker: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#FFF',
-    padding: 8,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: '#00B5B8',
-    elevation: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#3B82F6',
+    elevation: 5,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.3,
     shadowRadius: 4,
   },
-  markerEmoji: {
-    fontSize: 24,
+  markerAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
   },
-  markerTriangle: {
-    width: 0,
-    height: 0,
-    backgroundColor: 'transparent',
-    borderStyle: 'solid',
-    borderLeftWidth: 8,
-    borderRightWidth: 8,
-    borderBottomWidth: 12,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderBottomColor: '#00B5B8',
-    alignSelf: 'center',
-    transform: [{ rotate: '180deg' }],
-    marginTop: -2,
+  scrollView: {
+    flex: 1,
+    zIndex: 1,
   },
-  infoCard: {
-    position: 'absolute',
-    left: 20,
-    right: 20,
+  scrollContent: {
+    paddingTop: (height * 0.45) - 40, // Push content down to expose map, with negative margin overlap
+    paddingHorizontal: 16,
+  },
+  overlappingCard: {
     backgroundColor: '#FFF',
-    borderRadius: 20,
+    borderRadius: 24,
     padding: 20,
     elevation: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 12,
+    marginBottom: 24,
   },
-  cardHeader: {
+  cardTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
-    gap: 10,
   },
-  cardTitle: {
+  cardAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#F1F5F9',
+    marginRight: 16,
+  },
+  cardHeaderInfo: {
+    flex: 1,
+  },
+  cardName: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#0F172A',
+    marginBottom: 4,
+  },
+  statusBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  statusBadgeTextSafe: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#64748B',
-    textTransform: 'uppercase',
+    color: '#059669',
   },
-  addressText: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: '#11427B',
+  statusBadgeTextDanger: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#DC2626',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#F1F5F9',
+    marginVertical: 16,
+  },
+  locationLabel: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#94A3B8',
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  locationAddress: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1E293B',
+    marginBottom: 8,
+  },
+  timestamp: {
+    fontSize: 12,
+    color: '#64748B',
     marginBottom: 16,
   },
-  statusRow: {
+  refreshButton: {
+    backgroundColor: '#2563EB',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 16,
+  },
+  refreshButtonText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  zonesHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-    paddingTop: 16,
+    marginBottom: 16,
+    paddingHorizontal: 4,
   },
-  safeZoneBadge: {
+  zonesTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#0F172A',
+  },
+  manageBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#D1FAE5',
-    paddingVertical: 6,
+    backgroundColor: '#EFF6FF',
     paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    gap: 6,
+  },
+  manageBtnText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#3B82F6',
+  },
+  zoneItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF',
+    padding: 16,
     borderRadius: 16,
+    marginBottom: 12,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
   },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#059669',
-    marginRight: 6,
+  zoneIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#F8FAFC',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
   },
-  safeZoneText: {
+  zoneInfo: {
+    flex: 1,
+  },
+  zoneName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1E293B',
+    marginBottom: 2,
+  },
+  zoneRadius: {
+    fontSize: 12,
+    color: '#64748B',
+  },
+  activeZoneTag: {
+    backgroundColor: '#D1FAE5',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  activeZoneText: {
     color: '#059669',
     fontWeight: 'bold',
     fontSize: 12,
   },
-  timeText: {
-    fontSize: 12,
-    color: '#94A3B8',
-    fontWeight: 'bold',
+  deleteZoneBtn: {
+    padding: 8,
+    marginLeft: 8,
   },
-  emptyText: {
-    marginTop: 16,
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#FFF',
+    width: '90%',
+    borderRadius: 24,
+    padding: 24,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#334155',
+    color: '#0F172A',
   },
-  emptySubText: {
-    marginTop: 8,
-    fontSize: 14,
+  inputLabel: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#64748B',
+    marginBottom: 6,
+    marginLeft: 4,
+  },
+  modalInput: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 16,
+    color: '#0F172A',
+    marginBottom: 16,
+  },
+  inputDisabled: {
+    backgroundColor: '#F1F5F9',
     color: '#94A3B8',
+  },
+  rowInputs: {
+    flexDirection: 'row',
+  },
+  flex1: {
+    flex: 1,
+  },
+  saveBtn: {
+    backgroundColor: '#2563EB',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  saveBtnText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 16,
   }
 });

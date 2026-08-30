@@ -11,7 +11,7 @@ import * as Haptics from 'expo-haptics';
 
 export default function ParentMessagesScreen() {
   const insets = useSafeAreaInsets();
-  const { pairingCode, customQuickReplies, addCustomQuickReply, removeCustomQuickReply } = useAACStore();
+  const { pairingCode, customQuickReplies, addCustomQuickReply, removeCustomQuickReply, localParentName } = useAACStore();
   
   const [messages, setMessages] = useState<any[]>([]);
   const [inputText, setInputText] = useState('');
@@ -24,8 +24,6 @@ export default function ParentMessagesScreen() {
   const [isInputVisible, setIsInputVisible] = useState(false);
   
   const flatListRef = useRef<FlatList>(null);
-
-  const CURRENT_USER_NAME = 'Orang Tua';
 
   // 1. Data Fetching and Real-Time Sync (SAFE - NO TTS TRIGGER)
   // NOTE: This Parent UI listener only updates the visual FlatList.
@@ -67,7 +65,7 @@ export default function ParentMessagesScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await sendAACMessage(pairingCode, {
       sender: 'Parent',
-      senderName: CURRENT_USER_NAME,
+      senderName: localParentName,
       text: text.trim(),
       timestamp: Date.now()
     });
@@ -107,7 +105,7 @@ export default function ParentMessagesScreen() {
 
   const renderMessage = ({ item }: { item: any }) => {
     const isChild = item.sender_role === 'Child';
-    const isCurrentUser = item.senderName === CURRENT_USER_NAME;
+    const isCurrentUser = item.senderName === localParentName;
     const isOtherParent = !isChild && !isCurrentUser;
 
     let bubbleStyle = styles.bubbleChild;
@@ -236,6 +234,7 @@ export default function ParentMessagesScreen() {
               placeholder="Misal: Kakak sedang di jalan..."
               value={newReplyText}
               onChangeText={setNewReplyText}
+              maxLength={60}
               autoFocus
             />
             <View style={styles.modalActions}>

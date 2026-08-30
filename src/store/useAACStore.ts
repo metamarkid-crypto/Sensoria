@@ -65,7 +65,16 @@ export interface AACState {
   customQuickReplies: string[];
   
   // Ephemeral Real-Time Status
-  childStatus: { isOnline: boolean; lastSeen: string | null };
+  childStatus: { 
+    isOnline: boolean; 
+    lastSeen: string | null;
+    lat: number | null;
+    lng: number | null;
+    lastAddress: string | null;
+  };
+  
+  // Parent Identity
+  localParentName: string;
 
   // Actions
   setHasSeenOnboarding: (status: boolean) => void;
@@ -97,7 +106,8 @@ export interface AACState {
   addCustomQuickReply: (text: string) => void;
   removeCustomQuickReply: (text: string) => void;
   
-  setChildStatus: (isOnline: boolean, lastSeen: string | null) => void;
+  setChildStatus: (status: Partial<AACState['childStatus']>) => void;
+  setLocalParentName: (name: string) => void;
 }
 
 export const useAACStore = create<AACState>()(
@@ -128,7 +138,8 @@ export const useAACStore = create<AACState>()(
       
       aboutContent: null,
       customQuickReplies: ['❤️ Mama di sini', '⏳ Tunggu sebentar ya', '🍎 Makan dulu yuk'],
-      childStatus: { isOnline: false, lastSeen: null },
+      childStatus: { isOnline: false, lastSeen: null, lat: null, lng: null, lastAddress: null },
+      localParentName: 'Orang Tua',
       
       setHasSeenOnboarding: (status) => set({ hasSeenOnboarding: status }),
       setRole: (role) => set({ role }),
@@ -164,7 +175,10 @@ export const useAACStore = create<AACState>()(
       removeCustomQuickReply: (text) => set((state) => ({
         customQuickReplies: state.customQuickReplies.filter(reply => reply !== text)
       })),
-      setChildStatus: (isOnline, lastSeen) => set({ childStatus: { isOnline, lastSeen } }),
+      setChildStatus: (status) => set((state) => ({ 
+        childStatus: { ...state.childStatus, ...status } 
+      })),
+      setLocalParentName: (name) => set({ localParentName: name }),
     }),
     { 
       name: 'aac-storage',

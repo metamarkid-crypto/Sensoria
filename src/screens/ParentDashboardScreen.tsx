@@ -59,20 +59,26 @@ export default function ParentDashboardScreen() {
         
       if (!link) return;
 
-      const updateOnlineStatus = (lastSeenTimestamp: string) => {
+      const updateOnlineStatus = (lastSeenTimestamp: string, lat: number | null, lng: number | null, lastAddress: string | null) => {
         const lastActive = new Date(lastSeenTimestamp);
         const diffMins = Math.floor((new Date().getTime() - lastActive.getTime()) / 60000);
+        
+        let isOnline = false;
+        let lastSeenStr = 'Sekarang';
+        
         if (diffMins < 5) {
-          setChildStatus(true, 'Sekarang');
+          isOnline = true;
         } else {
-          setChildStatus(false, `${diffMins} menit lalu`);
+          lastSeenStr = `${diffMins} menit lalu`;
         }
+        
+        setChildStatus({ isOnline, lastSeen: lastSeenStr, lat, lng, lastAddress });
       };
 
       const fetchPresence = async () => {
-        const { data } = await supabase.from('devices').select('last_seen').eq('id', link.child_device_id).single();
+        const { data } = await supabase.from('devices').select('last_seen, latitude, longitude, last_address').eq('id', link.child_device_id).single();
         if (data && data.last_seen) {
-          updateOnlineStatus(data.last_seen);
+          updateOnlineStatus(data.last_seen, data.latitude, data.longitude, data.last_address);
         }
       };
       await fetchPresence();
@@ -84,7 +90,9 @@ export default function ParentDashboardScreen() {
           table: 'devices',
           filter: `id=eq.${link.child_device_id}`
         }, (payload) => {
-          if (payload.new.last_seen) updateOnlineStatus(payload.new.last_seen);
+          if (payload.new.last_seen) {
+            updateOnlineStatus(payload.new.last_seen, payload.new.latitude, payload.new.longitude, payload.new.last_address);
+          }
         }).subscribe();
     };
 
