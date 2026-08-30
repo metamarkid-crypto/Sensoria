@@ -159,26 +159,13 @@ export default function ParentMessagesScreen() {
           keyExtractor={(item) => item.id.toString()}
           renderItem={renderMessage}
           contentContainerStyle={styles.listContent}
+          style={styles.listStyle}
           inverted={true}
           showsVerticalScrollIndicator={false}
         />
 
         <View style={styles.inputSection}>
-          {/* Toggle Button for Text Input */}
-          <View style={styles.toggleRow}>
-            <TouchableOpacity 
-              style={styles.toggleBtn}
-              onPress={() => setIsInputVisible(!isInputVisible)}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.toggleText}>
-                {isInputVisible ? 'Sembunyikan Papan Ketik' : 'Tulis Pesan Manual'}
-              </Text>
-              <FontAwesome5 name={isInputVisible ? "chevron-down" : "chevron-up"} size={12} color="#94A3B8" />
-            </TouchableOpacity>
-          </View>
-
-          {/* Custom Quick Replies */}
+          {/* Custom Quick Replies (Moved above toggle) */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.quickReplyScroll} contentContainerStyle={styles.quickReplyContent}>
             {customQuickReplies.map((reply, index) => (
               <TouchableOpacity 
@@ -200,17 +187,31 @@ export default function ParentMessagesScreen() {
             </TouchableOpacity>
           </ScrollView>
 
+          {/* Toggle Button for Text Input */}
+          <View style={styles.toggleRow}>
+            <TouchableOpacity 
+              style={styles.toggleBtn}
+              onPress={() => setIsInputVisible(!isInputVisible)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.toggleText}>
+                {isInputVisible ? 'Tutup Papan Ketik' : 'Tulis Pesan Manual'}
+              </Text>
+              <FontAwesome5 name={isInputVisible ? "chevron-down" : "chevron-up"} size={12} color="#94A3B8" />
+            </TouchableOpacity>
+          </View>
+
           {/* Main Input Area (Toggleable) */}
           {isInputVisible && (
             <View style={styles.inputRow}>
               <TextInput
                 style={styles.textInput}
-                placeholder="Tulis pesan (maks 60 kar)..."
+                placeholder="Ketik (Maks 20 huruf)..."
                 placeholderTextColor="#94A3B8"
                 value={inputText}
                 onChangeText={setInputText}
                 onSubmitEditing={() => handleSend(inputText)}
-                maxLength={60} // Cognitive Load Limit
+                maxLength={20} // Enforced 20 char limit per user request
               />
               <TouchableOpacity 
                 style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]} 
@@ -261,8 +262,17 @@ const styles = StyleSheet.create({
   flex1: {
     flex: 1,
   },
+  listStyle: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    marginTop: -60,
+    zIndex: 10,
+    elevation: 5,
+  },
   listContent: {
     padding: 16,
+    paddingTop: 24, // extra padding for the rounded top
     paddingBottom: 24,
   },
   messageBubbleWrapper: {

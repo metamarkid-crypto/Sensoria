@@ -210,30 +210,30 @@ export default function ParentHomeScreen() {
           
           <TouchableOpacity style={styles.gridItem}>
             <View style={[styles.gridIconBox, { backgroundColor: '#DCFCE7' }]}>
-              <FontAwesome5 name="puzzle-piece" size={24} color="#16A34A" />
+              <FontAwesome5 name="puzzle-piece" size={20} color="#16A34A" />
             </View>
-            <Text style={[styles.gridText, { color: '#16A34A' }]}>Kosakata</Text>
+            <Text style={[styles.gridText, { color: '#16A34A' }]} numberOfLines={1}>Kosakata</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.gridItem}>
             <View style={[styles.gridIconBox, { backgroundColor: '#FFEDD5' }]}>
-              <FontAwesome5 name="sun" size={24} color="#EA580C" />
+              <FontAwesome5 name="sun" size={20} color="#EA580C" />
             </View>
-            <Text style={[styles.gridText, { color: '#EA580C' }]}>Rutinitas</Text>
+            <Text style={[styles.gridText, { color: '#EA580C' }]} numberOfLines={1}>Rutinitas</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.gridItem} onPress={() => navigation.navigate('VoiceSettings')}>
             <View style={[styles.gridIconBox, { backgroundColor: '#F3E8FF' }]}>
-              <FontAwesome5 name="volume-up" size={24} color="#9333EA" />
+              <FontAwesome5 name="volume-up" size={20} color="#9333EA" />
             </View>
-            <Text style={[styles.gridText, { color: '#9333EA' }]}>Suara</Text>
+            <Text style={[styles.gridText, { color: '#9333EA' }]} numberOfLines={1}>Suara</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.gridItem} onPress={() => navigation.navigate('AppearanceSettings')}>
             <View style={[styles.gridIconBox, { backgroundColor: '#EEF2FF' }]}>
-              <FontAwesome5 name="palette" size={24} color="#4F46E5" />
+              <FontAwesome5 name="palette" size={20} color="#4F46E5" />
             </View>
-            <Text style={[styles.gridText, { color: '#4F46E5' }]}>Tampilan</Text>
+            <Text style={[styles.gridText, { color: '#4F46E5' }]} numberOfLines={1}>Tampilan</Text>
           </TouchableOpacity>
 
         </View>
@@ -531,25 +531,24 @@ const styles = StyleSheet.create({
   },
   grid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     justifyContent: 'space-between',
-    gap: 16,
+    alignItems: 'center',
+    paddingHorizontal: 4,
   },
   gridItem: {
-    width: '22%',
     alignItems: 'center',
-    marginBottom: 8,
+    width: '24%', // 4 items per row
   },
   gridIconBox: {
-    width: 64,
-    height: 64,
+    width: 54,
+    height: 54,
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
   },
   gridText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: 'bold',
     textAlign: 'center',
   },

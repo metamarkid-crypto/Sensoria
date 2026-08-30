@@ -66,11 +66,17 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+    backgroundColor: '#F8FAFC', // Or #FFFFFF depending on design
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    marginTop: -60,
+    zIndex: 10,
+    elevation: 5,
   },
   content: {
     padding: 20,
-    paddingTop: 32, // Some top padding so it doesn't hug the header
-    paddingBottom: 100, // Room for bottom tabs
+    paddingTop: 32, 
+    paddingBottom: 100, 
   },
   card: {
     backgroundColor: '#FFFFFF',

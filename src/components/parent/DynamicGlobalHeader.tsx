@@ -22,7 +22,7 @@ export default function DynamicGlobalHeader({ routeName }: HeaderProps) {
 
   // Height Shapeshifting logic
   const isHome = routeName === 'Beranda';
-  const headerHeight = isHome ? 180 : 90 + insets.top;
+  const headerHeight = isHome ? 180 : 120 + insets.top;
 
   const renderHomeContent = () => (
     <View style={styles.headerTop}>
@@ -58,17 +58,9 @@ export default function DynamicGlobalHeader({ routeName }: HeaderProps) {
 
   const renderMessagesContent = () => (
     <View style={styles.rowHeader}>
+      <Text style={[styles.centerTitle, { marginRight: 'auto' }]}>Pesan</Text>
       <View style={styles.smallAvatarContainer}>
         <Image source={avatarSource} style={styles.smallAvatarImage} />
-      </View>
-      <View>
-        <Text style={styles.smallTitle} numberOfLines={1} ellipsizeMode="tail">{fullName}</Text>
-        <View style={styles.statusRow}>
-          <View style={[styles.dot, { width: 6, height: 6, borderRadius: 3, backgroundColor: isOnline ? '#34C759' : '#94A3B8' }]} />
-          <Text style={[styles.statusText, { fontSize: 11, color: isOnline ? '#34C759' : '#94A3B8' }]}>
-            {isOnline ? 'Online' : lastSeen ? `Aktif ${lastSeen} lalu` : 'Offline'}
-          </Text>
-        </View>
       </View>
     </View>
   );
@@ -83,7 +75,7 @@ export default function DynamicGlobalHeader({ routeName }: HeaderProps) {
   );
 
   const renderSettingsContent = () => (
-    <View style={styles.rowHeaderCenter}>
+    <View style={styles.rowHeader}>
       <Text style={styles.centerTitle}>Pengaturan</Text>
     </View>
   );
@@ -99,7 +91,7 @@ export default function DynamicGlobalHeader({ routeName }: HeaderProps) {
       {routeName === 'Pesan' && renderMessagesContent()}
       {routeName === 'Lokasi' && renderLocationContent()}
       {routeName === 'Atur' && renderSettingsContent()}
-      {isHome && <View style={{ height: 60 }} />}
+      <View style={{ height: 60 }} />
     </LinearGradient>
   );
 }
@@ -199,6 +191,7 @@ const styles = StyleSheet.create({
   rowHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
   rowHeaderBetween: {
     flexDirection: 'row',
@@ -213,10 +206,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   smallAvatarContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     overflow: 'hidden',
     borderWidth: 1.5,
     borderColor: '#4F46E5',
@@ -232,7 +224,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   centerTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#FFFFFF',
   }

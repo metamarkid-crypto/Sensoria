@@ -159,18 +159,18 @@ export default function ParentLocationScreen() {
 
   return (
     <View style={styles.container}>
-      {/* 2. Top Map (Absolute positioned behind ScrollView) */}
-      <View style={styles.mapContainer}>
-        <MapView
-          style={styles.map}
-          initialRegion={{
-            latitude: childLat,
-            longitude: childLng,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
-          }}
-          // Note: Android requires API key in app.json for Google Maps
-        >
+      <View style={styles.mapWrapper}>
+        <View style={styles.mapContainer}>
+          <MapView
+            style={styles.map}
+            provider={PROVIDER_GOOGLE}
+            initialRegion={{
+              latitude: childLat,
+              longitude: childLng,
+              latitudeDelta: 0.01,
+              longitudeDelta: 0.01,
+            }}
+          >
           {/* Custom Marker */}
           <Marker coordinate={{ latitude: childLat, longitude: childLng }} zIndex={2}>
             <View style={styles.customMarker}>
@@ -190,7 +190,8 @@ export default function ParentLocationScreen() {
               zIndex={1}
             />
           ))}
-        </MapView>
+          </MapView>
+        </View>
       </View>
 
       {/* Bottom Scrollable Content */}
@@ -339,13 +340,27 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
-  mapContainer: {
+  mapWrapper: {
     position: 'absolute',
-    top: 0,
+    top: -60, // Overlap the header
     left: 0,
     right: 0,
-    height: height * 0.45,
+    height: height * 0.45 + 60, // Compensate for the negative top
     zIndex: 0,
+    backgroundColor: '#FFF', // For the border radius corners
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+  },
+  mapContainer: {
+    flex: 1,
+    overflow: 'hidden', // Clip the map corners
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
   },
   map: {
     width: '100%',

@@ -4,6 +4,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { supabase } from '../services/db/supabase';
 import { useAACStore } from '../store/useAACStore';
+import * as Haptics from 'expo-haptics';
+import { TextInput, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 
 interface Props {
   isVisible: boolean;
@@ -12,13 +14,16 @@ interface Props {
 
 export default function PairingBottomSheet({ isVisible, onClose }: Props) {
   const [linkedParents, setLinkedParents] = useState<any[]>([]);
+  const [inputCode, setInputCode] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const insets = useSafeAreaInsets();
-  const { deviceId, pairingCode } = useAACStore();
+  const { deviceId, pairingCode, role, childProfile, setPairingCode, setChildProfile, localParentName } = useAACStore();
 
   useEffect(() => {
     if (!isVisible || !deviceId) return;
 
     const fetchLinkedParents = async () => {
+      if (role !== 'Child') return; // Only child fetches list of parents
       const { data, error } = await supabase
         .from('family_links')
         .select('*')
@@ -30,21 +35,204 @@ export default function PairingBottomSheet({ isVisible, onClose }: Props) {
     
     fetchLinkedParents();
 
-    const channel = supabase.channel('family_links_updates_sheet')
-      .on(
-        'postgres_changes', 
-        { event: '*', schema: 'public', table: 'family_links', filter: `child_device_id=eq.${deviceId}` }, 
-        (payload) => {
-          fetchLinkedParents();
-        }
-      )
-      .subscribe();
+    let channel: any = null;
+    if (role === 'Child') {
+      channel = supabase.channel('family_links_updates_sheet')
+        .on(
+          'postgres_changes', 
+          { event: '*', schema: 'public', table: 'family_links', filter: `child_device_id=eq.${deviceId}` }, 
+          (payload) => {
+            fetchLinkedParents();
+          }
+        )
+        .subscribe();
+    }
 
     // SAFEGUARD 1: Strict cleanup to prevent memory leaks
     return () => {
-      supabase.removeChannel(channel);
+      if (channel) supabase.removeChannel(channel);
     };
-  }, [isVisible, deviceId]);
+  }, [isVisible, deviceId, role]);
+
+  const handleLinkDevice = async () => {
+    if (!inputCode || inputCode.length !== 6) {
+      Alert.alert('Gagal', 'Masukkan 6 digit kode yang valid.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { data: childDevice, error: deviceError } = await supabase
+        .from('devices')
+        .select('id')
+        .eq('pairing_code', inputCode)
+        .eq('role', 'Child')
+        .single();
+        
+      if (deviceError || !childDevice) {
+        Alert.alert('Gagal', 'Kode tidak valid atau perangkat anak tidak ditemukan.');
+        setIsLoading(false);
+        return;
+      }
+
+      const parentName = localParentName || 'Orang Tua';
+
+      await supabase.from('family_links').upsert({
+        parent_device_id: deviceId,
+        child_device_id: childDevice.id,
+        parent_label: parentName
+      });
+
+      const { data: profile } = await supabase
+        .from('child_profiles')
+        .select('*')
+        .eq('device_id', childDevice.id)
+        .single();
+        
+      if (profile) {
+        setChildProfile({
+          device_id: childDevice.id,
+          fullName: profile.full_name,
+          nickname: profile.nickname,
+          gender: profile.settings?.childVoiceGender?.toLowerCase() === 'girl' ? 'Girl' : 'Boy',
+          settings: profile.settings
+        });
+      }
+
+      setPairingCode(inputCode);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert('Berhasil', 'Perangkat berhasil ditautkan!');
+      setInputCode('');
+      onClose();
+
+    } catch (err) {
+      Alert.alert('Error', 'Gagal menautkan perangkat.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUnlink = () => {
+    Alert.alert(
+      'Putuskan Tautan',
+      'Apakah Anda yakin ingin memutuskan tautan perangkat ini?',
+      [
+        { text: 'Batal', style: 'cancel' },
+        { 
+          text: 'Putuskan', 
+          style: 'destructive',
+          onPress: async () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            // We just clear local state for simplicity in MVP. 
+            // In a real app, we would also DELETE from family_links table.
+            if (deviceId) {
+               await supabase.from('family_links').delete().eq('parent_device_id', deviceId);
+            }
+            setPairingCode(null as any);
+            setChildProfile(null);
+          }
+        }
+      ]
+    );
+  };
+
+  const renderChildModeContent = () => (
+    <>
+      <Image source={require('../../assets/cover-pairing.png')} style={styles.sheetCoverImage} resizeMode="contain" />
+      <View style={styles.sheetCodeBox}>
+        <Text style={styles.sheetCodeLabel}>Kode Pairing Anda</Text>
+        {linkedParents.length >= 1 ? (
+          <View style={styles.sheetObfuscatedBox}>
+            <FontAwesome5 name="lock" size={24} color="#94A3B8" style={{ marginRight: 12 }} />
+            <Text style={styles.sheetObfuscatedText}>* * * * * *</Text>
+          </View>
+        ) : (
+          <View style={styles.sheetCodeRow}>
+            {pairingCode?.split('').map((digit, index) => {
+              const colors = ['#2488FF', '#FF2A7A', '#FF9800', '#4CAF50', '#9C27B0', '#00BCD4'];
+              return <Text key={index} style={[styles.sheetCodeDigit, { color: colors[index % colors.length] }]}>{digit}</Text>;
+            })}
+          </View>
+        )}
+        {linkedParents.length < 1 && (
+          <Text style={styles.sheetCodeDesc}>Masukkan kode ini pada perangkat keluarga untuk mulai terhubung.</Text>
+        )}
+      </View>
+      <View style={styles.sheetDevicesSection}>
+        <Text style={styles.sheetDevicesTitle}>Perangkat Terhubung</Text>
+        {linkedParents.length === 0 ? (
+          <Text style={styles.sheetDevicesEmpty}>Belum ada perangkat yang tertaut.</Text>
+        ) : (
+          linkedParents.map(parent => (
+            <View key={parent.id} style={styles.sheetDeviceRow}>
+              <View style={styles.sheetDeviceIconBox}>
+                <FontAwesome5 name="tablet-alt" size={20} color="#94A3B8" />
+              </View>
+              <Text style={styles.sheetDeviceName}>Sensoria {parent.parent_label}</Text>
+              <View style={styles.sheetDeviceStatus}>
+                <View style={styles.sheetDeviceDot} />
+                <Text style={styles.sheetDeviceStatusText}>Terhubung</Text>
+              </View>
+            </View>
+          ))
+        )}
+      </View>
+    </>
+  );
+
+  const renderParentModeContent = () => (
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Image source={require('../../assets/cover-pairing.png')} style={styles.sheetCoverImage} resizeMode="contain" />
+      
+      {pairingCode && childProfile ? (
+        // Already Linked
+        <View style={styles.sheetCodeBox}>
+          <Text style={styles.sheetCodeLabel}>Perangkat Anak Terhubung</Text>
+          <View style={[styles.sheetDeviceRow, { width: '100%', backgroundColor: '#F8FAFC', marginBottom: 20 }]}>
+            <View style={[styles.sheetDeviceIconBox, { backgroundColor: '#E0F2FE' }]}>
+              <FontAwesome5 name="child" size={20} color="#0EA5E9" />
+            </View>
+            <Text style={styles.sheetDeviceName}>{childProfile.fullName || childProfile.nickname}</Text>
+            <View style={styles.sheetDeviceStatus}>
+              <View style={styles.sheetDeviceDot} />
+              <Text style={styles.sheetDeviceStatusText}>Terhubung</Text>
+            </View>
+          </View>
+          <TouchableOpacity style={[styles.sheetAddButton, { borderColor: '#EF4444', backgroundColor: '#FEF2F2' }]} onPress={handleUnlink}>
+            <FontAwesome5 name="unlink" size={14} color="#EF4444" />
+            <Text style={[styles.sheetAddButtonText, { color: '#EF4444' }]}>Putuskan Tautan</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        // Needs Linking
+        <View style={styles.sheetCodeBox}>
+          <Text style={styles.sheetCodeLabel}>Masukkan Kode Pairing Anak</Text>
+          <TextInput
+            style={styles.pairingInput}
+            placeholder="Contoh: 123456"
+            value={inputCode}
+            onChangeText={setInputCode}
+            keyboardType="number-pad"
+            maxLength={6}
+          />
+          <Text style={styles.sheetCodeDesc}>Dapatkan 6-digit kode ini dari perangkat anak.</Text>
+          
+          <TouchableOpacity 
+            style={[styles.sheetAddButton, { backgroundColor: '#2488FF', marginTop: 16 }]}
+            onPress={handleLinkDevice}
+            disabled={isLoading || inputCode.length !== 6}
+          >
+            {isLoading ? <ActivityIndicator color="#FFF" /> : (
+              <>
+                <FontAwesome5 name="link" size={14} color="#FFF" />
+                <Text style={[styles.sheetAddButtonText, { color: '#FFF' }]}>Tautkan Sekarang</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
+    </KeyboardAvoidingView>
+  );
 
   return (
     <Modal visible={isVisible} animationType="slide" transparent onRequestClose={onClose}>
@@ -69,57 +257,7 @@ export default function PairingBottomSheet({ isVisible, onClose }: Props) {
             </TouchableOpacity>
           </View>
 
-          {/* Illustration */}
-          <Image source={require('../../assets/cover-pairing.png')} style={styles.sheetCoverImage} resizeMode="contain" />
-
-          {/* Code Display */}
-          <View style={styles.sheetCodeBox}>
-            <Text style={styles.sheetCodeLabel}>Kode Pairing Anda</Text>
-            {linkedParents.length >= 1 ? (
-              <View style={styles.sheetObfuscatedBox}>
-                <FontAwesome5 name="lock" size={24} color="#94A3B8" style={{ marginRight: 12 }} />
-                <Text style={styles.sheetObfuscatedText}>* * * * * *</Text>
-              </View>
-            ) : (
-              <View style={styles.sheetCodeRow}>
-                {pairingCode?.split('').map((digit, index) => {
-                  const colors = ['#2488FF', '#FF2A7A', '#FF9800', '#4CAF50', '#9C27B0', '#00BCD4'];
-                  return <Text key={index} style={[styles.sheetCodeDigit, { color: colors[index % colors.length] }]}>{digit}</Text>;
-                })}
-              </View>
-            )}
-            {linkedParents.length < 1 && (
-              <Text style={styles.sheetCodeDesc}>Masukkan kode ini pada perangkat keluarga untuk mulai terhubung.</Text>
-            )}
-          </View>
-
-          {/* Connected Devices */}
-          <View style={styles.sheetDevicesSection}>
-            <Text style={styles.sheetDevicesTitle}>Perangkat Terhubung</Text>
-            {linkedParents.length === 0 ? (
-              <Text style={styles.sheetDevicesEmpty}>Belum ada perangkat yang tertaut.</Text>
-            ) : (
-              linkedParents.map(parent => (
-                <View key={parent.id} style={styles.sheetDeviceRow}>
-                  <View style={styles.sheetDeviceIconBox}>
-                    <FontAwesome5 name="tablet-alt" size={20} color="#94A3B8" />
-                  </View>
-                  <Text style={styles.sheetDeviceName}>Sensoria {parent.parent_label}</Text>
-                  <View style={styles.sheetDeviceStatus}>
-                    <View style={styles.sheetDeviceDot} />
-                    <Text style={styles.sheetDeviceStatusText}>Terhubung</Text>
-                  </View>
-                </View>
-              ))
-            )}
-
-            {linkedParents.length >= 1 && (
-              <TouchableOpacity style={styles.sheetAddButton}>
-                <FontAwesome5 name="plus" size={14} color="#2488FF" />
-                <Text style={styles.sheetAddButtonText}>Tambah Perangkat</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+          {role === 'Child' ? renderChildModeContent() : renderParentModeContent()}
 
         </View>
       </TouchableOpacity>
@@ -311,4 +449,17 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#2488FF',
   },
+  pairingInput: {
+    width: '100%',
+    backgroundColor: '#F1F5F9',
+    borderWidth: 2,
+    borderColor: '#E2E8F0',
+    borderRadius: 16,
+    padding: 16,
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    letterSpacing: 8,
+    marginBottom: 16,
+  }
 });
