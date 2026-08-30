@@ -8,7 +8,6 @@ import { FontAwesome5 } from '@expo/vector-icons';
 import { supabase, sendAACMessage } from '../../services/db/supabase';
 import { useAACStore } from '../../store/useAACStore';
 import * as Haptics from 'expo-haptics';
-import { LinearGradient } from 'expo-linear-gradient';
 
 export default function ParentMessagesScreen() {
   const insets = useSafeAreaInsets();
@@ -21,9 +20,16 @@ export default function ParentMessagesScreen() {
   const [isModalVisible, setModalVisible] = useState(false);
   const [newReplyText, setNewReplyText] = useState('');
   
+  // Toggleable Input State
+  const [isInputVisible, setIsInputVisible] = useState(false);
+  
   const flatListRef = useRef<FlatList>(null);
 
+  const CURRENT_USER_NAME = 'Orang Tua';
+
   // 1. Data Fetching and Real-Time Sync (SAFE - NO TTS TRIGGER)
+  // NOTE: This Parent UI listener only updates the visual FlatList.
+  // The actual Audio/TTS playback on the Child's side is handled by the pre-existing listener on ChildAACScreen.tsx
   useEffect(() => {
     if (!pairingCode) return;
 
@@ -46,7 +52,6 @@ export default function ParentMessagesScreen() {
         table: 'messages',
         filter: `channel_id=eq.${pairingCode}`
       }, (payload) => {
-        // Only append visually (to the top since inverted), TTS is handled by ParentDashboardScreen
         setMessages((prev) => [payload.new, ...prev]);
       })
       .subscribe();
@@ -62,7 +67,7 @@ export default function ParentMessagesScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await sendAACMessage(pairingCode, {
       sender: 'Parent',
-      senderName: 'Orang Tua',
+      senderName: CURRENT_USER_NAME,
       text: text.trim(),
       timestamp: Date.now()
     });
@@ -102,13 +107,39 @@ export default function ParentMessagesScreen() {
 
   const renderMessage = ({ item }: { item: any }) => {
     const isChild = item.sender_role === 'Child';
+    const isCurrentUser = item.senderName === CURRENT_USER_NAME;
+    const isOtherParent = !isChild && !isCurrentUser;
+
+    let bubbleStyle = styles.bubbleChild;
+    let textStyle = styles.textChild;
+    let timeStyle = styles.timeChild;
+
+    if (!isChild) {
+      if (isCurrentUser) {
+        bubbleStyle = styles.bubbleParent;
+        textStyle = styles.textParent;
+        timeStyle = styles.timeParent;
+      } else {
+        bubbleStyle = styles.bubbleOtherParent;
+        textStyle = styles.textOtherParent;
+        timeStyle = styles.timeOtherParent;
+      }
+    }
+
     return (
       <View style={[styles.messageBubbleWrapper, isChild ? styles.wrapperLeft : styles.wrapperRight]}>
-        <View style={[styles.messageBubble, isChild ? styles.bubbleChild : styles.bubbleParent]}>
-          <Text style={[styles.messageText, isChild ? styles.textChild : styles.textParent]}>
+        <View style={[styles.messageBubble, bubbleStyle]}>
+          {/* Sender Name Tag for Parents */}
+          {!isChild && (
+            <Text style={[styles.senderNameTag, isCurrentUser ? styles.nameTagSelf : styles.nameTagOther]}>
+              {item.senderName || 'Keluarga'}
+            </Text>
+          )}
+          
+          <Text style={[styles.messageText, textStyle]}>
             {item.text_content}
           </Text>
-          <Text style={[styles.timestamp, isChild ? styles.timeChild : styles.timeParent]}>
+          <Text style={[styles.timestamp, timeStyle]}>
             {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </Text>
         </View>
@@ -118,9 +149,7 @@ export default function ParentMessagesScreen() {
 
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom }]}>
-      <LinearGradient colors={['#181824', '#11427B']} style={styles.header}>
-        <Text style={styles.headerTitle}>Pesan</Text>
-      </LinearGradient>
+      {/* Note: The global header is provided by Tab.Navigator in ParentDashboardScreen */}
 
       <KeyboardAvoidingView 
         style={styles.flex1} 
@@ -137,6 +166,20 @@ export default function ParentMessagesScreen() {
         />
 
         <View style={styles.inputSection}>
+          {/* Toggle Button for Text Input */}
+          <View style={styles.toggleRow}>
+            <TouchableOpacity 
+              style={styles.toggleBtn}
+              onPress={() => setIsInputVisible(!isInputVisible)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.toggleText}>
+                {isInputVisible ? 'Sembunyikan Papan Ketik' : 'Tulis Pesan Manual'}
+              </Text>
+              <FontAwesome5 name={isInputVisible ? "chevron-down" : "chevron-up"} size={12} color="#94A3B8" />
+            </TouchableOpacity>
+          </View>
+
           {/* Custom Quick Replies */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.quickReplyScroll} contentContainerStyle={styles.quickReplyContent}>
             {customQuickReplies.map((reply, index) => (
@@ -159,24 +202,27 @@ export default function ParentMessagesScreen() {
             </TouchableOpacity>
           </ScrollView>
 
-          {/* Main Input Area */}
-          <View style={styles.inputRow}>
-            <TextInput
-              style={styles.textInput}
-              placeholder="Tulis pesan..."
-              placeholderTextColor="#94A3B8"
-              value={inputText}
-              onChangeText={setInputText}
-              onSubmitEditing={() => handleSend(inputText)}
-            />
-            <TouchableOpacity 
-              style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]} 
-              onPress={() => handleSend(inputText)}
-              disabled={!inputText.trim()}
-            >
-              <FontAwesome5 name="paper-plane" size={18} color="#FFF" />
-            </TouchableOpacity>
-          </View>
+          {/* Main Input Area (Toggleable) */}
+          {isInputVisible && (
+            <View style={styles.inputRow}>
+              <TextInput
+                style={styles.textInput}
+                placeholder="Tulis pesan (maks 60 kar)..."
+                placeholderTextColor="#94A3B8"
+                value={inputText}
+                onChangeText={setInputText}
+                onSubmitEditing={() => handleSend(inputText)}
+                maxLength={60} // Cognitive Load Limit
+              />
+              <TouchableOpacity 
+                style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]} 
+                onPress={() => handleSend(inputText)}
+                disabled={!inputText.trim()}
+              >
+                <FontAwesome5 name="paper-plane" size={18} color="#FFF" />
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </KeyboardAvoidingView>
 
@@ -213,18 +259,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
     paddingBottom: 60, // Padding for Tab Bar
   },
-  header: {
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFF',
-  },
   flex1: {
     flex: 1,
   },
@@ -256,6 +290,22 @@ const styles = StyleSheet.create({
     backgroundColor: '#11427B', // Navy Blue
     borderBottomRightRadius: 4,
   },
+  bubbleOtherParent: {
+    backgroundColor: '#0D9488', // Teal
+    borderBottomRightRadius: 4,
+  },
+  senderNameTag: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    marginBottom: 4,
+    opacity: 0.8,
+  },
+  nameTagSelf: {
+    color: '#93C5FD',
+  },
+  nameTagOther: {
+    color: '#CCFBF1',
+  },
   messageText: {
     fontSize: 16,
     marginBottom: 4,
@@ -264,6 +314,9 @@ const styles = StyleSheet.create({
     color: '#0F172A',
   },
   textParent: {
+    color: '#FFFFFF',
+  },
+  textOtherParent: {
     color: '#FFFFFF',
   },
   timestamp: {
@@ -276,16 +329,37 @@ const styles = StyleSheet.create({
   timeParent: {
     color: '#93C5FD',
   },
+  timeOtherParent: {
+    color: '#99F6E4',
+  },
   inputSection: {
     backgroundColor: '#FFF',
     borderTopWidth: 1,
     borderTopColor: '#E2E8F0',
-    paddingTop: 12,
+    paddingTop: 8,
     paddingBottom: 16,
+  },
+  toggleRow: {
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  toggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: '#F8FAFC',
+    gap: 6,
+  },
+  toggleText: {
+    fontSize: 12,
+    color: '#94A3B8',
+    fontWeight: 'bold',
   },
   quickReplyScroll: {
     maxHeight: 40,
-    marginBottom: 12,
+    marginBottom: 8,
   },
   quickReplyContent: {
     paddingHorizontal: 16,
@@ -313,6 +387,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: 16,
     alignItems: 'center',
+    marginTop: 8,
   },
   textInput: {
     flex: 1,

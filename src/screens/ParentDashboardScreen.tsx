@@ -12,12 +12,13 @@ import * as Haptics from 'expo-haptics';
 import ParentHomeScreen from './parent/ParentHomeScreen';
 import ParentMessagesScreen from './parent/ParentMessagesScreen';
 import ParentLocationScreen from './parent/ParentLocationScreen';
-import SettingsScreen from './SettingsScreen';
+import ParentSettingsListScreen from './parent/ParentSettingsListScreen';
+import DynamicGlobalHeader from '../components/parent/DynamicGlobalHeader';
 
 const Tab = createBottomTabNavigator();
 
 export default function ParentDashboardScreen() {
-  const { pairingCode, language } = useAACStore();
+  const { pairingCode, language, deviceId, setChildStatus } = useAACStore();
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
@@ -44,12 +45,62 @@ export default function ParentDashboardScreen() {
     };
   }, [pairingCode, language]);
 
+  useEffect(() => {
+    // 2. Global Real-time Connection Status Listener
+    let presenceSub: any = null;
+
+    const checkStatus = async () => {
+      if (!deviceId) return;
+      const { data: link } = await supabase
+        .from('family_links')
+        .select('child_device_id')
+        .eq('parent_device_id', deviceId)
+        .single();
+        
+      if (!link) return;
+
+      const updateOnlineStatus = (lastSeenTimestamp: string) => {
+        const lastActive = new Date(lastSeenTimestamp);
+        const diffMins = Math.floor((new Date().getTime() - lastActive.getTime()) / 60000);
+        if (diffMins < 5) {
+          setChildStatus(true, 'Sekarang');
+        } else {
+          setChildStatus(false, `${diffMins} menit lalu`);
+        }
+      };
+
+      const fetchPresence = async () => {
+        const { data } = await supabase.from('devices').select('last_seen').eq('id', link.child_device_id).single();
+        if (data && data.last_seen) {
+          updateOnlineStatus(data.last_seen);
+        }
+      };
+      await fetchPresence();
+
+      presenceSub = supabase.channel('global_presence')
+        .on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'devices',
+          filter: `id=eq.${link.child_device_id}`
+        }, (payload) => {
+          if (payload.new.last_seen) updateOnlineStatus(payload.new.last_seen);
+        }).subscribe();
+    };
+
+    checkStatus();
+    return () => {
+      if (presenceSub) supabase.removeChannel(presenceSub);
+    };
+  }, [deviceId]);
+
   return (
     <View style={{ flex: 1, backgroundColor: '#F5F7FA' }}>
       <StatusBar style="light" />
       <Tab.Navigator
         screenOptions={({ route }) => ({
-          headerShown: false,
+          headerShown: true,
+          header: ({ route }) => <DynamicGlobalHeader routeName={route.name} />,
           tabBarIcon: ({ color, size }) => {
             let iconName = '';
 
@@ -64,14 +115,15 @@ export default function ParentDashboardScreen() {
             }
 
             return (
-              <View style={{ position: 'relative', padding: 4 }}>
+              <View style={{ position: 'relative', padding: 4, height: 32, justifyContent: 'center' }}>
                 <FontAwesome5 name={iconName} size={size} color={color} />
                 {route.name === 'Pesan' && (
                   <View style={{
-                    position: 'absolute', top: -4, right: -4, 
+                    position: 'absolute', top: -4, right: -10, 
                     backgroundColor: '#FF3B30', width: 16, height: 16, 
                     borderRadius: 8, justifyContent: 'center', alignItems: 'center',
-                    borderWidth: 1.5, borderColor: '#FFF'
+                    borderWidth: 1.5, borderColor: '#FFF',
+                    zIndex: 2
                   }}>
                     <Text style={{ color: '#FFF', fontSize: 9, fontWeight: 'bold' }}>2</Text>
                   </View>
@@ -90,9 +142,10 @@ export default function ParentDashboardScreen() {
             bottom: 0,
             left: 0,
             right: 0,
-            height: 60 + insets.bottom,
-            paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
-            elevation: 8,
+            height: 70 + insets.bottom,
+            paddingBottom: insets.bottom > 0 ? insets.bottom : 12,
+            paddingTop: 8,
+            elevation: 10,
             shadowColor: '#000',
             shadowOffset: { width: 0, height: -2 },
             shadowOpacity: 0.1,
@@ -107,16 +160,7 @@ export default function ParentDashboardScreen() {
         <Tab.Screen name="Beranda" component={ParentHomeScreen} />
         <Tab.Screen name="Pesan" component={ParentMessagesScreen} />
         <Tab.Screen name="Lokasi" component={ParentLocationScreen} />
-        <Tab.Screen 
-          name="Atur" 
-          component={SettingsScreen} 
-          listeners={({ navigation }) => ({
-            tabPress: (e) => {
-              e.preventDefault(); // Stop default tab routing
-              navigation.navigate('Settings'); // Push to Root Stack (Settings is the name in AppNavigator)
-            },
-          })}
-        />
+        <Tab.Screen name="Atur" component={ParentSettingsListScreen} />
       </Tab.Navigator>
     </View>
   );

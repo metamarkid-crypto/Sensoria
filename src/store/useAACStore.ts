@@ -64,6 +64,9 @@ export interface AACState {
   // Custom Quick Replies
   customQuickReplies: string[];
   
+  // Ephemeral Real-Time Status
+  childStatus: { isOnline: boolean; lastSeen: string | null };
+
   // Actions
   setHasSeenOnboarding: (status: boolean) => void;
   setRole: (role: UserRole) => void;
@@ -93,6 +96,8 @@ export interface AACState {
   setAboutContent: (content: AboutContent) => void;
   addCustomQuickReply: (text: string) => void;
   removeCustomQuickReply: (text: string) => void;
+  
+  setChildStatus: (isOnline: boolean, lastSeen: string | null) => void;
 }
 
 export const useAACStore = create<AACState>()(
@@ -123,6 +128,7 @@ export const useAACStore = create<AACState>()(
       
       aboutContent: null,
       customQuickReplies: ['❤️ Mama di sini', '⏳ Tunggu sebentar ya', '🍎 Makan dulu yuk'],
+      childStatus: { isOnline: false, lastSeen: null },
       
       setHasSeenOnboarding: (status) => set({ hasSeenOnboarding: status }),
       setRole: (role) => set({ role }),
@@ -158,6 +164,7 @@ export const useAACStore = create<AACState>()(
       removeCustomQuickReply: (text) => set((state) => ({
         customQuickReplies: state.customQuickReplies.filter(reply => reply !== text)
       })),
+      setChildStatus: (isOnline, lastSeen) => set({ childStatus: { isOnline, lastSeen } }),
     }),
     { 
       name: 'aac-storage',

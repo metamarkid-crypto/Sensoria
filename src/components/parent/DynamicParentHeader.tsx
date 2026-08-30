@@ -34,18 +34,23 @@ export default function DynamicParentHeader({ childProfile, isOnline, lastSeen }
             />
           </View>
           <View style={styles.childInfo}>
-            <Text style={styles.childName}>{childProfile?.nickname || childProfile?.fullName || 'Belum ditautkan'}</Text>
+            <Text style={styles.childName} numberOfLines={1} ellipsizeMode="tail">
+              {childProfile?.fullName || childProfile?.name || childProfile?.nickname || 'Belum ditautkan'}
+            </Text>
             <View style={styles.statusRow}>
               <View style={[styles.dot, { backgroundColor: isOnline ? '#34C759' : '#94A3B8' }]} />
               <Text style={[styles.statusText, { color: isOnline ? '#34C759' : '#94A3B8' }]}>
                 {isOnline ? 'Online' : 'Offline'}
               </Text>
             </View>
+            <Text style={styles.lastSeenText}>
+              Terakhir aktif: {isOnline ? 'Sekarang' : (lastSeen || 'Belum diketahui')}
+            </Text>
           </View>
         </View>
         
         <View style={styles.iconGroup}>
-          <TouchableOpacity style={styles.iconButton}>
+          <TouchableOpacity style={[styles.iconButton, { alignSelf: 'flex-start', marginTop: 4 }]}>
             <FontAwesome5 name="bell" size={20} color="#FFFFFF" />
             <View style={styles.badge}>
               <Text style={styles.badgeText}>2</Text>
@@ -63,7 +68,7 @@ export default function DynamicParentHeader({ childProfile, isOnline, lastSeen }
 const styles = StyleSheet.create({
   container: {
     width: width,
-    height: 220, // Fixed height for overlap math
+    height: 180, // Reduced from 220
     paddingHorizontal: 24,
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,
@@ -72,7 +77,7 @@ const styles = StyleSheet.create({
   headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   profileSection: {
     flexDirection: 'row',
@@ -98,16 +103,18 @@ const styles = StyleSheet.create({
   },
   childInfo: {
     justifyContent: 'center',
+    maxWidth: width - 130, // Prevent text from pushing the bell icon off screen
   },
   childName: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#FFFFFF',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 2,
   },
   dot: {
     width: 8,
@@ -116,8 +123,12 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   statusText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
+  },
+  lastSeenText: {
+    fontSize: 11,
+    color: '#CBD5E1',
   },
   iconGroup: {
     flexDirection: 'row',
