@@ -58,9 +58,17 @@ export default function DynamicGlobalHeader({ routeName }: HeaderProps) {
 
   const renderMessagesContent = () => (
     <View style={styles.rowHeader}>
-      <Text style={[styles.centerTitle, { marginRight: 'auto' }]}>Pesan</Text>
       <View style={styles.smallAvatarContainer}>
         <Image source={avatarSource} style={styles.smallAvatarImage} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.smallTitle} numberOfLines={1} ellipsizeMode="tail">{fullName}</Text>
+        <View style={styles.statusRow}>
+          <View style={[styles.dot, { width: 6, height: 6, borderRadius: 3, backgroundColor: isOnline ? '#34C759' : '#94A3B8' }]} />
+          <Text style={[styles.statusText, { fontSize: 11, color: isOnline ? '#34C759' : '#94A3B8' }]}>
+            {isOnline ? 'Online' : lastSeen ? `Aktif ${lastSeen} lalu` : 'Offline'}
+          </Text>
+        </View>
       </View>
     </View>
   );
@@ -206,12 +214,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   smallAvatarContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    marginRight: 12,
     overflow: 'hidden',
     borderWidth: 1.5,
     borderColor: '#4F46E5',
+    backgroundColor: '#FFF',
   },
   smallAvatarImage: {
     width: '100%',

@@ -123,11 +123,11 @@ export default function ParentDashboardScreen() {
             }
 
             return (
-              <View style={{ position: 'relative', padding: 4, height: 32, justifyContent: 'center' }}>
+              <View style={{ position: 'relative', justifyContent: 'center', alignItems: 'center' }}>
                 <FontAwesome5 name={iconName} size={size} color={color} />
                 {route.name === 'Pesan' && (
                   <View style={{
-                    position: 'absolute', top: -4, right: -10, 
+                    position: 'absolute', top: -6, right: -12, 
                     backgroundColor: '#FF3B30', width: 16, height: 16, 
                     borderRadius: 8, justifyContent: 'center', alignItems: 'center',
                     borderWidth: 1.5, borderColor: '#FFF',

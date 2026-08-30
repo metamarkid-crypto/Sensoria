@@ -10,7 +10,7 @@ import Toast from 'react-native-toast-message';
 
 export default function ParentHomeScreen() {
   const navigation = useNavigation<any>();
-  const { pairingCode, language, deviceId, childProfile } = useAACStore();
+  const { pairingCode, language, deviceId, childProfile, localParentName } = useAACStore();
   
   const [recentMessage, setRecentMessage] = useState<any>(null);
   
@@ -106,7 +106,7 @@ export default function ParentHomeScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     await sendAACMessage(pairingCode, {
       sender: 'Parent',
-      senderName: 'Orang Tua',
+      senderName: localParentName || 'Orang Tua',
       text: text,
       timestamp: Date.now()
     });
@@ -122,7 +122,8 @@ export default function ParentHomeScreen() {
 
   return (
     <View style={styles.container}>
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} bounces={false}>
+      <View style={styles.overlapWrapper}>
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} bounces={false}>
         
         {/* WIDGET A: Pesan Terbaru */}
       <View style={styles.card}>
@@ -359,7 +360,8 @@ export default function ParentHomeScreen() {
         </View>
       </View>
 
-      </ScrollView>
+        </ScrollView>
+      </View>
     </View>
   );
 }
@@ -367,9 +369,9 @@ export default function ParentHomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F7FA', // Matches bottom of the gradient wrapper in Dashboard
+    backgroundColor: '#181824', // Base color to blend with header gradient
   },
-  scrollView: {
+  overlapWrapper: {
     flex: 1,
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 32,
@@ -377,6 +379,10 @@ const styles = StyleSheet.create({
     marginTop: -60, // Overlap the fixed 220 height gradient header
     zIndex: 10,
     elevation: 5,
+    overflow: 'hidden', // CRITICAL: Fixes touch zone offset bug on Android
+  },
+  scrollView: {
+    flex: 1,
   },
   scrollContent: {
     padding: 20,

@@ -158,8 +158,8 @@ export default function ParentLocationScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.mapWrapper}>
+    <View style={[styles.container, { paddingBottom: 80 + insets.bottom }]}>
+      <View style={styles.overlapWrapper}>
         <View style={styles.mapContainer}>
           <MapView
             style={styles.map}
@@ -192,9 +192,8 @@ export default function ParentLocationScreen() {
           ))}
           </MapView>
         </View>
-      </View>
 
-      {/* Bottom Scrollable Content */}
+        {/* Bottom Scrollable Content */}
       <ScrollView 
         style={styles.scrollView} 
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
@@ -331,6 +330,7 @@ export default function ParentLocationScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
+      </View>
     </View>
   );
 }
@@ -338,33 +338,28 @@ export default function ParentLocationScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#181824',
   },
-  mapWrapper: {
-    position: 'absolute',
-    top: -60, // Overlap the header
-    left: 0,
-    right: 0,
-    height: height * 0.45 + 60, // Compensate for the negative top
-    zIndex: 0,
-    backgroundColor: '#FFF', // For the border radius corners
+  overlapWrapper: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
+    marginTop: -60,
+    zIndex: 10,
     elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
+    overflow: 'hidden',
   },
   mapContainer: {
-    flex: 1,
-    overflow: 'hidden', // Clip the map corners
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: height * 0.45,
+    zIndex: 0,
   },
   map: {
-    width: '100%',
-    height: '100%',
+    ...StyleSheet.absoluteFillObject,
   },
   customMarker: {
     width: 44,

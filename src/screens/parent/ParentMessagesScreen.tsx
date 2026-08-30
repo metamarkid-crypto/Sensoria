@@ -146,8 +146,8 @@ export default function ParentMessagesScreen() {
   };
 
   return (
-    <View style={[styles.container, { paddingBottom: insets.bottom }]}>
-      {/* Note: The global header is provided by Tab.Navigator in ParentDashboardScreen */}
+    <View style={[styles.container, { paddingBottom: 80 + insets.bottom }]}>
+      <View style={styles.overlapWrapper}>
 
       <KeyboardAvoidingView 
         style={styles.flex1} 
@@ -225,30 +225,33 @@ export default function ParentMessagesScreen() {
         </View>
       </KeyboardAvoidingView>
 
-      {/* Add Custom Quick Reply Modal */}
-      <Modal visible={isModalVisible} transparent animationType="fade">
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Balasan Favorit Baru</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Misal: Kakak sedang di jalan..."
-              value={newReplyText}
-              onChangeText={setNewReplyText}
-              maxLength={60}
-              autoFocus
-            />
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.modalBtnCancel} onPress={() => setModalVisible(false)}>
-                <Text style={styles.modalBtnCancelText}>Batal</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalBtnSave} onPress={handleSaveQuickReply}>
-                <Text style={styles.modalBtnSaveText}>Simpan</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
         </KeyboardAvoidingView>
-      </Modal>
+
+        {/* Add Custom Quick Reply Modal */}
+        <Modal visible={isModalVisible} transparent animationType="fade">
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Balasan Favorit Baru</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Misal: Kakak sedang di jalan..."
+                value={newReplyText}
+                onChangeText={setNewReplyText}
+                maxLength={60}
+                autoFocus
+              />
+              <View style={styles.modalActions}>
+                <TouchableOpacity style={styles.modalBtnCancel} onPress={() => setModalVisible(false)}>
+                  <Text style={styles.modalBtnCancelText}>Batal</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.modalBtnSave} onPress={handleSaveQuickReply}>
+                  <Text style={styles.modalBtnSaveText}>Simpan</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
+      </View>
     </View>
   );
 }
@@ -256,19 +259,24 @@ export default function ParentMessagesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
-    paddingBottom: 60, // Padding for Tab Bar
+    backgroundColor: '#181824', // Base color to blend with header gradient
   },
-  flex1: {
+  overlapWrapper: {
     flex: 1,
-  },
-  listStyle: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F8FAFC',
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
     marginTop: -60,
     zIndex: 10,
     elevation: 5,
+    overflow: 'hidden',
+  },
+  flex1: {
+    flex: 1,
+  },
+  listStyle: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
   },
   listContent: {
     padding: 16,

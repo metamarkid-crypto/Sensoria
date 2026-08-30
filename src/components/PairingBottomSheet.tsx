@@ -181,7 +181,7 @@ export default function PairingBottomSheet({ isVisible, onClose }: Props) {
   );
 
   const renderParentModeContent = () => (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <View>
       <Image source={require('../../assets/cover-pairing.png')} style={styles.sheetCoverImage} resizeMode="contain" />
       
       {pairingCode && childProfile ? (
@@ -207,31 +207,36 @@ export default function PairingBottomSheet({ isVisible, onClose }: Props) {
         // Needs Linking
         <View style={styles.sheetCodeBox}>
           <Text style={styles.sheetCodeLabel}>Masukkan Kode Pairing Anak</Text>
-          <TextInput
-            style={styles.pairingInput}
-            placeholder="Contoh: 123456"
-            value={inputCode}
-            onChangeText={setInputCode}
-            keyboardType="number-pad"
-            maxLength={6}
-          />
+          
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.pairingInput}
+              placeholder="123456"
+              placeholderTextColor="#CBD5E1"
+              value={inputCode}
+              onChangeText={setInputCode}
+              keyboardType="number-pad"
+              maxLength={6}
+            />
+          </View>
+          
           <Text style={styles.sheetCodeDesc}>Dapatkan 6-digit kode ini dari perangkat anak.</Text>
           
           <TouchableOpacity 
-            style={[styles.sheetAddButton, { backgroundColor: '#2488FF', marginTop: 16 }]}
+            style={[styles.linkButton, (!inputCode || inputCode.length !== 6) && styles.linkButtonDisabled]}
             onPress={handleLinkDevice}
             disabled={isLoading || inputCode.length !== 6}
           >
             {isLoading ? <ActivityIndicator color="#FFF" /> : (
               <>
                 <FontAwesome5 name="link" size={14} color="#FFF" />
-                <Text style={[styles.sheetAddButtonText, { color: '#FFF' }]}>Tautkan Sekarang</Text>
+                <Text style={styles.linkButtonText}>Tautkan Sekarang</Text>
               </>
             )}
           </TouchableOpacity>
         </View>
       )}
-    </KeyboardAvoidingView>
+    </View>
   );
 
   return (
@@ -450,16 +455,38 @@ const styles = StyleSheet.create({
     color: '#2488FF',
   },
   pairingInput: {
-    width: '100%',
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#F8FAFC',
     borderWidth: 2,
     borderColor: '#E2E8F0',
     borderRadius: 16,
     padding: 16,
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 32,
+    fontWeight: '900',
     textAlign: 'center',
-    letterSpacing: 8,
+    letterSpacing: 12,
+    color: '#0F172A',
+  },
+  inputContainer: {
+    width: '100%',
     marginBottom: 16,
+  },
+  linkButton: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#2488FF',
+    borderRadius: 16,
+    paddingVertical: 16,
+    marginTop: 16,
+    gap: 8,
+  },
+  linkButtonDisabled: {
+    backgroundColor: '#94A3B8',
+  },
+  linkButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FFF',
   }
 });

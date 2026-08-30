@@ -98,9 +98,27 @@ export default function ChildAACScreen() {
       )
       .subscribe();
 
+    const familyLinksChannel = supabase.channel('child_family_links')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'family_links', filter: `child_device_id=eq.${deviceId}` },
+        (payload) => {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          Toast.show({ 
+            type: 'success', 
+            text1: 'Perangkat Tertaut! 🎉', 
+            text2: `Sensoria Orang Tua berhasil terhubung.`, 
+            position: 'top',
+            visibilityTime: 4000
+          });
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(channel);
       supabase.removeChannel(settingsChannel);
+      supabase.removeChannel(familyLinksChannel);
     };
   }, []);
 
