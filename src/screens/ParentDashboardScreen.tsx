@@ -7,7 +7,6 @@ import { useAACStore } from '../store/useAACStore';
 import { playTTS } from '../services/ai/audioManager';
 import * as Haptics from 'expo-haptics';
 
-import DynamicParentHeader from '../components/parent/DynamicParentHeader';
 import ParentHomeScreen from './parent/ParentHomeScreen';
 import ParentMessagesScreen from './parent/ParentMessagesScreen';
 import ParentLocationScreen from './parent/ParentLocationScreen';
@@ -43,8 +42,7 @@ export default function ParentDashboardScreen() {
   }, [pairingCode, language]);
 
   return (
-    <>
-      <DynamicParentHeader />
+    <View style={{ flex: 1, backgroundColor: '#F5F7FA' }}>
       <Tab.Navigator
         screenOptions={({ route }) => ({
           headerShown: false,
@@ -105,8 +103,17 @@ export default function ParentDashboardScreen() {
         <Tab.Screen name="Beranda" component={ParentHomeScreen} />
         <Tab.Screen name="Pesan" component={ParentMessagesScreen} />
         <Tab.Screen name="Lokasi" component={ParentLocationScreen} />
-        <Tab.Screen name="Atur" component={SettingsScreen} />
+        <Tab.Screen 
+          name="Atur" 
+          component={SettingsScreen} 
+          listeners={({ navigation }) => ({
+            tabPress: (e) => {
+              e.preventDefault(); // Stop default tab routing
+              navigation.navigate('Settings'); // Push to Root Stack (Settings is the name in AppNavigator)
+            },
+          })}
+        />
       </Tab.Navigator>
-    </>
+    </View>
   );
 }

@@ -4,9 +4,12 @@ import { FontAwesome5 } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Toast from 'react-native-toast-message';
 
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 const { width } = Dimensions.get('window');
 
 export default function DynamicParentHeader() {
+  const insets = useSafeAreaInsets();
   const handleSettingsPress = () => {
     Toast.show({
       type: 'info',
@@ -19,7 +22,7 @@ export default function DynamicParentHeader() {
   return (
     <LinearGradient 
       colors={['#181824', '#11427B', '#007C92']} 
-      style={styles.container}
+      style={[styles.container, { paddingTop: insets.top + 20 }]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
     >
@@ -49,12 +52,11 @@ export default function DynamicParentHeader() {
 const styles = StyleSheet.create({
   container: {
     width: width,
-    paddingTop: 60, // Accommodate safe area status bar manually for seamless gradient
+    height: 220, // Fixed height for overlap math
     paddingHorizontal: 24,
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,
-    paddingBottom: 20,
-    zIndex: 1, // Keep header below the overlapping card on Android if needed, wait, the card will have zIndex 10.
+    zIndex: 1,
   },
   headerTop: {
     flexDirection: 'row',

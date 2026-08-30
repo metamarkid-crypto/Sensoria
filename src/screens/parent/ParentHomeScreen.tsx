@@ -5,6 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import { supabase, sendAACMessage } from '../../services/db/supabase';
 import { useAACStore } from '../../store/useAACStore';
 import { playTTS } from '../../services/ai/audioManager';
+import DynamicParentHeader from '../../components/parent/DynamicParentHeader';
 import { LinearGradient } from 'expo-linear-gradient';
 import Toast from 'react-native-toast-message';
 
@@ -147,9 +148,11 @@ export default function ParentHomeScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} bounces={false}>
-      
-      {/* CHILD STATUS OVERLAPPING CARD */}
+    <View style={styles.container}>
+      <DynamicParentHeader />
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} bounces={false}>
+        
+        {/* CHILD STATUS OVERLAPPING CARD */}
       <View style={styles.overlappingCard}>
         <View style={styles.avatarContainer}>
           {/* Fallback to local boy/girl avatar based on childProfile */}
@@ -311,36 +314,40 @@ export default function ParentHomeScreen() {
         </View>
       </View>
 
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F4F8', // Light slate background
+    backgroundColor: '#F5F7FA', // Matches bottom of the gradient wrapper in Dashboard
+  },
+  scrollView: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    marginTop: -60, // Overlap the fixed 220 height gradient header
+    zIndex: 10,
+    elevation: 5,
   },
   scrollContent: {
     padding: 20,
-    paddingTop: 0,
+    paddingTop: 24,
     paddingBottom: 40,
   },
   overlappingCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
-    padding: 16,
+    padding: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: -40, // Pull up to overlap the gradient header
     marginBottom: 20,
-    
-    // CRITICAL: Defeating Z-Index Clipping Bug
-    zIndex: 10,
-    elevation: 5, 
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
+    // Note: Removed zIndex and elevation from here since they are now on the parent ScrollView
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
   },
   avatarContainer: {
     width: 60,
