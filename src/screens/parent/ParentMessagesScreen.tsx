@@ -146,7 +146,7 @@ export default function ParentMessagesScreen() {
   };
 
   return (
-    <View style={[styles.container, { paddingBottom: 80 + insets.bottom }]}>
+    <View style={styles.container}>
       <View style={styles.overlapWrapper}>
 
       <KeyboardAvoidingView 
@@ -164,7 +164,7 @@ export default function ParentMessagesScreen() {
           showsVerticalScrollIndicator={false}
         />
 
-        <View style={styles.inputSection}>
+        <View style={[styles.inputSection, { paddingBottom: 80 + insets.bottom }]}>
           {/* Custom Quick Replies (Moved above toggle) */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.quickReplyScroll} contentContainerStyle={styles.quickReplyContent}>
             {customQuickReplies.map((reply, index) => (
@@ -267,7 +267,6 @@ const styles = StyleSheet.create({
     marginTop: -60,
     zIndex: 10,
     elevation: 5,
-    overflow: 'hidden',
   },
   flex1: {
     flex: 1,

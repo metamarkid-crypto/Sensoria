@@ -158,7 +158,7 @@ export default function ParentLocationScreen() {
   };
 
   return (
-    <View style={[styles.container, { paddingBottom: 80 + insets.bottom }]}>
+    <View style={styles.container}>
       <View style={styles.overlapWrapper}>
         <View style={styles.mapContainer}>
           <MapView
@@ -348,7 +348,6 @@ const styles = StyleSheet.create({
     marginTop: -60,
     zIndex: 10,
     elevation: 5,
-    overflow: 'hidden',
   },
   mapContainer: {
     position: 'absolute',
@@ -357,6 +356,9 @@ const styles = StyleSheet.create({
     right: 0,
     height: height * 0.45,
     zIndex: 0,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    overflow: 'hidden',
   },
   map: {
     ...StyleSheet.absoluteFillObject,
