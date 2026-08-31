@@ -17,7 +17,9 @@ export default function PairingBottomSheet({ isVisible, onClose }: Props) {
   const [inputCode, setInputCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const insets = useSafeAreaInsets();
-  const { deviceId, pairingCode, role, childProfile, setPairingCode, setChildProfile, localParentName } = useAACStore();
+  const { deviceId, pairingCode, role, childProfile, setPairingCode, setChildProfile, localParentName, setLocalParentName } = useAACStore();
+  const [selectedRole, setSelectedRole] = useState(localParentName || 'Ibu');
+  const roleOptions = ['Ibu', 'Ayah', 'Kakek', 'Nenek', 'Terapis', 'Guru'];
 
   useEffect(() => {
     if (!isVisible || !deviceId) return;
@@ -75,12 +77,12 @@ export default function PairingBottomSheet({ isVisible, onClose }: Props) {
         return;
       }
 
-      const parentName = localParentName || 'Orang Tua';
+      setLocalParentName(selectedRole);
 
       await supabase.from('family_links').upsert({
         parent_device_id: deviceId,
         child_device_id: childDevice.id,
-        parent_label: parentName
+        parent_label: selectedRole
       });
 
       const { data: profile } = await supabase
@@ -221,6 +223,27 @@ export default function PairingBottomSheet({ isVisible, onClose }: Props) {
           </View>
           
           <Text style={styles.sheetCodeDesc}>Dapatkan 6-digit kode ini dari perangkat anak.</Text>
+          
+          <Text style={[styles.sheetCodeLabel, { marginTop: 16, marginBottom: 8 }]}>Pilih Peran Anda</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16, width: '100%' }}>
+            {roleOptions.map(r => (
+              <TouchableOpacity 
+                key={r} 
+                style={[
+                  styles.rolePill, 
+                  selectedRole === r ? styles.rolePillActive : styles.rolePillInactive
+                ]}
+                onPress={() => setSelectedRole(r)}
+              >
+                <Text style={[
+                  styles.rolePillText, 
+                  selectedRole === r ? styles.rolePillTextActive : styles.rolePillTextInactive
+                ]}>
+                  {r}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
           
           <TouchableOpacity 
             style={[styles.linkButton, (!inputCode || inputCode.length !== 6) && styles.linkButtonDisabled]}
@@ -488,5 +511,30 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#FFF',
+  },
+  rolePill: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    marginRight: 8,
+    borderWidth: 1,
+  },
+  rolePillActive: {
+    backgroundColor: '#E0F2FE',
+    borderColor: '#3B82F6',
+  },
+  rolePillInactive: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#E2E8F0',
+  },
+  rolePillText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  rolePillTextActive: {
+    color: '#3B82F6',
+  },
+  rolePillTextInactive: {
+    color: '#94A3B8',
   }
 });

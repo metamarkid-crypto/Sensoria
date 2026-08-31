@@ -185,13 +185,26 @@ export default function ChildAACScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     handleSpeakAll();
     
+    // Clear sentence immediately for better UX
+    const sentenceToWrap = [...currentSentence];
+    clearSentence();
+    
     let loc = location;
     try {
-      loc = await Location.getCurrentPositionAsync({});
+      // Safety Critical: 3-second strict timeout for GPS fetch
+      const locationPromise = Location.getCurrentPositionAsync({});
+      const timeoutPromise = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('GPS Timeout')), 3000)
+      );
+      
+      loc = await Promise.race([locationPromise, timeoutPromise]);
       setLocation(loc);
-    } catch(e) {}
+    } catch(e) {
+      console.warn("GPS fetch failed or timed out. Force sending message.");
+      // loc remains as the last known location, or null. We don't block.
+    }
     
-    const fullText = currentSentence.map(w => language === 'id' ? w.word_id : w.word_zh).join(' ');
+    const fullText = sentenceToWrap.map(w => language === 'id' ? w.word_id : w.word_zh).join(' ');
     
     if (pairingCode) {
       await sendAACMessage(pairingCode, {
@@ -205,8 +218,6 @@ export default function ChildAACScreen() {
     } else {
       Toast.show({ type: 'error', text1: 'Gagal', text2: 'Belum tersambung ke perangkat orang tua.', position: 'top' });
     }
-    
-    clearSentence();
   };
 
   const handleAddCustomWord = async () => {

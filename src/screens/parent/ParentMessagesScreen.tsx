@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, 
-  KeyboardAvoidingView, Platform, ScrollView, Modal, Alert 
+  KeyboardAvoidingView, Platform, ScrollView, Modal, Alert, Image 
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontAwesome5 } from '@expo/vector-icons';
@@ -11,7 +11,7 @@ import * as Haptics from 'expo-haptics';
 
 export default function ParentMessagesScreen() {
   const insets = useSafeAreaInsets();
-  const { pairingCode, customQuickReplies, addCustomQuickReply, removeCustomQuickReply, localParentName } = useAACStore();
+  const { pairingCode, customQuickReplies, addCustomQuickReply, removeCustomQuickReply, localParentName, childProfile } = useAACStore();
   
   const [messages, setMessages] = useState<any[]>([]);
   const [inputText, setInputText] = useState('');
@@ -132,6 +132,19 @@ export default function ParentMessagesScreen() {
             <Text style={[styles.senderNameTag, isCurrentUser ? styles.nameTagSelf : styles.nameTagOther]}>
               {item.senderName || 'Keluarga'}
             </Text>
+          )}
+          
+          {/* Child Identity Header */}
+          {isChild && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+              <Image 
+                source={childProfile?.gender === 'Boy' ? require('../../../assets/icon.png') : require('../../../assets/icon.png')} 
+                style={{ width: 20, height: 20, borderRadius: 10, marginRight: 6, backgroundColor: '#BAE6FD' }} 
+              />
+              <Text style={[styles.senderNameTag, { color: '#0369A1', marginBottom: 0 }]}>
+                {childProfile?.nickname || 'Anak'} {childProfile?.gender === 'Boy' ? '👦' : '👧'}
+              </Text>
+            </View>
           )}
           
           <Text style={[styles.messageText, textStyle]}>

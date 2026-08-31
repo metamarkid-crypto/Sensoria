@@ -14,9 +14,9 @@ export default function ParentHomeScreen() {
   
   const [recentMessage, setRecentMessage] = useState<any>(null);
   
-  // Analytics & Location State
+  const { childStatus } = useAACStore();
+  const currentAddress = childStatus.lastAddress || 'Lokasi belum tersedia';
   const [todayMessageCount, setTodayMessageCount] = useState<number>(0);
-  const [currentAddress, setCurrentAddress] = useState<string>('Memuat...');
   
   // NEW: Comprehensive Activity Widget State
   const TABS = ['Hari Ini', '7 Hari', '30 Hari'] as const;
@@ -144,18 +144,17 @@ export default function ParentHomeScreen() {
             <View style={styles.speechBubble}>
               <Text style={styles.messageText}>{recentMessage.text_content}</Text>
               
-              {/* Fake Waveform & Play Button */}
+              {/* Child Avatar & Nickname Header inside bubble */}
               <View style={styles.audioRow}>
                 <View style={styles.waveform}>
-                  <FontAwesome5 name="robot" size={24} color="#3B82F6" style={{marginRight: 10}} />
-                  {/* Mocking waveform with vertical bars */}
-                  {[...Array(15)].map((_, i) => (
-                    <View key={i} style={[styles.waveBar, { height: 4 + Math.random() * 12 }]} />
-                  ))}
+                  <Image 
+                    source={childProfile?.gender === 'Boy' ? require('../../../assets/icon.png') : require('../../../assets/icon.png')} 
+                    style={{ width: 24, height: 24, borderRadius: 12, marginRight: 8, backgroundColor: '#E0F2FE' }} 
+                  />
+                  <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#3B82F6' }}>
+                    {childProfile?.nickname || 'Anak'}
+                  </Text>
                 </View>
-                <TouchableOpacity style={styles.playButton} onPress={handleReplayTTS}>
-                  <FontAwesome5 name="play" size={12} color="#FFF" style={{ marginLeft: 3 }} />
-                </TouchableOpacity>
               </View>
             </View>
 
