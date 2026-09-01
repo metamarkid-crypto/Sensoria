@@ -48,9 +48,6 @@ export default function DynamicGlobalHeader({ routeName }: HeaderProps) {
       <View style={styles.iconGroup}>
         <TouchableOpacity style={[styles.iconButton, { alignSelf: 'flex-start', marginTop: 4 }]}>
           <FontAwesome5 name="bell" size={20} color="#FFFFFF" />
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>2</Text>
-          </View>
         </TouchableOpacity>
       </View>
     </View>

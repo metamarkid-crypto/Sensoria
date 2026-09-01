@@ -5,7 +5,7 @@ import { FontAwesome5 } from '@expo/vector-icons';
 import { supabase } from '../services/db/supabase';
 import { useAACStore } from '../store/useAACStore';
 import * as Haptics from 'expo-haptics';
-import { TextInput, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import { TextInput, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 
 interface Props {
   isVisible: boolean;

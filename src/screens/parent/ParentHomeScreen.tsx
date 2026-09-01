@@ -289,7 +289,7 @@ export default function ParentHomeScreen() {
                 <FontAwesome5 name="sun" size={16} color="#EA580C" />
               </View>
               <View>
-                <Text style={styles.statValue}>7</Text>
+                <Text style={styles.statValue}>0</Text>
                 <Text style={styles.statLabel}>Permintaan</Text>
               </View>
             </View>
@@ -299,7 +299,7 @@ export default function ParentHomeScreen() {
                 <FontAwesome5 name="puzzle-piece" size={16} color="#9333EA" />
               </View>
               <View>
-                <Text style={styles.statValue}>5</Text>
+                <Text style={styles.statValue}>0</Text>
                 <Text style={styles.statLabel}>Respons sosial</Text>
               </View>
             </View>

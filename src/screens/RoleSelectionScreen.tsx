@@ -20,7 +20,8 @@ export default function RoleSelectionScreen() {
   const [showSettings, setShowSettings] = useState(false);
   const [showRecovery, setShowRecovery] = useState(false);
   const [recoveryCode, setRecoveryCode] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [loadingRole, setLoadingRole] = useState<UserRole | null>(null);
+  const [isRecovering, setIsRecovering] = useState(false);
 
   // Helper UUID for Secure Store initial generation
   const generateUUID = () => {
@@ -46,7 +47,7 @@ export default function RoleSelectionScreen() {
 
   const handleSelectRole = async (role: UserRole) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setIsLoading(true);
+    setLoadingRole(role);
 
     try {
       let currentDeviceId = deviceId;
@@ -75,7 +76,7 @@ export default function RoleSelectionScreen() {
       // Fallback: still let them in even if offline
       setRole(role);
     } finally {
-      setIsLoading(false);
+      setLoadingRole(null);
     }
   };
 
@@ -85,7 +86,7 @@ export default function RoleSelectionScreen() {
       return;
     }
     
-    setIsLoading(true);
+    setIsRecovering(true);
     try {
       // Find the device with this pairing code
       const { data: devices, error: deviceError } = await supabase
@@ -136,7 +137,7 @@ export default function RoleSelectionScreen() {
     } catch (err) {
       Toast.show({ type: 'error', text1: 'Error', text2: 'Gagal memulihkan data.', position: 'top' });
     } finally {
-      setIsLoading(false);
+      setIsRecovering(false);
     }
   };
 
@@ -201,17 +202,27 @@ export default function RoleSelectionScreen() {
           </View>
 
           <View style={styles.buttonSection}>
-            <TouchableOpacity onPress={() => handleSelectRole('Child')} activeOpacity={0.9} style={styles.roleBtn} disabled={isLoading}>
+            <TouchableOpacity onPress={() => handleSelectRole('Child')} activeOpacity={0.9} style={styles.roleBtn} disabled={loadingRole !== null}>
               <Image source={require('../../assets/mode-anak.webp')} style={styles.roleImage} resizeMode="contain" />
+              {loadingRole === 'Child' && (
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(255,255,255,0.6)', justifyContent: 'center', alignItems: 'center', borderRadius: 24 }]}>
+                  <ActivityIndicator size="large" color="#00B5B8" />
+                </View>
+              )}
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={() => handleSelectRole('Parent')} activeOpacity={0.9} style={styles.roleBtn} disabled={isLoading}>
+            <TouchableOpacity onPress={() => handleSelectRole('Parent')} activeOpacity={0.9} style={styles.roleBtn} disabled={loadingRole !== null}>
               <Image source={require('../../assets/mode-orangtua.webp')} style={styles.roleImage} resizeMode="contain" />
+              {loadingRole === 'Parent' && (
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(255,255,255,0.6)', justifyContent: 'center', alignItems: 'center', borderRadius: 24 }]}>
+                  <ActivityIndicator size="large" color="#00B5B8" />
+                </View>
+              )}
             </TouchableOpacity>
           </View>
 
           <View style={styles.bottomSection}>
-            <TouchableOpacity onPress={() => setShowRecovery(true)} style={styles.recoveryBtnBox} disabled={isLoading}>
+            <TouchableOpacity onPress={() => setShowRecovery(true)} style={styles.recoveryBtnBox} disabled={loadingRole !== null}>
               <View style={styles.recoveryIconBox}>
                 <FontAwesome5 name="sync-alt" size={20} color="#FFF" />
               </View>
@@ -274,10 +285,10 @@ export default function RoleSelectionScreen() {
               maxLength={6}
               autoFocus={true}
             />
-            <TouchableOpacity style={styles.recoverySubmit} onPress={handleRecoverProfile} disabled={isLoading}>
-              {isLoading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.recoverySubmitText}>Pulihkan</Text>}
+            <TouchableOpacity style={styles.recoverySubmit} onPress={handleRecoverProfile} disabled={isRecovering}>
+              {isRecovering ? <ActivityIndicator color="#FFF" /> : <Text style={styles.recoverySubmitText}>Pulihkan</Text>}
             </TouchableOpacity>
-            <TouchableOpacity style={styles.recoveryCancel} onPress={() => setShowRecovery(false)} disabled={isLoading}>
+            <TouchableOpacity style={styles.recoveryCancel} onPress={() => setShowRecovery(false)} disabled={isRecovering}>
               <Text style={styles.recoveryCancelText}>Batal</Text>
             </TouchableOpacity>
           </View>

@@ -170,7 +170,8 @@ const styles = StyleSheet.create({
   },
   skipButton: {
     paddingVertical: 12,
-    width: 80,
+    paddingLeft: 12,
+    width: 90,
   },
   skipText: {
     color: '#94A3B8',
@@ -179,10 +180,10 @@ const styles = StyleSheet.create({
   },
   nextButton: {
     backgroundColor: '#2488FF', // Cheerful blue
-    paddingVertical: 14,
-    paddingHorizontal: 24,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
     borderRadius: 30,
-    minWidth: 120,
+    minWidth: 100,
     alignItems: 'center',
     shadowColor: '#2488FF',
     shadowOffset: { width: 0, height: 4 },
