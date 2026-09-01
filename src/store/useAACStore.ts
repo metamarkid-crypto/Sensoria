@@ -43,8 +43,6 @@ export interface AACState {
   selectedVoice: string; // LMNT voice id
   speakOnTap: boolean;
   soundFeedback: boolean;
-  childVoiceGender: 'Boy' | 'Girl';
-  parentVoiceGender: 'Dad' | 'Mom';
   
   // Appearance Settings
   cardSize: 'S' | 'M' | 'L' | 'XL';
@@ -91,8 +89,6 @@ export interface AACState {
   setSelectedVoice: (voice: string) => void;
   setSpeakOnTap: (status: boolean) => void;
   setSoundFeedback: (status: boolean) => void;
-  setChildVoiceGender: (gender: 'Boy' | 'Girl') => void;
-  setParentVoiceGender: (gender: 'Dad' | 'Mom') => void;
   setCardSize: (size: 'S' | 'M' | 'L' | 'XL') => void;
   setTextSize: (size: 'A-' | 'A' | 'A+') => void;
   setCardSpacing: (spacing: number) => void;
@@ -125,8 +121,6 @@ export const useAACStore = create<AACState>()(
       selectedVoice: 'id-female-1',
       speakOnTap: true,
       soundFeedback: true,
-      childVoiceGender: 'Boy',
-      parentVoiceGender: 'Dad',
       cardSize: 'L',
       textSize: 'A',
       cardSpacing: 10,
@@ -157,8 +151,6 @@ export const useAACStore = create<AACState>()(
       setSelectedVoice: (voice) => set({ selectedVoice: voice }),
       setSpeakOnTap: (status) => set({ speakOnTap: status }),
       setSoundFeedback: (status) => set({ soundFeedback: status }),
-      setChildVoiceGender: (gender) => set({ childVoiceGender: gender }),
-      setParentVoiceGender: (gender) => set({ parentVoiceGender: gender }),
       setCardSize: (size) => set({ cardSize: size }),
       setTextSize: (size) => set({ textSize: size }),
       setCardSpacing: (spacing) => set({ cardSpacing: spacing }),

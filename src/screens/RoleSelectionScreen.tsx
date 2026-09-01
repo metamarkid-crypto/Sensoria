@@ -119,7 +119,7 @@ export default function RoleSelectionScreen() {
         setChildProfile({
           fullName: profile.full_name,
           nickname: profile.nickname,
-          gender: profile.settings?.childVoiceGender?.toLowerCase() === 'girl' ? 'girl' : 'boy'
+          gender: profile.settings?.childProfileGender || 'Boy'
         });
         
         // Load remote settings to Zustand

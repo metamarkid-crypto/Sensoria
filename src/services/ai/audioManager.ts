@@ -6,7 +6,7 @@ import { useAACStore } from '../../store/useAACStore';
 import { recordAudioAccess, getLRUAudioFiles, removeAudioMetadata } from '../db/sqlite';
 import { logger } from '../../utils/logger';
 
-const CACHE_DIR = FileSystem.cacheDirectory + 'lmnt_audio/';
+const CACHE_DIR = FileSystem.cacheDirectory + 'fish_audio/';
 const MAX_CACHE_SIZE_MB = parseInt(process.env.EXPO_PUBLIC_MAX_AUDIO_CACHE_MB || '50', 10);
 
 // Ensure cache directory exists and respect max size limit
@@ -65,22 +65,32 @@ const ensureCacheLimit = async () => {
   }
 };
 
-export const clearAudioCache = async (text: string, language: 'id' | 'en' | 'zh', role: 'Child' | 'Parent') => {
+export const clearAudioCache = async (text: string, language: 'id' | 'en' | 'zh', role: string) => {
   const store = useAACStore.getState();
-  const { childVoiceGender, parentVoiceGender } = store;
+  
   let voiceId = '';
   if (role === 'Child') {
-    voiceId = childVoiceGender === 'Boy' 
+    voiceId = store.childProfile?.gender === 'Boy' 
       ? process.env.EXPO_PUBLIC_VOICE_BOY || 'daniel' 
       : process.env.EXPO_PUBLIC_VOICE_GIRL || 'lily';
   } else {
-    voiceId = parentVoiceGender === 'Dad'
-      ? process.env.EXPO_PUBLIC_VOICE_DAD || 'james'
-      : process.env.EXPO_PUBLIC_VOICE_MOM || 'sarah';
+    // Smart Role-to-Voice Mapping for Parents/Others
+    const lowerRole = role.toLowerCase();
+    const maleKeywords = ['ayah', 'papa', 'papi', 'abi', 'bapak', 'kakek', 'paman', 'om'];
+    const femaleKeywords = ['ibu', 'mama', 'mami', 'bunda', 'nenek', 'tante', 'bibi'];
+    
+    if (maleKeywords.some(kw => lowerRole.includes(kw))) {
+      voiceId = process.env.EXPO_PUBLIC_VOICE_DAD || 'james';
+    } else if (femaleKeywords.some(kw => lowerRole.includes(kw))) {
+      voiceId = process.env.EXPO_PUBLIC_VOICE_MOM || 'sarah';
+    } else {
+      // Fallback
+      voiceId = process.env.EXPO_PUBLIC_VOICE_MOM || 'sarah';
+    }
   }
   
   const safeText = text.replace(/[^a-zA-Z0-9]/g, '_');
-  const fileName = `lmnt_${language}_${voiceId}_${store.speechRate}_${safeText}.mp3`;
+  const fileName = `fish_${language}_${voiceId}_${store.speechRate}_${safeText}.mp3`;
   const fileUri = CACHE_DIR + fileName;
   
   const fileInfo = await FileSystem.getInfoAsync(fileUri);
@@ -90,9 +100,9 @@ export const clearAudioCache = async (text: string, language: 'id' | 'en' | 'zh'
   }
 };
 
-export const playTTS = async (text: string, language: 'id' | 'en' | 'zh', role: 'Child' | 'Parent') => {
+export const playTTS = async (text: string, language: 'id' | 'en' | 'zh', role: string) => {
   const store = useAACStore.getState();
-  const { speechRate, childVoiceGender, parentVoiceGender } = store;
+  const { speechRate } = store;
 
   // 1. Cek Local Audio Map
   if (localAudioMap[text]) {
@@ -105,18 +115,34 @@ export const playTTS = async (text: string, language: 'id' | 'en' | 'zh', role: 
     }
   }
 
-  // 2. Tentukan Voice ID dari .env untuk LMNT
-  const apiKey = process.env.EXPO_PUBLIC_LMNT_API_KEY;
+  // 2. Tentukan Voice ID dari .env untuk Fish Audio
+  const apiKey = process.env.EXPO_PUBLIC_FISH_AUDIO_API_KEY;
   
   let voiceId = '';
+  let isMale = false;
+  
   if (role === 'Child') {
-    voiceId = childVoiceGender === 'Boy' 
-      ? process.env.EXPO_PUBLIC_VOICE_BOY || 'daniel' // Default fallback
+    isMale = store.childProfile?.gender === 'Boy';
+    voiceId = isMale
+      ? process.env.EXPO_PUBLIC_VOICE_BOY || 'daniel'
       : process.env.EXPO_PUBLIC_VOICE_GIRL || 'lily';
   } else {
-    voiceId = parentVoiceGender === 'Dad'
-      ? process.env.EXPO_PUBLIC_VOICE_DAD || 'james'
-      : process.env.EXPO_PUBLIC_VOICE_MOM || 'sarah';
+    // Smart Role-to-Voice Mapping for Parents/Others
+    const lowerRole = role.toLowerCase();
+    const maleKeywords = ['ayah', 'papa', 'papi', 'abi', 'bapak', 'kakek', 'paman', 'om'];
+    const femaleKeywords = ['ibu', 'mama', 'mami', 'bunda', 'nenek', 'tante', 'bibi'];
+    
+    if (maleKeywords.some(kw => lowerRole.includes(kw))) {
+      isMale = true;
+      voiceId = process.env.EXPO_PUBLIC_VOICE_DAD || 'james';
+    } else if (femaleKeywords.some(kw => lowerRole.includes(kw))) {
+      isMale = false;
+      voiceId = process.env.EXPO_PUBLIC_VOICE_MOM || 'sarah';
+    } else {
+      // Fallback
+      isMale = false;
+      voiceId = process.env.EXPO_PUBLIC_VOICE_MOM || 'sarah';
+    }
   }
 
   // Jika API key LMNT tersedia, coba fetch
@@ -125,7 +151,7 @@ export const playTTS = async (text: string, language: 'id' | 'en' | 'zh', role: 
       await ensureCacheLimit();
       const safeText = text.replace(/[^a-zA-Z0-9]/g, '_');
       // Include speechRate in cache filename so different speeds trigger new downloads
-      const fileName = `lmnt_${language}_${voiceId}_${speechRate}_${safeText}.mp3`;
+      const fileName = `fish_${language}_${voiceId}_${speechRate}_${safeText}.mp3`;
       const fileUri = CACHE_DIR + fileName;
 
         // Modify text to sound more relaxed/suprasegmental (adding conversational pauses)
@@ -135,26 +161,50 @@ export const playTTS = async (text: string, language: 'id' | 'en' | 'zh', role: 
         const fileInfo = await FileSystem.getInfoAsync(fileUri);
         
         if (!fileInfo.exists) {
-          // Fetch dari LMNT REST API (Streaming buffer)
-          console.log('Fetching from LMNT API...');
+          // Fetch dari Fish Audio REST API (POST request)
+          console.log('Fetching from Fish Audio API...');
           
-          // Construct query params
-          // Adding 'language' parameter to force correct accent (e.g. 'id' or 'zh')
-          const lmntLang = language === 'id' ? 'id' : language === 'en' ? 'en' : 'zh';
-          
-          const downloadRes = await FileSystem.downloadAsync(
-            `https://api.lmnt.com/v1/ai/speech?voice=${voiceId}&format=mp3&text=${encodeURIComponent(relaxedText)}&speed=${speechRate}&language=${lmntLang}`,
-            fileUri,
-            {
-              headers: {
-                'X-API-Key': apiKey
+          const response = await fetch('https://api.fish.audio/v1/tts', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+              'Content-Type': 'application/json',
+              'model': 's2.1-pro-free'
+            },
+            body: JSON.stringify({
+              text: relaxedText,
+              reference_id: voiceId,
+              format: 'mp3',
+              latency: 'normal',
+              prosody: {
+                speed: speechRate,
+                volume: 0,
+                normalize_loudness: true
               }
-            }
-          );
+            })
+          });
           
-          if (downloadRes.status !== 200) {
-             throw new Error('Download failed');
+          if (!response.ok) {
+            throw new Error(`Fish Audio API failed: ${response.status} ${response.statusText}`);
           }
+          
+          // Convert binary Blob to Base64 and save to Cache
+          const blob = await response.blob();
+          const reader = new FileReader();
+          reader.readAsDataURL(blob);
+          
+          await new Promise<void>((resolve, reject) => {
+            reader.onloadend = async () => {
+              try {
+                const base64data = (reader.result as string).split(',')[1];
+                await FileSystem.writeAsStringAsync(fileUri, base64data, { encoding: FileSystem.EncodingType.Base64 });
+                resolve();
+              } catch (err) {
+                reject(err);
+              }
+            };
+            reader.onerror = reject;
+          });
           
           // Record access and size in SQLite LRU cache metadata
           const newFileInfo = await FileSystem.getInfoAsync(fileUri);
@@ -172,7 +222,7 @@ export const playTTS = async (text: string, language: 'id' | 'en' | 'zh', role: 
       return;
 
     } catch (error) {
-      console.log('LMNT Error, fallback ke Offline TTS:', error);
+      console.log('Fish Audio Error, fallback ke Offline TTS:', error);
       logger.logError(error, { 
         action: 'ai_voice_generation', 
         role, 
@@ -187,9 +237,9 @@ export const playTTS = async (text: string, language: 'id' | 'en' | 'zh', role: 
   // Manipulasi Pitch & Rate
   let pitch = 1.0;
   if (role === 'Child') {
-    pitch = childVoiceGender === 'Boy' ? 1.4 : 1.7;
+    pitch = isMale ? 1.4 : 1.7;
   } else {
-    pitch = parentVoiceGender === 'Dad' ? 0.7 : 1.2;
+    pitch = isMale ? 0.7 : 1.2;
   }
 
   Speech.speak(text, { 

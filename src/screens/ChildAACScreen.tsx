@@ -24,7 +24,7 @@ export default function ChildAACScreen() {
   const { 
     currentSentence, clearSentence, addToSentence, setRole, 
     language, childProfile, pairingCode, deviceId, 
-    setSpeechRate, setChildVoiceGender,
+    setSpeechRate,
     cardSize, cardSpacing, speakOnTap
   } = useAACStore();
   const [words, setWords] = useState<AACWord[]>([]);
@@ -81,7 +81,8 @@ export default function ChildAACScreen() {
 
     const channel = subscribeToAACMessages(pairingCode, (payload: any) => {
       if (payload.sender === 'Parent') {
-        playTTS(payload.text, language, 'Parent');
+        const senderName = payload.senderName || 'Parent';
+        playTTS(payload.text, language, senderName);
         Toast.show({ type: 'info', text1: '👩‍👦 Pesan dari Orang Tua', text2: payload.text, position: 'top', visibilityTime: 4000 });
       }
     });

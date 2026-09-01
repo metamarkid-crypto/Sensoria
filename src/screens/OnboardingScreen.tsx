@@ -13,7 +13,7 @@ export default function OnboardingScreen({ navigation }: any) {
   const [gender, setGender] = useState<'boy' | 'girl' | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const { setChildProfile, setChildVoiceGender, deviceId } = useAACStore();
+  const { setChildProfile, deviceId } = useAACStore();
 
   const handleSave = async () => {
     if (!fullName.trim() || !nickname.trim() || !gender) {
@@ -27,7 +27,6 @@ export default function OnboardingScreen({ navigation }: any) {
     try {
       // 1. Simpan ke local store
       setChildProfile({ fullName: fullName.trim(), nickname: nickname.trim(), gender: gender === 'boy' ? 'Boy' : 'Girl' });
-      setChildVoiceGender(gender === 'boy' ? 'Boy' : 'Girl');
       
       // 2. Simpan ke Supabase (jika sudah ada koneksi)
       if (deviceId) {
@@ -36,7 +35,6 @@ export default function OnboardingScreen({ navigation }: any) {
           full_name: fullName.trim(),
           nickname: nickname.trim(),
           settings: {
-            childVoiceGender: gender === 'boy' ? 'Boy' : 'Girl',
             speechRate: 1.0
           }
         });

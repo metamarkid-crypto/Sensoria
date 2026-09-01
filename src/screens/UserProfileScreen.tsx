@@ -22,7 +22,7 @@ export default function UserProfileScreen() {
       setFullName(childProfile.full_name || childProfile.fullName || '');
       setNickname(childProfile.nickname || '');
       // SAFEGUARD 3: Ensure we strictly read the JSONB payload
-      setGender(childProfile.settings?.childVoiceGender === 'Girl' ? 'Girl' : 'Boy');
+      setGender(childProfile.gender);
     }
   }, [childProfile]);
 
@@ -37,10 +37,8 @@ export default function UserProfileScreen() {
       if (!childProfile?.device_id) throw new Error("Device ID tidak ditemukan.");
 
       // SAFEGUARD 3: Strict Gender Payload
-      const updatedSettings = {
-        ...(childProfile.settings || {}),
-        childVoiceGender: gender // strictly 'Boy' or 'Girl'
-      };
+      const updatedSettings = { ...childProfile.settings };
+      // childVoiceGender is no longer needed
 
       const { error } = await supabase
         .from('child_profiles')
