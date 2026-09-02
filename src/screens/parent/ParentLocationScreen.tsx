@@ -159,45 +159,55 @@ export default function ParentLocationScreen() {
 
   return (
     <View style={styles.container}>
-      {/* 1. BACKGROUND MAP */}
-      <View style={styles.mapBackground}>
-        <MapView
-          style={StyleSheet.absoluteFillObject}
-          provider={PROVIDER_GOOGLE}
-          region={{
-            latitude: Number(childLat) || -6.200000,
-            longitude: Number(childLng) || 106.816666,
-            latitudeDelta: 0.005,
-            longitudeDelta: 0.005,
-          }}
-        >
-          <Marker coordinate={{ latitude: Number(childLat) || -6.200000, longitude: Number(childLng) || 106.816666 }}>
-            <View style={styles.customMarker}>
-              <Image source={avatarSource} style={styles.markerAvatar} />
-            </View>
-          </Marker>
+      {/* 1. THE WRAPPER (Restoring the Rounded Corners over the Global Header) */}
+      <View style={styles.overlapWrapper}>
+        
+        {/* 2. BACKGROUND MAP (Static, Absolute to the Wrapper) */}
+        <View style={styles.mapContainer}>
+          <MapView
+            style={StyleSheet.absoluteFillObject}
+            provider={PROVIDER_GOOGLE}
+            region={{
+              latitude: Number(childLat) || -6.200000,
+              longitude: Number(childLng) || 106.816666,
+              latitudeDelta: 0.005,
+              longitudeDelta: 0.005,
+            }}
+          >
+            <Marker coordinate={{ latitude: Number(childLat) || -6.200000, longitude: Number(childLng) || 106.816666 }}>
+              <View style={styles.customMarker}>
+                <Image source={avatarSource} style={styles.markerAvatar} />
+              </View>
+            </Marker>
 
-          {safeZones.map(zone => (
-            <Circle
-              key={zone.id}
-              center={{ latitude: Number(zone.lat), longitude: Number(zone.lng) }}
-              radius={Number(zone.radius)}
-              fillColor="rgba(59, 130, 246, 0.2)"
-              strokeColor="rgba(59, 130, 246, 0.8)"
-              strokeWidth={2}
-            />
-          ))}
-        </MapView>
-      </View>
+            {safeZones.map(zone => (
+              <Circle
+                key={zone.id}
+                center={{ latitude: Number(zone.lat), longitude: Number(zone.lng) }}
+                radius={Number(zone.radius)}
+                fillColor="rgba(59, 130, 246, 0.2)"
+                strokeColor="rgba(59, 130, 246, 0.8)"
+                strokeWidth={2}
+              />
+            ))}
+          </MapView>
+        </View>
 
-      {/* 2. FOREGROUND SCROLLVIEW */}
-      <ScrollView 
-        style={styles.scrollView} 
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Overlapping Card */}
-        <View style={styles.overlappingCard}>
+        {/* 3. FOREGROUND SCROLLVIEW (Absolute, covering the whole screen) */}
+        <View style={styles.overlayContainer} pointerEvents="box-none">
+          <ScrollView 
+            style={styles.scrollView} 
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+          >
+            {/* Transparent Spacer to reveal the map behind it */}
+            <View style={styles.transparentSpacer} />
+
+            {/* Solid Content Area */}
+            <View style={styles.solidContent}>
+              
+              {/* The Overlapping Card (Pulled up into the transparent space) */}
+              <View style={styles.overlappingCard}>
           <View style={styles.cardTopRow}>
               <Image source={avatarSource} style={styles.cardAvatar} />
               <View style={styles.cardHeaderInfo}>
@@ -265,7 +275,11 @@ export default function ParentLocationScreen() {
               </View>
             );
           })}
-      </ScrollView>
+          })}
+            </View>
+          </ScrollView>
+        </View>
+      </View>
 
       {/* Smart Add Modal */}
       <Modal visible={isAddModalVisible} transparent animationType="fade">
@@ -333,46 +347,42 @@ export default function ParentLocationScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#181824', // Matches Global Header
   },
-  mapBackground: {
+  overlapWrapper: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    marginTop: -40, // Pulls up over the header
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    overflow: 'hidden', // Required to clip the map corners
+  },
+  mapContainer: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: height * 0.45,
-    zIndex: 0,
-    // STRICTLY NO borderRadius OR overflow: 'hidden' HERE
+    height: height * 0.55, // Map takes up 55% of the screen
+    backgroundColor: '#E2E8F0', // Fallback color
   },
-  customMarker: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#FFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: '#3B82F6',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-  },
-  markerAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  overlayContainer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 10,
   },
   scrollView: {
     flex: 1,
-    zIndex: 1,
   },
-  scrollContent: {
-    paddingTop: (height * 0.45) - 40, // Pushes content down, leaving 40px overlap
+  transparentSpacer: {
+    height: (height * 0.55) - 60, // Leaves 60px of map to be overlapped by the card
+  },
+  solidContent: {
+    backgroundColor: '#F8FAFC',
+    minHeight: height, // Ensures the background stays solid when scrolling up
     paddingHorizontal: 16,
+    paddingBottom: 120,
   },
   overlappingCard: {
+    marginTop: -40, // Pulls the card up into the transparent spacer
     backgroundColor: '#FFF',
     borderRadius: 24,
     padding: 20,
