@@ -171,14 +171,12 @@ export default function ParentLocationScreen() {
               longitudeDelta: 0.01,
             }}
           >
-          {/* Custom Marker */}
-          <Marker coordinate={{ latitude: childLat, longitude: childLng }} zIndex={2}>
+          <Marker coordinate={{ latitude: childLat, longitude: childLng }}>
             <View style={styles.customMarker}>
               <Image source={avatarSource} style={styles.markerAvatar} />
             </View>
           </Marker>
 
-          {/* Safe Zone Circles */}
           {safeZones.map(zone => (
             <Circle
               key={zone.id}
@@ -187,7 +185,6 @@ export default function ParentLocationScreen() {
               fillColor="rgba(59, 130, 246, 0.2)"
               strokeColor="rgba(59, 130, 246, 0.8)"
               strokeWidth={2}
-              zIndex={1}
             />
           ))}
           </MapView>
@@ -195,81 +192,79 @@ export default function ParentLocationScreen() {
 
         {/* Bottom Scrollable Content */}
       <ScrollView 
-        style={styles.scrollView} 
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
-        showsVerticalScrollIndicator={false}
-      >
+          style={styles.scrollView} 
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
+          showsVerticalScrollIndicator={false}
+        >
         {/* Overlapping Card */}
         <View style={styles.overlappingCard}>
           <View style={styles.cardTopRow}>
-            <Image source={avatarSource} style={styles.cardAvatar} />
-            <View style={styles.cardHeaderInfo}>
-              <Text style={styles.cardName} numberOfLines={1}>{fullName}</Text>
-              
-              {/* Dynamic Safe Zone Status */}
-              <View style={styles.statusBadgeRow}>
-                {activeZone ? (
-                  <>
-                    <FontAwesome5 name="check-circle" size={14} color="#059669" />
-                    <Text style={styles.statusBadgeTextSafe}>Di area aman: {activeZone.name}</Text>
-                  </>
-                ) : (
-                  <>
-                    <FontAwesome5 name="exclamation-circle" size={14} color="#DC2626" />
-                    <Text style={styles.statusBadgeTextDanger}>Di luar area aman</Text>
-                  </>
-                )}
+              <Image source={avatarSource} style={styles.cardAvatar} />
+              <View style={styles.cardHeaderInfo}>
+                <Text style={styles.cardName} numberOfLines={1}>{fullName}</Text>
+                <View style={styles.statusBadgeRow}>
+                  {activeZone ? (
+                    <>
+                      <FontAwesome5 name="check-circle" size={14} color="#059669" />
+                      <Text style={styles.statusBadgeTextSafe}>Di area aman: {activeZone.name}</Text>
+                    </>
+                  ) : (
+                    <>
+                      <FontAwesome5 name="exclamation-circle" size={14} color="#DC2626" />
+                      <Text style={styles.statusBadgeTextDanger}>Di luar area aman</Text>
+                    </>
+                  )}
+                </View>
               </View>
             </View>
-          </View>
 
           <View style={styles.divider} />
 
-          <Text style={styles.locationLabel}>Lokasi Terakhir</Text>
-          <Text style={styles.locationAddress} numberOfLines={2}>
-            {childStatus.lastAddress || 'Belum ada data alamat'}
-          </Text>
-          <Text style={styles.timestamp}>
-            Pembaruan terakhir: {childStatus.lastSeen ? childStatus.lastSeen : 'Belum diketahui'}
-          </Text>
+            <Text style={styles.locationLabel}>Lokasi Terakhir</Text>
+            <Text style={styles.locationAddress} numberOfLines={2}>
+              {childStatus.lastAddress || 'Belum ada data alamat'}
+            </Text>
+            <Text style={styles.timestamp}>
+              Pembaruan terakhir: {childStatus.lastSeen ? childStatus.lastSeen : 'Belum diketahui'}
+            </Text>
 
-          <TouchableOpacity style={styles.refreshButton} onPress={handleRefreshLocation} activeOpacity={0.8}>
-            <FontAwesome5 name="sync-alt" size={14} color="#FFF" style={{ marginRight: 8 }} />
-            <Text style={styles.refreshButtonText}>Perbarui Lokasi</Text>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity style={styles.refreshButton} onPress={handleRefreshLocation} activeOpacity={0.8}>
+              <FontAwesome5 name="sync-alt" size={14} color="#FFF" style={{ marginRight: 8 }} />
+              <Text style={styles.refreshButtonText}>Perbarui Lokasi</Text>
+            </TouchableOpacity>
+          </View>
 
         {/* Safe Zone List */}
         <View style={styles.zonesHeaderRow}>
-          <Text style={styles.zonesTitle}>Area Aman</Text>
-          <TouchableOpacity style={styles.manageBtn} onPress={openAddModal}>
-            <Text style={styles.manageBtnText}>Kelola</Text>
-            <FontAwesome5 name="cog" size={12} color="#3B82F6" />
-          </TouchableOpacity>
+            <Text style={styles.zonesTitle}>Area Aman</Text>
+            <TouchableOpacity style={styles.manageBtn} onPress={openAddModal}>
+              <Text style={styles.manageBtnText}>Kelola</Text>
+              <FontAwesome5 name="cog" size={12} color="#3B82F6" />
+            </TouchableOpacity>
         </View>
 
         {safeZones.map(zone => {
-          const isCurrentlyHere = activeZone?.id === zone.id;
-          return (
-            <View key={zone.id} style={styles.zoneItem}>
-              <View style={styles.zoneIconWrap}>
-                <FontAwesome5 name="shield-alt" size={16} color={isCurrentlyHere ? "#059669" : "#64748B"} />
-              </View>
-              <View style={styles.zoneInfo}>
-                <Text style={styles.zoneName}>{zone.name}</Text>
-                <Text style={styles.zoneRadius}>Radius: {zone.radius} meter</Text>
-              </View>
-              {isCurrentlyHere && (
-                <View style={styles.activeZoneTag}>
-                  <Text style={styles.activeZoneText}>Aktif</Text>
+            const isCurrentlyHere = activeZone?.id === zone.id;
+            return (
+              <View key={zone.id} style={styles.zoneItem}>
+                <View style={styles.zoneIconWrap}>
+                  <FontAwesome5 name="shield-alt" size={16} color={isCurrentlyHere ? "#059669" : "#64748B"} />
                 </View>
-              )}
-              <TouchableOpacity onPress={() => handleDeleteZone(zone.id)} style={styles.deleteZoneBtn}>
-                <FontAwesome5 name="trash" size={14} color="#EF4444" />
-              </TouchableOpacity>
-            </View>
-          );
-        })}
+                <View style={styles.zoneInfo}>
+                  <Text style={styles.zoneName}>{zone.name}</Text>
+                  <Text style={styles.zoneRadius}>Radius: {zone.radius} meter</Text>
+                </View>
+                {isCurrentlyHere && (
+                  <View style={styles.activeZoneTag}>
+                    <Text style={styles.activeZoneText}>Aktif</Text>
+                  </View>
+                )}
+                <TouchableOpacity onPress={() => handleDeleteZone(zone.id)} style={styles.deleteZoneBtn}>
+                  <FontAwesome5 name="trash" size={14} color="#EF4444" />
+                </TouchableOpacity>
+              </View>
+            );
+          })}
       </ScrollView>
 
       {/* Smart Add Modal */}
@@ -348,20 +343,15 @@ const styles = StyleSheet.create({
     marginTop: -60,
     zIndex: 10,
     elevation: 5,
+    overflow: 'hidden', 
   },
   mapContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
     height: height * 0.45,
-    zIndex: 0,
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    overflow: 'hidden',
+    width: '100%',
+    backgroundColor: '#E2E8F0',
   },
   map: {
-    ...StyleSheet.absoluteFillObject,
+    flex: 1,
   },
   customMarker: {
     width: 44,
@@ -385,10 +375,8 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
-    zIndex: 1,
   },
   scrollContent: {
-    paddingTop: (height * 0.45) - 40, // Push content down to expose map, with negative margin overlap
     paddingHorizontal: 16,
   },
   overlappingCard: {

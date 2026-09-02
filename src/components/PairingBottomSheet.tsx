@@ -264,15 +264,19 @@ export default function PairingBottomSheet({ isVisible, onClose }: Props) {
 
   return (
     <Modal visible={isVisible} animationType="slide" transparent onRequestClose={onClose}>
-      <TouchableOpacity 
-        style={styles.bottomSheetOverlay} 
-        activeOpacity={1} 
-        onPress={onClose}
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
       >
-        <View 
-          style={[styles.bottomSheetContainer, { paddingBottom: Math.max(insets.bottom, 20) }]}
-          onStartShouldSetResponder={() => true}
+        <TouchableOpacity 
+          style={styles.bottomSheetOverlay} 
+          activeOpacity={1} 
+          onPress={onClose}
         >
+          <View 
+            style={[styles.bottomSheetContainer, { paddingBottom: Math.max(insets.bottom, 20) }]}
+            onStartShouldSetResponder={() => true}
+          >
           
           {/* Header */}
           <View style={styles.sheetHeader}>
@@ -289,6 +293,7 @@ export default function PairingBottomSheet({ isVisible, onClose }: Props) {
 
         </View>
       </TouchableOpacity>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

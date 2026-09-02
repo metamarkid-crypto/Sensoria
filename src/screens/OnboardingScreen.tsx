@@ -55,7 +55,8 @@ export default function OnboardingScreen({ navigation }: any) {
       <LinearGradient colors={['#F0F8FF', '#E0FFFF']} style={StyleSheet.absoluteFill} />
       
       <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
         style={styles.container}
       >
         <ScrollView contentContainerStyle={styles.scrollContent}>

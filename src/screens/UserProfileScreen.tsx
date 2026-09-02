@@ -95,7 +95,8 @@ export default function UserProfileScreen() {
       </View>
 
       <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
         style={{ flex: 1 }}
       >
         <ScrollView contentContainerStyle={styles.content}>

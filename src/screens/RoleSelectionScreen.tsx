@@ -271,7 +271,7 @@ export default function RoleSelectionScreen() {
       <Modal visible={showRecovery} transparent animationType="slide">
         <KeyboardAvoidingView 
           style={styles.modalOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
         >
           <View style={styles.recoveryContainer}>
             <Text style={styles.recoveryTitle}>Pulihkan Profil Anak</Text>
