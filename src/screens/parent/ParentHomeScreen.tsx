@@ -96,8 +96,30 @@ export default function ParentHomeScreen() {
       })
       .subscribe();
 
+    const profileSub = supabase.channel('home_child_profile')
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'child_profiles',
+        filter: `device_id=eq.${childProfile?.device_id || ''}`
+      }, (payload: any) => {
+        if (payload.new) {
+          const currentProfile = useAACStore.getState().childProfile;
+          useAACStore.getState().setChildProfile({
+            ...currentProfile,
+            nickname: payload.new.nickname || currentProfile?.nickname,
+            full_name: payload.new.full_name || currentProfile?.full_name,
+            fullName: payload.new.full_name || currentProfile?.fullName,
+            gender: payload.new.settings?.childProfileGender || currentProfile?.gender,
+            settings: payload.new.settings || currentProfile?.settings
+          });
+        }
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(msgSub);
+      supabase.removeChannel(profileSub);
     };
   }, [pairingCode]);
 
@@ -158,21 +180,20 @@ export default function ParentHomeScreen() {
               </View>
             </View>
 
-            {/* Quick Replies (Flex 1) */}
             <View style={styles.quickReplyRow}>
               <TouchableOpacity style={styles.flexBtn} onPress={() => handleQuickReply('Oke')} activeOpacity={0.8}>
                 <LinearGradient colors={['#FF9800', '#F57C00']} style={styles.btnGradient}>
-                  <Text style={styles.btnText}>👍 Oke</Text>
+                  <Text style={styles.btnText}>Oke</Text>
                 </LinearGradient>
               </TouchableOpacity>
               <TouchableOpacity style={styles.flexBtn} onPress={() => handleQuickReply('Ya')} activeOpacity={0.8}>
                 <LinearGradient colors={['#34D399', '#10B981']} style={styles.btnGradient}>
-                  <Text style={styles.btnText}>☑️ Ya</Text>
+                  <Text style={styles.btnText}>Ya</Text>
                 </LinearGradient>
               </TouchableOpacity>
               <TouchableOpacity style={styles.flexBtn} onPress={() => handleQuickReply('Tidak')} activeOpacity={0.8}>
                 <LinearGradient colors={['#F87171', '#EF4444']} style={styles.btnGradient}>
-                  <Text style={styles.btnText}>❌ Tidak</Text>
+                  <Text style={styles.btnText}>Tidak</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>

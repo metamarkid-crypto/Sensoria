@@ -93,6 +93,19 @@ export default function ChildAACScreen() {
         { event: 'UPDATE', schema: 'public', table: 'child_profiles', filter: `device_id=eq.${deviceId}` },
         (payload: any) => {
           if (payload.new && payload.new.settings) {
+            const currentProfile = useAACStore.getState().childProfile;
+            
+            // Perbarui childProfile dengan gender dari settings dan field lainnya
+            useAACStore.getState().setChildProfile({
+              ...currentProfile,
+              nickname: payload.new.nickname || currentProfile?.nickname,
+              full_name: payload.new.full_name || currentProfile?.full_name,
+              fullName: payload.new.full_name || currentProfile?.fullName,
+              gender: payload.new.settings.childProfileGender || currentProfile?.gender,
+              settings: payload.new.settings
+            });
+
+            // Juga terapkan setting langsung (jika ada settings lain seperti speechRate dll)
             useAACStore.setState(payload.new.settings);
           }
         }

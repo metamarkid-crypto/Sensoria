@@ -131,7 +131,7 @@ export const useAACStore = create<AACState>()(
       releaseToSpeak: false,
       
       aboutContent: null,
-      customQuickReplies: ['❤️ Mama di sini', '⏳ Tunggu sebentar ya', '🍎 Makan dulu yuk'],
+      customQuickReplies: ['Mama di sini', 'Tunggu sebentar ya', 'Makan dulu yuk'],
       childStatus: { isOnline: false, lastSeen: null, lat: null, lng: null, lastAddress: null },
       localParentName: 'Orang Tua',
       

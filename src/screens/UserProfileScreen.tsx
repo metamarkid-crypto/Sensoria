@@ -37,7 +37,7 @@ export default function UserProfileScreen() {
       if (!childProfile?.device_id) throw new Error("Device ID tidak ditemukan.");
 
       // SAFEGUARD 3: Strict Gender Payload
-      const updatedSettings = { ...childProfile.settings };
+      const updatedSettings = { ...childProfile.settings, childProfileGender: gender };
       // childVoiceGender is no longer needed
 
       const { error } = await supabase
@@ -57,6 +57,7 @@ export default function UserProfileScreen() {
         full_name: fullName,
         fullName: fullName,
         nickname: nickname,
+        gender: gender,
         settings: updatedSettings
       });
 

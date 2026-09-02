@@ -164,7 +164,8 @@ export default function ParentMessagesScreen() {
 
       <KeyboardAvoidingView 
         style={styles.flex1} 
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 20}
       >
         <FlatList
           ref={flatListRef}

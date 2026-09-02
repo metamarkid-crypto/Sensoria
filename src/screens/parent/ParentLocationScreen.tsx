@@ -159,19 +159,19 @@ export default function ParentLocationScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.overlapWrapper}>
-        <View style={styles.mapContainer}>
-          <MapView
-            style={styles.map}
-            provider={PROVIDER_GOOGLE}
-            initialRegion={{
-              latitude: childLat,
-              longitude: childLng,
-              latitudeDelta: 0.01,
-              longitudeDelta: 0.01,
-            }}
-          >
-          <Marker coordinate={{ latitude: childLat, longitude: childLng }}>
+      {/* 1. BACKGROUND MAP */}
+      <View style={styles.mapBackground}>
+        <MapView
+          style={StyleSheet.absoluteFillObject}
+          provider={PROVIDER_GOOGLE}
+          region={{
+            latitude: Number(childLat) || -6.200000,
+            longitude: Number(childLng) || 106.816666,
+            latitudeDelta: 0.005,
+            longitudeDelta: 0.005,
+          }}
+        >
+          <Marker coordinate={{ latitude: Number(childLat) || -6.200000, longitude: Number(childLng) || 106.816666 }}>
             <View style={styles.customMarker}>
               <Image source={avatarSource} style={styles.markerAvatar} />
             </View>
@@ -180,22 +180,22 @@ export default function ParentLocationScreen() {
           {safeZones.map(zone => (
             <Circle
               key={zone.id}
-              center={{ latitude: zone.lat, longitude: zone.lng }}
-              radius={zone.radius}
+              center={{ latitude: Number(zone.lat), longitude: Number(zone.lng) }}
+              radius={Number(zone.radius)}
               fillColor="rgba(59, 130, 246, 0.2)"
               strokeColor="rgba(59, 130, 246, 0.8)"
               strokeWidth={2}
             />
           ))}
-          </MapView>
-        </View>
+        </MapView>
+      </View>
 
-        {/* Bottom Scrollable Content */}
+      {/* 2. FOREGROUND SCROLLVIEW */}
       <ScrollView 
-          style={styles.scrollView} 
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
-          showsVerticalScrollIndicator={false}
-        >
+        style={styles.scrollView} 
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Overlapping Card */}
         <View style={styles.overlappingCard}>
           <View style={styles.cardTopRow}>
@@ -325,7 +325,7 @@ export default function ParentLocationScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      </View>
+      </ScrollView>
     </View>
   );
 }
@@ -333,25 +333,16 @@ export default function ParentLocationScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#181824',
-  },
-  overlapWrapper: {
-    flex: 1,
     backgroundColor: '#F8FAFC',
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    marginTop: -60,
-    zIndex: 10,
-    elevation: 5,
-    overflow: 'hidden', 
   },
-  mapContainer: {
+  mapBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
     height: height * 0.45,
-    width: '100%',
-    backgroundColor: '#E2E8F0',
-  },
-  map: {
-    flex: 1,
+    zIndex: 0,
+    // STRICTLY NO borderRadius OR overflow: 'hidden' HERE
   },
   customMarker: {
     width: 44,
@@ -375,8 +366,10 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+    zIndex: 1,
   },
   scrollContent: {
+    paddingTop: (height * 0.45) - 40, // Pushes content down, leaving 40px overlap
     paddingHorizontal: 16,
   },
   overlappingCard: {

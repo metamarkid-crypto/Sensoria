@@ -35,7 +35,8 @@ export default function OnboardingScreen({ navigation }: any) {
           full_name: fullName.trim(),
           nickname: nickname.trim(),
           settings: {
-            speechRate: 1.0
+            speechRate: 1.0,
+            childProfileGender: gender === 'boy' ? 'Boy' : 'Girl'
           }
         });
       }
