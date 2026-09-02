@@ -325,7 +325,7 @@ export default function ParentLocationScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      </ScrollView>
+
     </View>
   );
 }
