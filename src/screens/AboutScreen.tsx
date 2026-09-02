@@ -14,9 +14,9 @@ export default function AboutScreen() {
   // Fallback content if completely offline and store is empty
   const defaultContent: AboutContent = {
     description: "Sensoria AAC adalah aplikasi komunikasi alternatif dan argumentatif yang dirancang khusus untuk memfasilitasi anak-anak dengan spektrum autisme atau tantangan komunikasi lainnya. Kami percaya setiap suara pantas didengar.",
-    contactEmail: "support@sensoria-aac.id",
+    contactEmail: "support@aacsensoria.id",
     version: "v1.0.0 (Beta)",
-    privacyPolicyUrl: "https://sensoria-aac.id/privacy"
+    privacyPolicyUrl: "https://aacsensoria.id/privacy"
   };
 
   const displayContent = aboutContent || defaultContent;
