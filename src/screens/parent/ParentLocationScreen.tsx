@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Dimensions, ScrollView, TouchableOpacity, Image, Modal, TextInput, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Modal, TextInput, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import MapView, { Marker, Circle, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontAwesome5 } from '@expo/vector-icons';
@@ -7,18 +7,20 @@ import { supabase } from '../../services/db/supabase';
 import { useAACStore } from '../../store/useAACStore';
 import * as Haptics from 'expo-haptics';
 
-const { width, height } = Dimensions.get('window');
+// NOTE (Android stability): No Dimensions.get('window') here on purpose.
+// Both regions below are sized with percentage offsets resolved against the
+// parent container, so nothing can be pushed off-screen by a stale window size.
 
 // 1. Haversine Distance Utility
 function getDistanceFromLatLonInMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371e3; // Radius of the earth in m
   const dLat = (lat2 - lat1) * (Math.PI / 180);
   const dLon = (lon2 - lon1) * (Math.PI / 180);
-  const a = 
-    Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * 
-    Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   const d = R * c; // Distance in m
   return d;
 }
@@ -26,14 +28,14 @@ function getDistanceFromLatLonInMeters(lat1: number, lon1: number, lat2: number,
 export default function ParentLocationScreen() {
   const insets = useSafeAreaInsets();
   const { childProfile, childStatus } = useAACStore();
-  
+
   // JSONB Global State: Read from childProfile.settings.safeZones
   const safeZones = childProfile?.settings?.safeZones || [];
-  
+
   const [isAddModalVisible, setAddModalVisible] = useState(false);
   const [newZoneName, setNewZoneName] = useState('');
   const [newZoneRadius, setNewZoneRadius] = useState('100');
-  
+
   // Smart Add Modal auto-fills with current child coordinates
   const [newZoneLat, setNewZoneLat] = useState(childStatus.lat ? childStatus.lat.toString() : '');
   const [newZoneLng, setNewZoneLng] = useState(childStatus.lng ? childStatus.lng.toString() : '');
@@ -42,6 +44,10 @@ export default function ParentLocationScreen() {
   const childLng = childStatus.lng || 106.816666;
   const avatarSource = childProfile?.gender === 'Girl' ? require('../../../assets/icon.png') : require('../../../assets/icon.png');
   const fullName = childProfile?.fullName || childProfile?.name || childProfile?.nickname || 'Anak';
+
+  // Bottom tab bar floats absolutely over this screen (see ParentDashboardScreen),
+  // so scrolling content must reserve room for it.
+  const bottomBarHeight = 70 + insets.bottom;
 
   // Geofencing Logic
   let activeZone = null;
@@ -78,14 +84,14 @@ export default function ParentLocationScreen() {
       Alert.alert('Error', 'Harap isi semua kolom.');
       return;
     }
-    
+
     if (!childProfile?.device_id) {
       Alert.alert('Error', 'Profil anak tidak ditemukan.');
       return;
     }
 
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    
+
     const newZone = {
       id: Date.now().toString(),
       name: newZoneName.trim(),
@@ -103,19 +109,19 @@ export default function ParentLocationScreen() {
         .from('child_profiles')
         .update({ settings: mergedSettings })
         .eq('device_id', childProfile.device_id);
-        
+
       if (error) throw error;
-      
+
       // Update local state to reflect immediately before Supabase Postgres Changes kicks in
       useAACStore.setState({
         childProfile: { ...childProfile, settings: mergedSettings }
       });
-      
+
     } catch (error) {
       console.error('Failed to sync Safe Zones:', error);
       Alert.alert('Gagal', 'Tidak dapat menyimpan Area Aman ke server.');
     }
-    
+
     setAddModalVisible(false);
   };
 
@@ -125,8 +131,8 @@ export default function ParentLocationScreen() {
       'Apakah Anda yakin ingin menghapus area ini?',
       [
         { text: 'Batal', style: 'cancel' },
-        { 
-          text: 'Hapus', 
+        {
+          text: 'Hapus',
           style: 'destructive',
           onPress: async () => {
             if (!childProfile?.device_id) return;
@@ -140,13 +146,13 @@ export default function ParentLocationScreen() {
                 .from('child_profiles')
                 .update({ settings: mergedSettings })
                 .eq('device_id', childProfile.device_id);
-                
+
               if (error) throw error;
-              
+
               useAACStore.setState({
                 childProfile: { ...childProfile, settings: mergedSettings }
               });
-              
+
             } catch (error) {
               console.error('Failed to delete Safe Zone:', error);
               Alert.alert('Gagal', 'Tidak dapat menghapus Area Aman dari server.');
@@ -159,9 +165,14 @@ export default function ParentLocationScreen() {
 
   return (
     <View style={styles.container}>
-      
-      {/* 1. BACKGROUND MAP (Absolute at the bottom layer) */}
-      <View style={styles.mapContainer}>
+
+      {/* ================================================================
+          LAYER 1 — MAP (Android-safe, dedicated native surface region)
+          Absolutely positioned to the TOP band only. Percentage-sized so
+          it always lands on-screen. Nothing scrolls over it, nothing
+          transparent covers it, and no sibling has elevation over it.
+          ================================================================ */}
+      <View style={styles.mapRegion} pointerEvents="auto">
         <MapView
           style={styles.map}
           provider={PROVIDER_GOOGLE}
@@ -191,65 +202,68 @@ export default function ParentLocationScreen() {
         </MapView>
       </View>
 
-      {/* 2. FOREGROUND SCROLLVIEW (Naturally renders on top) */}
-      <ScrollView 
-        style={styles.scrollView} 
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Spacer to push content down and reveal the map */}
-        <View style={styles.transparentSpacer} />
+      {/* ================================================================
+          LAYER 2 — SOLID BOTTOM SHEET
+          Fully opaque, bounded height, rounded top corners, overflow
+          hidden. Its top edge overlaps the map by a small opaque margin
+          (the rounded corners "float" over the map, Google-Maps style).
+          The ONLY ScrollView on this screen lives inside this sheet.
+          ================================================================ */}
+      <View style={styles.bottomSheet}>
 
-        {/* Solid Bottom Sheet (Provides the rounded corners over the map) */}
-        <View style={styles.solidBottomSheet}>
-          
-          {/* The Overlapping Card (Breaks out of the bottom sheet to overlap) */}
-          <View style={styles.overlappingCard}>
+        {/* STATIC Child Info Card — sibling of the ScrollView, anchored to
+            the top of the sheet. It never crosses into the map region, so
+            it needs no negative margins or boundary elevation. */}
+        <View style={styles.infoCard}>
           <View style={styles.cardTopRow}>
-              <Image source={avatarSource} style={styles.cardAvatar} />
-              <View style={styles.cardHeaderInfo}>
-                <Text style={styles.cardName} numberOfLines={1}>{fullName}</Text>
-                <View style={styles.statusBadgeRow}>
-                  {activeZone ? (
-                    <>
-                      <FontAwesome5 name="check-circle" size={14} color="#059669" />
-                      <Text style={styles.statusBadgeTextSafe}>Di area aman: {activeZone.name}</Text>
-                    </>
-                  ) : (
-                    <>
-                      <FontAwesome5 name="exclamation-circle" size={14} color="#DC2626" />
-                      <Text style={styles.statusBadgeTextDanger}>Di luar area aman</Text>
-                    </>
-                  )}
-                </View>
+            <Image source={avatarSource} style={styles.cardAvatar} />
+            <View style={styles.cardHeaderInfo}>
+              <Text style={styles.cardName} numberOfLines={1}>{fullName}</Text>
+              <View style={styles.statusBadgeRow}>
+                {activeZone ? (
+                  <>
+                    <FontAwesome5 name="check-circle" size={13} color="#059669" />
+                    <Text style={styles.statusBadgeTextSafe} numberOfLines={1}>Di area aman: {activeZone.name}</Text>
+                  </>
+                ) : (
+                  <>
+                    <FontAwesome5 name="exclamation-circle" size={13} color="#DC2626" />
+                    <Text style={styles.statusBadgeTextDanger} numberOfLines={1}>Di luar area aman</Text>
+                  </>
+                )}
               </View>
             </View>
-
-          <View style={styles.divider} />
-
-            <Text style={styles.locationLabel}>Lokasi Terakhir</Text>
-            <Text style={styles.locationAddress} numberOfLines={2}>
-              {childStatus.lastAddress || 'Belum ada data alamat'}
-            </Text>
-            <Text style={styles.timestamp}>
-              Pembaruan terakhir: {childStatus.lastSeen ? childStatus.lastSeen : 'Belum diketahui'}
-            </Text>
-
             <TouchableOpacity style={styles.refreshButton} onPress={handleRefreshLocation} activeOpacity={0.8}>
-              <FontAwesome5 name="sync-alt" size={14} color="#FFF" style={{ marginRight: 8 }} />
-              <Text style={styles.refreshButtonText}>Perbarui Lokasi</Text>
+              <FontAwesome5 name="sync-alt" size={16} color="#FFF" />
             </TouchableOpacity>
           </View>
 
-        {/* Safe Zone List */}
-        <View style={styles.zonesHeaderRow}>
+          <View style={styles.divider} />
+
+          <Text style={styles.locationLabel}>Lokasi Terakhir</Text>
+          <Text style={styles.locationAddress} numberOfLines={1}>
+            {childStatus.lastAddress || 'Belum ada data alamat'}
+          </Text>
+          <Text style={styles.timestamp} numberOfLines={1}>
+            Pembaruan terakhir: {childStatus.lastSeen ? childStatus.lastSeen : 'Belum diketahui'}
+          </Text>
+        </View>
+
+        {/* Safe Zone list — scrolls ONLY inside the opaque sheet. */}
+        <ScrollView
+          style={styles.sheetScroll}
+          contentContainerStyle={[styles.sheetScrollContent, { paddingBottom: bottomBarHeight + 12 }]}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.zonesHeaderRow}>
             <Text style={styles.zonesTitle}>Area Aman</Text>
             <TouchableOpacity style={styles.manageBtn} onPress={openAddModal}>
               <Text style={styles.manageBtnText}>Kelola</Text>
               <FontAwesome5 name="cog" size={12} color="#3B82F6" />
             </TouchableOpacity>
-        </View>
+          </View>
 
-        {safeZones.map(zone => {
+          {safeZones.map(zone => {
             const isCurrentlyHere = activeZone?.id === zone.id;
             return (
               <View key={zone.id} style={styles.zoneItem}>
@@ -271,8 +285,8 @@ export default function ParentLocationScreen() {
               </View>
             );
           })}
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </View>
 
       {/* Smart Add Modal */}
       <Modal visible={isAddModalVisible} transparent animationType="fade">
@@ -284,7 +298,7 @@ export default function ParentLocationScreen() {
                 <FontAwesome5 name="times" size={20} color="#94A3B8" />
               </TouchableOpacity>
             </View>
-            
+
             <Text style={styles.inputLabel}>Nama Tempat</Text>
             <TextInput
               style={styles.modalInput}
@@ -292,7 +306,7 @@ export default function ParentLocationScreen() {
               value={newZoneName}
               onChangeText={setNewZoneName}
             />
-            
+
             <View style={styles.rowInputs}>
               <View style={styles.flex1}>
                 <Text style={styles.inputLabel}>Latitude</Text>
@@ -332,7 +346,6 @@ export default function ParentLocationScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-
     </View>
   );
 }
@@ -340,64 +353,72 @@ export default function ParentLocationScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC', // Base background
+    backgroundColor: '#F8FAFC', // Matches the sheet so the scene edges blend
   },
-  mapContainer: {
+  /* --- LAYER 1: MAP (top band, its own native surface) --- */
+  mapRegion: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: height * 0.5, // Map takes exactly 50% of the screen height
-    backgroundColor: '#E2E8F0', 
+    // Map ends ~8% BELOW the sheet's top edge: the sheet is opaque there, so
+    // this hidden overlap only exists to give the sheet's rounded top corners
+    // real map pixels to float over (no transparent spacer over the map).
+    bottom: '44%',
+    backgroundColor: '#E2E8F0',
+    overflow: 'hidden',
   },
   map: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
-  scrollView: {
-    flex: 1,
+  /* --- LAYER 2: SOLID BOTTOM SHEET --- */
+  bottomSheet: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: '52%', // Bounded height — never grows past this
+    backgroundColor: '#F8FAFC', // FULLY OPAQUE: no alpha blending over the map surface
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    overflow: 'hidden',
   },
-  transparentSpacer: {
-    height: (height * 0.5) - 60, // Pushes the solid sheet down, leaving 60px for overlap
-  },
-  solidBottomSheet: {
-    backgroundColor: '#F8FAFC',
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    minHeight: height, // Ensures the list background covers the map when scrolled up
-    paddingHorizontal: 16,
-    // NO overflow: hidden! So the card can pop out freely.
-  },
-  overlappingCard: {
-    marginTop: -40, // Magically pulls the card UP to overlap the map and the sheet
+  /* Static child info card (NOT inside the ScrollView) */
+  infoCard: {
+    marginTop: 14,
+    marginHorizontal: 16,
     backgroundColor: '#FFF',
-    borderRadius: 24,
-    padding: 20,
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    marginBottom: 24,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#EDF1F7',
+    padding: 14,
+    // Deliberately no elevation/shadow: the card sits at the top of the sheet
+    // and must never render a translucent edge near the map boundary.
   },
   cardTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   cardAvatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     backgroundColor: '#F1F5F9',
-    marginRight: 16,
+    marginRight: 12,
   },
   cardHeaderInfo: {
     flex: 1,
+    marginRight: 10,
   },
   cardName: {
-    fontSize: 20,
+    fontSize: 17,
     fontWeight: 'bold',
     color: '#0F172A',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   statusBadgeRow: {
     flexDirection: 'row',
@@ -405,56 +426,60 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   statusBadgeTextSafe: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: 'bold',
     color: '#059669',
+    flexShrink: 1,
   },
   statusBadgeTextDanger: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: 'bold',
     color: '#DC2626',
+    flexShrink: 1,
+  },
+  refreshButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#2563EB',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   divider: {
     height: 1,
     backgroundColor: '#F1F5F9',
-    marginVertical: 16,
+    marginVertical: 10,
   },
   locationLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 'bold',
     color: '#94A3B8',
     textTransform: 'uppercase',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   locationAddress: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: '#1E293B',
-    marginBottom: 8,
+    marginBottom: 2,
   },
   timestamp: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#64748B',
-    marginBottom: 16,
   },
-  refreshButton: {
-    backgroundColor: '#2563EB',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 16,
+  /* Scrolling list — confined to the sheet */
+  sheetScroll: {
+    flex: 1,
   },
-  refreshButtonText: {
-    color: '#FFF',
-    fontWeight: 'bold',
-    fontSize: 16,
+  sheetScrollContent: {
+    paddingHorizontal: 16,
   },
   zonesHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginTop: 12,
+    marginBottom: 12,
     paddingHorizontal: 4,
   },
   zonesTitle: {
@@ -483,6 +508,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 16,
     marginBottom: 12,
+    // Elevation is safe here: zone items sit mid-sheet, far from the map boundary.
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -526,6 +552,26 @@ const styles = StyleSheet.create({
     padding: 8,
     marginLeft: 8,
   },
+  /* Map marker */
+  customMarker: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 3,
+    borderColor: '#FFF',
+    overflow: 'hidden',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  markerAvatar: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  /* Smart Add Modal */
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
