@@ -37,6 +37,14 @@ function formatLastSeen(iso: string | null): string {
 
 const DEFAULT_COORD = { latitude: -6.200000, longitude: 106.816666 };
 
+// Header geometry mirrors the shared gradient header used on the other tabs
+// (see DynamicGlobalHeader: '#181824/#11427B/#007C92', 24px bottom radii,
+// paddingHorizontal 24). Height reserves enough room below the title so the
+// 24px curvature renders smooth over the map, and the floating info card
+// clears it by CARD_TOP_OFFSET below the header's bottom edge.
+const HEADER_BASE_HEIGHT = 72;
+const CARD_TOP_OFFSET = 16;
+
 export default function ParentLocationScreen() {
   const insets = useSafeAreaInsets();
   const { childProfile, childStatus, deviceId, role, setChildStatus } = useAACStore();
@@ -69,7 +77,7 @@ export default function ParentLocationScreen() {
 
   const currentCoord = coordsRef.current ?? DEFAULT_COORD;
   const avatarSource = require('../../../assets/icon.png');
-  const fullName = childProfile?.fullName || childProfile?.name || childProfile?.nickname || 'Anak';
+  const fullName = childProfile?.fullName || childProfile?.full_name || childProfile?.nickname || 'Anak';
 
   // Bottom tab bar floats absolutely over this screen (see ParentDashboardScreen).
   const tabBarHeight = 70 + insets.bottom;
@@ -291,28 +299,19 @@ export default function ParentLocationScreen() {
 
       {/* ================================================================
           LAYER 0 — CURVED GRADIENT HEADER (absolute, floats over the map)
-          The nav header is hidden for this tab; this one owns the curvature
-          (24px bottom radii) + the live refresh ping button.
+          Replicates the app-wide header used on Beranda/Pesan/Atur
+          (DynamicGlobalHeader): same gradient, same 24px bottom curvature,
+          and a single left-aligned title. overflow:'hidden' clips the
+          gradient crisply to the curvature over the native map surface.
+          The refresh action lives on the floating child info card only.
           ================================================================ */}
       <LinearGradient
         colors={['#181824', '#11427B', '#007C92']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={[styles.header, { paddingTop: insets.top + 8, height: insets.top + 60 }]}
+        style={[styles.header, { paddingTop: insets.top + 10, height: insets.top + HEADER_BASE_HEIGHT }]}
       >
         <Text style={styles.headerTitle}>Lokasi</Text>
-        <TouchableOpacity
-          style={styles.headerRefreshBtn}
-          onPress={handleRefreshLocation}
-          disabled={isRefreshing}
-          activeOpacity={0.8}
-        >
-          {isRefreshing ? (
-            <ActivityIndicator size="small" color="#FFF" />
-          ) : (
-            <FontAwesome5 name="sync-alt" size={18} color="#FFF" />
-          )}
-        </TouchableOpacity>
       </LinearGradient>
 
       {/* ================================================================
@@ -351,11 +350,12 @@ export default function ParentLocationScreen() {
           ))}
         </MapView>
 
-        {/* Floating Child Info Card (reference: card over map, under header) */}
+        {/* Floating Child Info Card — sits below the curved header with a
+            clear top margin so it never collides with the curvature. */}
         <View
           style={[
             styles.infoCard,
-            { top: insets.top + 74 },
+            { top: insets.top + HEADER_BASE_HEIGHT + CARD_TOP_OFFSET },
           ]}
         >
           <View style={styles.cardTopRow}>
@@ -506,6 +506,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
   },
   /* --- LAYER 0: CURVED GRADIENT HEADER --- */
+  // Same curvature recipe as the shared DynamicGlobalHeader (Pengaturan):
+  // 24px bottom radii + overflow hidden so the gradient clips smoothly to
+  // the curve instead of bleeding square corners over the map surface.
   header: {
     position: 'absolute',
     top: 0,
@@ -513,10 +516,11 @@ const styles = StyleSheet.create({
     right: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
+    justifyContent: 'flex-start',
+    paddingHorizontal: 24,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
+    overflow: 'hidden',
     zIndex: 5,
     // No elevation: the header floats over the map; shadows near the surface
     // are unnecessary and the gradient + curvature carry the design.
@@ -525,14 +529,6 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: 'bold',
     color: '#FFFFFF',
-  },
-  headerRefreshBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   /* --- LAYER 1: MAP + FLOATING INFO CARD --- */
   infoCard: {

@@ -22,7 +22,7 @@ export default function UserProfileScreen() {
       setFullName(childProfile.full_name || childProfile.fullName || '');
       setNickname(childProfile.nickname || '');
       // SAFEGUARD 3: Ensure we strictly read the JSONB payload
-      setGender(childProfile.gender);
+      setGender(childProfile.gender ?? 'Boy');
     }
   }, [childProfile]);
 

@@ -55,11 +55,15 @@ export const getAACMessagesHistory = async (channelId: string) => {
  * Mendengarkan pesan baru secara realtime menggunakan Realtime Postgres Changes
  */
 export const subscribeToAACMessages = (channelId: string, onMessageReceived: (payload: any) => void) => {
+  const channel = supabase.channel(`public:messages:channel_id=eq.${channelId}`);
+
   if (!supabaseUrl || !supabaseAnonKey) {
-    return { unsubscribe: () => {} };
+    // Dev/unconfigured: hand back the detached (never-subscribed) channel so
+    // every caller holds a real RealtimeChannel; removeChannel is a no-op.
+    return channel;
   }
 
-  const channel = supabase.channel(`public:messages:channel_id=eq.${channelId}`)
+  return channel
     .on(
       'postgres_changes',
       { event: 'INSERT', schema: 'public', table: 'messages', filter: `channel_id=eq.${channelId}` },
@@ -76,6 +80,4 @@ export const subscribeToAACMessages = (channelId: string, onMessageReceived: (pa
       }
     )
     .subscribe();
-
-  return channel;
 };

@@ -99,7 +99,7 @@ export default function ChildAACScreen() {
         }
       } catch (err) {
         console.warn('Catch-up Sync failed (Offline Mode Active):', err);
-        logger.logError('Catch-up Sync Failed', err);
+        logger.logError(err, { action: 'Catch-up Sync Failed', role: 'Child' });
       }
     };
     catchUpSync();
@@ -281,7 +281,7 @@ export default function ChildAACScreen() {
         await loadDatabase(); 
         Toast.show({ type: 'success', text1: 'Berhasil', text2: `AI mengenali benda ini sebagai "${tags.id}" / "${tags.zh}"`, position: 'top' });
       } catch (e: any) {
-        logger.logError('Failed to process image with AI', e);
+        logger.logError(e, { action: 'Failed to process image with AI', role: 'Child' });
         Toast.show({ type: 'error', text1: 'Error', text2: 'Gagal memproses gambar dengan AI.', position: 'top' });
       } finally {
         setIsProcessingAI(false);

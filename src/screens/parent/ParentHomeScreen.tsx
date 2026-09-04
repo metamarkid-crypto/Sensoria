@@ -7,6 +7,7 @@ import { useAACStore } from '../../store/useAACStore';
 import { playTTS } from '../../services/ai/audioManager';
 import { LinearGradient } from 'expo-linear-gradient';
 import Toast from 'react-native-toast-message';
+import * as Haptics from 'expo-haptics';
 
 export default function ParentHomeScreen() {
   const navigation = useNavigation<any>();

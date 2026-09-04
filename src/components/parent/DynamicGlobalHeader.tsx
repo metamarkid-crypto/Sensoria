@@ -17,7 +17,7 @@ export default function DynamicGlobalHeader({ routeName }: HeaderProps) {
   const { childProfile, childStatus } = useAACStore();
   const { isOnline, lastSeen } = childStatus;
 
-  const fullName = childProfile?.fullName || childProfile?.name || childProfile?.nickname || 'Belum ditautkan';
+  const fullName = childProfile?.fullName || childProfile?.full_name || childProfile?.nickname || 'Belum ditautkan';
   const avatarSource = childProfile?.gender === 'Girl' ? require('../../../assets/icon.png') : require('../../../assets/icon.png');
 
   // Height Shapeshifting logic
@@ -211,9 +211,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   smallAvatarContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     marginRight: 12,
     overflow: 'hidden',
     borderWidth: 1.5,

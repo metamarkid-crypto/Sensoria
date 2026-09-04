@@ -310,16 +310,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 20,
   },
+  // All bubble styles declare the same corner keys (base 20px radius comes
+  // from `messageBubble`) so StyleSheet.create infers one uniform shape — the
+  // child pinches bottom-LEFT, parents pinch bottom-RIGHT.
   bubbleChild: {
     backgroundColor: '#E0F2FE', // Soft pastel blue
     borderBottomLeftRadius: 4,
+    borderBottomRightRadius: 20,
   },
   bubbleParent: {
     backgroundColor: '#11427B', // Navy Blue
+    borderBottomLeftRadius: 20,
     borderBottomRightRadius: 4,
   },
   bubbleOtherParent: {
     backgroundColor: '#0D9488', // Teal
+    borderBottomLeftRadius: 20,
     borderBottomRightRadius: 4,
   },
   senderNameTag: {

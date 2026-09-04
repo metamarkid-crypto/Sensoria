@@ -36,7 +36,7 @@ export default function SentenceStrip() {
               imageSource = { uri: item.imageUrl };
             } else {
               const expectedFilename = `${item.word_id.toLowerCase().replace(/\s+/g, '_')}.png`;
-              imageSource = getLocalImage(expectedFilename, childProfile?.gender) || { uri: item.imageUrl };
+              imageSource = getLocalImage(expectedFilename, (childProfile?.gender?.toLowerCase() ?? null) as 'boy' | 'girl' | null) || { uri: item.imageUrl };
             }
             
             return (
