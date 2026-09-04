@@ -6,6 +6,7 @@ import * as Haptics from 'expo-haptics';
 import SettingsScreen from './SettingsScreen';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../services/db/supabase';
+import { ensureTrialSubscription } from '../services/db/subscriptions';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import Toast from 'react-native-toast-message';
@@ -69,7 +70,19 @@ export default function RoleSelectionScreen() {
         role: role,
         pairing_code: pairingCode
       });
-      
+
+      // Blueprint: inject the premium free trial right after a successful setup.
+      // Child only — subscriptions are keyed by child_device_id and cover linked
+      // Parents via the Combo rule. Idempotent + non-fatal: a billing hiccup must
+      // never block onboarding, and an existing subscription is never overwritten.
+      if (role === 'Child') {
+        try {
+          await ensureTrialSubscription(currentDeviceId);
+        } catch (trialError) {
+          console.warn('Trial injection skipped (non-fatal):', trialError);
+        }
+      }
+
       setRole(role);
     } catch (e) {
       console.error('Error registering device:', e);
@@ -98,7 +111,6 @@ export default function RoleSelectionScreen() {
         
       if (deviceError || !devices) {
         Toast.show({ type: 'error', text1: 'Gagal', text2: 'Kode tidak ditemukan atau salah.', position: 'top' });
-        setIsLoading(false);
         return;
       }
 
@@ -125,7 +137,11 @@ export default function RoleSelectionScreen() {
         // Load remote settings to Zustand
         if (profile.settings) {
           useAACStore.getState().setSpeechRate(profile.settings.speechRate || 1.0);
-          useAACStore.getState().setChildVoiceGender(profile.settings.childVoiceGender || 'Boy');
+          useAACStore.getState().setVolume(typeof profile.settings.volume === 'number' ? profile.settings.volume : 1.0);
+          // childVoiceGender is deprecated (see UserProfileScreen); childProfileGender is the source of truth.
+          // Map the recovered gender to a matching default voice preset.
+          const recoveredGender = profile.settings.childProfileGender || profile.settings.childVoiceGender || 'Boy';
+          useAACStore.getState().setSelectedVoice(recoveredGender === 'Girl' ? 'id-female-1' : 'id-male-1');
         }
         
         Toast.show({ type: 'success', text1: 'Berhasil', text2: 'Profil Anak berhasil dipulihkan!', position: 'top' });

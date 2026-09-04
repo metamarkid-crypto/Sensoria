@@ -17,12 +17,7 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.Sensoria",
-      "config": {
-        "googleMaps": {
-          "apiKey": "AIzaSyB0y1M-8wsIWSkhrMKjTrnKdgtWT4n1eEs"
-        }
-      }
+      "package": "id.sensoria.aac"
     },
     "web": {
       "favicon": "./assets/favicon.png"

@@ -9,6 +9,47 @@ import { logger } from '../../utils/logger';
 const CACHE_DIR = FileSystem.cacheDirectory + 'fish_audio/';
 const MAX_CACHE_SIZE_MB = parseInt(process.env.EXPO_PUBLIC_MAX_AUDIO_CACHE_MB || '50', 10);
 
+// UI voice presets (VoiceSettingsScreen) → custom-trained Fish Audio reference IDs.
+// Strict 1:1 mapping to environment variables — NO string fallbacks. Every ID must
+// be the reference_id of a real custom Fish Audio model (configured via .env).
+const VOICE_PRESETS: Record<string, { referenceId: string; isMale: boolean }> = {
+  'id-female-1': { referenceId: process.env.EXPO_PUBLIC_VOICE_GIRL as string, isMale: false },
+  'id-female-2': { referenceId: process.env.EXPO_PUBLIC_VOICE_GIRL_2 as string, isMale: false },
+  'id-male-1': { referenceId: process.env.EXPO_PUBLIC_VOICE_BOY as string, isMale: true },
+  'id-male-2': { referenceId: process.env.EXPO_PUBLIC_VOICE_BOY_2 as string, isMale: true },
+};
+
+// Resolve which voice to use. Explicit user pick (store.selectedVoice) wins for Child speech;
+// parents keep the smart role-based keyword mapping so defaults are unchanged.
+const resolveVoice = (role: string): { voiceId: string; isMale: boolean } => {
+  const store = useAACStore.getState();
+
+  const preset = store.selectedVoice && VOICE_PRESETS[store.selectedVoice];
+  if (role === 'Child' && preset) {
+    return { voiceId: preset.referenceId, isMale: preset.isMale };
+  }
+
+  if (role === 'Child') {
+    const isMale = store.childProfile?.gender === 'Boy';
+    return {
+      voiceId: (isMale
+        ? process.env.EXPO_PUBLIC_VOICE_BOY
+        : process.env.EXPO_PUBLIC_VOICE_GIRL) as string,
+      isMale,
+    };
+  }
+
+  // Smart Role-to-Voice Mapping for Parents/Others
+  const lowerRole = role.toLowerCase();
+  const maleKeywords = ['ayah', 'papa', 'papi', 'abi', 'bapak', 'kakek', 'paman', 'om'];
+
+  // Male keywords (Ayah/Papa/...) use the Dad model; everything else uses the Mom model.
+  if (maleKeywords.some(kw => lowerRole.includes(kw))) {
+    return { voiceId: process.env.EXPO_PUBLIC_VOICE_DAD as string, isMale: true };
+  }
+  return { voiceId: process.env.EXPO_PUBLIC_VOICE_MOM as string, isMale: false };
+};
+
 // Ensure cache directory exists and respect max size limit
 const ensureCacheLimit = async () => {
   const dirInfo = await FileSystem.getInfoAsync(CACHE_DIR);
@@ -67,27 +108,7 @@ const ensureCacheLimit = async () => {
 
 export const clearAudioCache = async (text: string, language: 'id' | 'en' | 'zh', role: string) => {
   const store = useAACStore.getState();
-  
-  let voiceId = '';
-  if (role === 'Child') {
-    voiceId = store.childProfile?.gender === 'Boy' 
-      ? process.env.EXPO_PUBLIC_VOICE_BOY || 'daniel' 
-      : process.env.EXPO_PUBLIC_VOICE_GIRL || 'lily';
-  } else {
-    // Smart Role-to-Voice Mapping for Parents/Others
-    const lowerRole = role.toLowerCase();
-    const maleKeywords = ['ayah', 'papa', 'papi', 'abi', 'bapak', 'kakek', 'paman', 'om'];
-    const femaleKeywords = ['ibu', 'mama', 'mami', 'bunda', 'nenek', 'tante', 'bibi'];
-    
-    if (maleKeywords.some(kw => lowerRole.includes(kw))) {
-      voiceId = process.env.EXPO_PUBLIC_VOICE_DAD || 'james';
-    } else if (femaleKeywords.some(kw => lowerRole.includes(kw))) {
-      voiceId = process.env.EXPO_PUBLIC_VOICE_MOM || 'sarah';
-    } else {
-      // Fallback
-      voiceId = process.env.EXPO_PUBLIC_VOICE_MOM || 'sarah';
-    }
-  }
+  const { voiceId } = resolveVoice(role);
   
   const safeText = text.replace(/[^a-zA-Z0-9]/g, '_');
   const fileName = `fish_${language}_${voiceId}_${store.speechRate}_${safeText}.mp3`;
@@ -108,6 +129,7 @@ export const playTTS = async (text: string, language: 'id' | 'en' | 'zh', role: 
   if (localAudioMap[text]) {
     try {
       const player = createAudioPlayer(localAudioMap[text]);
+      player.volume = store.volume;
       player.play();
       return;
     } catch (e) {
@@ -115,35 +137,9 @@ export const playTTS = async (text: string, language: 'id' | 'en' | 'zh', role: 
     }
   }
 
-  // 2. Tentukan Voice ID dari .env untuk Fish Audio
+  // 2. Tentukan Voice ID — user pick dari store (Voice Settings) atau default berbasis gender/role
   const apiKey = process.env.EXPO_PUBLIC_FISH_AUDIO_API_KEY;
-  
-  let voiceId = '';
-  let isMale = false;
-  
-  if (role === 'Child') {
-    isMale = store.childProfile?.gender === 'Boy';
-    voiceId = isMale
-      ? process.env.EXPO_PUBLIC_VOICE_BOY || 'daniel'
-      : process.env.EXPO_PUBLIC_VOICE_GIRL || 'lily';
-  } else {
-    // Smart Role-to-Voice Mapping for Parents/Others
-    const lowerRole = role.toLowerCase();
-    const maleKeywords = ['ayah', 'papa', 'papi', 'abi', 'bapak', 'kakek', 'paman', 'om'];
-    const femaleKeywords = ['ibu', 'mama', 'mami', 'bunda', 'nenek', 'tante', 'bibi'];
-    
-    if (maleKeywords.some(kw => lowerRole.includes(kw))) {
-      isMale = true;
-      voiceId = process.env.EXPO_PUBLIC_VOICE_DAD || 'james';
-    } else if (femaleKeywords.some(kw => lowerRole.includes(kw))) {
-      isMale = false;
-      voiceId = process.env.EXPO_PUBLIC_VOICE_MOM || 'sarah';
-    } else {
-      // Fallback
-      isMale = false;
-      voiceId = process.env.EXPO_PUBLIC_VOICE_MOM || 'sarah';
-    }
-  }
+  const { voiceId, isMale } = resolveVoice(role);
 
   // Jika API key LMNT tersedia, coba fetch
   if (apiKey) {
@@ -216,8 +212,9 @@ export const playTTS = async (text: string, language: 'id' | 'en' | 'zh', role: 
           await recordAudioAccess(fileUri, fileInfo.size || 0);
         }
 
-      // Play cached/downloaded file
+      // Play cached/downloaded file (volume applied at playback, not baked into the cached file)
       const player = createAudioPlayer(fileUri);
+      player.volume = store.volume;
       player.play();
       return;
 
@@ -245,6 +242,7 @@ export const playTTS = async (text: string, language: 'id' | 'en' | 'zh', role: 
   Speech.speak(text, { 
     language: language === 'id' ? 'id-ID' : language === 'en' ? 'en-US' : 'zh-CN',
     rate: speechRate,
-    pitch: pitch
+    pitch: pitch,
+    volume: store.volume
   });
 };
