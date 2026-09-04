@@ -12,6 +12,7 @@ import AppearanceSettingsScreen from '../screens/AppearanceSettingsScreen';
 import VoiceSettingsScreen from '../screens/VoiceSettingsScreen';
 import AccessibilitySettingsScreen from '../screens/AccessibilitySettingsScreen';
 import AboutScreen from '../screens/AboutScreen';
+import PaywallScreen from '../screens/PaywallScreen';
 import { useAACStore } from '../store/useAACStore';
 
 const Stack = createNativeStackNavigator();
@@ -40,6 +41,7 @@ export default function AppNavigator() {
               <Stack.Screen name="VoiceSettings" component={VoiceSettingsScreen} options={{ animation: 'slide_from_right' }} />
               <Stack.Screen name="AccessibilitySettings" component={AccessibilitySettingsScreen} options={{ animation: 'slide_from_right' }} />
               <Stack.Screen name="AboutScreen" component={AboutScreen} options={{ animation: 'slide_from_right' }} />
+              <Stack.Screen name="Paywall" component={PaywallScreen} options={{ presentation: 'modal' }} />
             </>
           )
         ) : (
@@ -52,6 +54,7 @@ export default function AppNavigator() {
             <Stack.Screen name="VoiceSettings" component={VoiceSettingsScreen} options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="AccessibilitySettings" component={AccessibilitySettingsScreen} options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="AboutScreen" component={AboutScreen} options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="Paywall" component={PaywallScreen} options={{ presentation: 'modal' }} />
           </>
         )}
       </Stack.Navigator>

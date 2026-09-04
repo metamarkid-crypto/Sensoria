@@ -1,6 +1,13 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  DEFAULT_CHILD_GRACE_DAYS,
+  evaluateAccess,
+  fetchPremiumEntitlement,
+} from '../services/db/entitlement';
+import type { SubscriptionStatus } from '../services/db/types';
+import type { EntitlementRole } from '../services/db/entitlement';
 
 export type UserRole = 'None' | 'Child' | 'Parent';
 export type AppLanguage = 'id' | 'en' | 'zh';
@@ -27,6 +34,39 @@ export interface AboutContent {
   contactEmail: string;
   version: string;
   privacyPolicyUrl: string;
+}
+
+/**
+ * Global premium entitlement (Master Blueprint — Combo rule).
+ *
+ * Protocol — "Compassionate Child, Strict Parent". The raw expiry boundaries
+ * (`status`, `trialEndsAt`, `expiresAt`) plus the dynamic grace length
+ * (`childGracePeriodDays`) ARE persisted locally (offline-first mandate): a
+ * Child launching offline must still know how long its grace window lasts.
+ *
+ * Derived booleans (`isPremium`, `loaded`, `lastError`) are NEVER persisted —
+ * a stored "premium: true" would go stale while the app is offline. Instead
+ * they are recomputed from the raw boundaries against `Date.now()` on every
+ * refresh, on rehydration, and by any gate via `evaluateAccess()`. Time can
+ * never be fooled by a stale flag.
+ */
+export interface PremiumState {
+  /** Strict entitlement now (active/trial with a future end date). */
+  isPremium: boolean;
+  /** True once data is known: a fetch resolved, or raw state was rehydrated. */
+  loaded: boolean;
+  status: SubscriptionStatus | null;
+  planId: string | null;
+  trialEndsAt: string | null;
+  expiresAt: string | null;
+  /**
+   * Dynamic child grace (days) cached from app_settings — persisted so the
+   * Child node can compute its compassionate window entirely offline.
+   */
+  childGracePeriodDays: number;
+  lastCheckedAt: number | null;
+  /** Set when a refresh errors — kept for debug; gate keeps last known value. */
+  lastError: string | null;
 }
 
 export interface AACState {
@@ -74,6 +114,9 @@ export interface AACState {
   // Parent Identity
   localParentName: string;
 
+  // Premium Entitlement (Combo rule — evaluated for Child or linked Parent)
+  premium: PremiumState;
+
   // Actions
   setHasSeenOnboarding: (status: boolean) => void;
   setRole: (role: UserRole) => void;
@@ -104,11 +147,44 @@ export interface AACState {
   
   setChildStatus: (status: Partial<AACState['childStatus']>) => void;
   setLocalParentName: (name: string) => void;
+  refreshEntitlement: () => Promise<void>;
+  resetPremium: () => void;
 }
+
+/** Raw boundary subset that survives persistence — derived booleans never do. */
+export type PersistedPremium = Pick<
+  PremiumState,
+  'status' | 'planId' | 'trialEndsAt' | 'expiresAt' | 'childGracePeriodDays' | 'lastCheckedAt'
+>;
+
+const INITIAL_PREMIUM = (): PremiumState => ({
+  isPremium: false,
+  loaded: false,
+  status: null,
+  planId: null,
+  trialEndsAt: null,
+  expiresAt: null,
+  childGracePeriodDays: DEFAULT_CHILD_GRACE_DAYS,
+  lastCheckedAt: null,
+  lastError: null,
+});
+
+/**
+ * Strict `isPremium` recomputed from raw boundaries at this instant. Derived
+ * booleans are never trusted across time — every write/rehydrate re-derives.
+ */
+const deriveIsPremium = (raw: PersistedPremium, role: UserRole): boolean => {
+  const { phase } = evaluateAccess(
+    { loaded: true, ...raw },
+    role as EntitlementRole,
+    Date.now(),
+  );
+  return phase === 'premium';
+};
 
 export const useAACStore = create<AACState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       hasSeenOnboarding: false,
       role: 'None',
       language: 'id',
@@ -134,6 +210,7 @@ export const useAACStore = create<AACState>()(
       customQuickReplies: ['Mama di sini', 'Tunggu sebentar ya', 'Makan dulu yuk'],
       childStatus: { isOnline: false, lastSeen: null, lat: null, lng: null, lastAddress: null },
       localParentName: 'Orang Tua',
+      premium: INITIAL_PREMIUM(),
       
       setHasSeenOnboarding: (status) => set({ hasSeenOnboarding: status }),
       setRole: (role) => set({ role }),
@@ -171,10 +248,97 @@ export const useAACStore = create<AACState>()(
         childStatus: { ...state.childStatus, ...status } 
       })),
       setLocalParentName: (name) => set({ localParentName: name }),
+
+      // --- Premium Entitlement ---
+      // Child device → evaluates its own subscription row.
+      // Parent device → resolves linked child(ren) via family_links first
+      // (Combo rule: the child's subscription covers its linked parents).
+      refreshEntitlement: async () => {
+        const { role, deviceId } = get();
+        if (role === 'None' || !deviceId) return; // lifecycle wipes on role change
+
+        try {
+          const snapshot = await fetchPremiumEntitlement(deviceId, role);
+          const raw: PersistedPremium = {
+            status: snapshot.subscription?.status ?? null,
+            planId: snapshot.subscription?.plan_id ?? null,
+            trialEndsAt: snapshot.subscription?.trial_ends_at ?? null,
+            expiresAt: snapshot.subscription?.expires_at ?? null,
+            childGracePeriodDays: snapshot.childGracePeriodDays,
+            lastCheckedAt: Date.now(),
+          };
+          set({
+            premium: {
+              ...raw,
+              isPremium: deriveIsPremium(raw, role),
+              loaded: true,
+              lastError: null,
+            },
+          });
+        } catch (e) {
+          // Offline or mid-session blip: KEEP the persisted raw boundaries (the
+          // offline source of truth) but RE-derive isPremium against now — time
+          // passing while offline must move an expired row to locked, never
+          // leave a stale "premium" behind.
+          set((state) => ({
+            premium: {
+              ...state.premium,
+              isPremium: deriveIsPremium(state.premium, state.role),
+              loaded: true,
+              lastCheckedAt: Date.now(),
+              lastError: e instanceof Error ? e.message : String(e),
+            },
+          }));
+        }
+      },
+      resetPremium: () => set({ premium: INITIAL_PREMIUM() }),
     }),
-    { 
+    {
       name: 'aac-storage',
-      storage: createJSONStorage(() => AsyncStorage)
+      storage: createJSONStorage(() => AsyncStorage),
+      // Persist ONLY the raw entitlement boundaries — derived booleans must
+      // never survive a restart, or time spent offline would fool the gate.
+      partialize: (state) => {
+        const persisted: Partial<AACState> = { ...state };
+        // Derived booleans are intentionally omitted — raw boundaries only.
+        persisted.premium = {
+          status: state.premium.status,
+          planId: state.premium.planId,
+          trialEndsAt: state.premium.trialEndsAt,
+          expiresAt: state.premium.expiresAt,
+          childGracePeriodDays: state.premium.childGracePeriodDays,
+          lastCheckedAt: state.premium.lastCheckedAt,
+        } as unknown as AACState['premium'];
+        delete (persisted as Partial<AACState> & { refreshEntitlement?: unknown }).refreshEntitlement;
+        delete (persisted as Partial<AACState> & { resetPremium?: unknown }).resetPremium;
+        return persisted;
+      },
+      // Restore the raw boundaries into a FULL PremiumState and recompute the
+      // derived fields against the current time. An offline launch reads this
+      // merged state — isPremium here is fresh, not whatever was stored.
+      merge: (persisted: any, current: AACState): AACState => {
+        const merged: AACState = { ...current, ...persisted };
+        const raw = (persisted?.premium ?? {}) as Partial<PersistedPremium>;
+        const premium: PremiumState = {
+          isPremium: false,
+          loaded: false,
+          status: raw.status ?? null,
+          planId: raw.planId ?? null,
+          trialEndsAt: raw.trialEndsAt ?? null,
+          expiresAt: raw.expiresAt ?? null,
+          childGracePeriodDays:
+            typeof raw.childGracePeriodDays === 'number'
+              ? raw.childGracePeriodDays
+              : DEFAULT_CHILD_GRACE_DAYS,
+          lastCheckedAt: raw.lastCheckedAt ?? null,
+          lastError: null,
+        };
+        // Boundaries restored from storage count as known data.
+        premium.loaded = premium.lastCheckedAt !== null || premium.status !== null;
+        premium.isPremium = deriveIsPremium(premium, merged.role ?? 'None');
+        merged.premium = premium;
+        return merged;
+      },
     }
   )
 );

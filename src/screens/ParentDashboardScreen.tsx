@@ -1,9 +1,11 @@
-import React, { useEffect } from 'react';
-import { View, Text } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useNavigation } from '@react-navigation/native';
 import { FontAwesome5 } from '@expo/vector-icons';
+import { evaluateAccess } from '../services/db/entitlement';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { supabase } from '../services/db/supabase';
 import { useAACStore } from '../store/useAACStore';
 import { playTTS } from '../services/ai/audioManager';
@@ -20,8 +22,36 @@ const Tab = createBottomTabNavigator();
 export default function ParentDashboardScreen() {
   const { pairingCode, language, deviceId, setChildStatus } = useAACStore();
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<any>();
+  const premium = useAACStore((s) => s.premium);
+  const role = useAACStore((s) => s.role);
+  const refreshEntitlement = useAACStore((s) => s.refreshEntitlement);
+
+  // ── Strict Parent gating ("Compassionate Child, Strict Parent") ──────────
+  // Zero offline tolerance: a locked parent is locked even offline. Local
+  // expiry boundaries come from persisted state, evaluated against NOW.
+  const parentAccess = role === 'Parent'
+    ? evaluateAccess(premium, 'Parent', Date.now())
+    : null;
+  const parentLocked = parentAccess?.phase === 'locked';
+  const parentOffline = parentLocked && premium.lastError != null;
+
+  // Show the Paywall once per lock episode (it honors web_payment_active
+  // itself). If dismissed without paying, the lock view below remains.
+  const paywallShownRef = useRef(false);
+  useEffect(() => {
+    if (!parentLocked) {
+      paywallShownRef.current = false;
+      return;
+    }
+    if (!parentOffline && !paywallShownRef.current) {
+      paywallShownRef.current = true;
+      navigation.navigate('Paywall');
+    }
+  }, [parentLocked, parentOffline, navigation]);
 
   useEffect(() => {
+    if (parentLocked) return; // locked parents must not keep live channels
     if (!pairingCode) return;
 
     // Global Real-Time TTS Pager
@@ -43,11 +73,12 @@ export default function ParentDashboardScreen() {
     return () => {
       supabase.removeChannel(subscription); // Safeguard against memory leaks
     };
-  }, [pairingCode, language]);
+  }, [pairingCode, language, parentLocked]);
 
   useEffect(() => {
     // 2. Global Real-time Connection Status Listener
     let presenceSub: any = null;
+    if (parentLocked) return; // locked parents must not poll presence
 
     const checkStatus = async () => {
       if (!deviceId) return;
@@ -100,7 +131,19 @@ export default function ParentDashboardScreen() {
     return () => {
       if (presenceSub) supabase.removeChannel(presenceSub);
     };
-  }, [deviceId]);
+  }, [deviceId, parentLocked]);
+
+  // Strict Parent lock — evaluated AFTER every hook so hook order stays stable
+  // across lock/unlock transitions.
+  if (parentLocked) {
+    return (
+      <ParentStrictLock
+        offline={parentOffline}
+        onRetry={() => void refreshEntitlement()}
+        onExtend={() => navigation.navigate('Paywall')}
+      />
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: '#F5F7FA' }}>
@@ -156,9 +199,150 @@ export default function ParentDashboardScreen() {
       >
         <Tab.Screen name="Beranda" component={ParentHomeScreen} />
         <Tab.Screen name="Pesan" component={ParentMessagesScreen} />
-        <Tab.Screen name="Lokasi" component={ParentLocationScreen} />
+        {/* Lokasi renders its own curved gradient header (Roadmap #3 UI) */}
+        <Tab.Screen name="Lokasi" component={ParentLocationScreen} options={{ headerShown: false }} />
         <Tab.Screen name="Atur" component={ParentSettingsListScreen} />
       </Tab.Navigator>
     </View>
   );
 }
+
+/**
+ * Strict Parent lock — shown while the local expiry boundary is in the past.
+ * Parents get ZERO grace ("Compassionate Child, Strict Parent").
+ *
+ *  • Offline → hard block, no payment UI can be reached: exact copy from the
+ *    protocol, plus a retry that re-reads local state (no network needed to
+ *    keep locking once expired).
+ *  • Online  → the Paywall modal is auto-presented (it honors
+ *    `web_payment_active` itself); if dismissed, the CTA reopens it.
+ */
+function ParentStrictLock({
+  offline,
+  onRetry,
+  onExtend,
+}: {
+  offline: boolean;
+  onRetry: () => void;
+  onExtend: () => void;
+}) {
+  return (
+    <View style={lockStyles.screen}>
+      <View style={lockStyles.card}>
+        <View style={lockStyles.iconCircle}>
+          <FontAwesome5 name="lock" size={30} color="#FFF" solid />
+        </View>
+        <Text style={lockStyles.title}>
+          {offline ? 'Koneksi Terputus' : 'Langganan Berakhir'}
+        </Text>
+        {offline ? (
+          <Text style={lockStyles.message}>
+            Sesi Anda telah berakhir, silakan hubungkan internet untuk perpanjangan.
+          </Text>
+        ) : (
+          <Text style={lockStyles.message}>
+            Akses Pantau Anak Anda telah berakhir. Perpanjang langganan untuk
+            melanjutkan memantau lokasi, pesan, dan zona aman anak.
+          </Text>
+        )}
+
+        {offline ? (
+          <TouchableOpacity style={lockStyles.primaryBtn} onPress={onRetry}>
+            <FontAwesome5 name="sync" size={15} color="#FFF" solid />
+            <Text style={lockStyles.primaryBtnText}>Coba Lagi</Text>
+          </TouchableOpacity>
+        ) : (
+          <>
+            <TouchableOpacity style={lockStyles.primaryBtn} onPress={onExtend}>
+              <FontAwesome5 name="crown" size={15} color="#FFF" solid />
+              <Text style={lockStyles.primaryBtnText}>Perpanjang Langganan</Text>
+            </TouchableOpacity>
+            <Text style={lockStyles.hint}>
+              Masih dalam masa aktif? Ketuk “Coba Lagi” untuk memeriksa ulang.
+            </Text>
+            <TouchableOpacity onPress={onRetry} style={lockStyles.retryLink}>
+              <Text style={lockStyles.retryLinkText}>Coba Lagi</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+    </View>
+  );
+}
+
+const lockStyles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: '#F5F7FA',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 28,
+  },
+  card: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: '#FFF',
+    borderRadius: 24,
+    paddingVertical: 36,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+  },
+  iconCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#11427B',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 18,
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#11427B',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  message: {
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 21,
+    marginBottom: 24,
+  },
+  primaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'stretch',
+    backgroundColor: '#00B5B8',
+    borderRadius: 14,
+    paddingVertical: 15,
+    gap: 8,
+  },
+  primaryBtnText: {
+    color: '#FFF',
+    fontWeight: '800',
+    fontSize: 15,
+  },
+  hint: {
+    fontSize: 12,
+    color: '#94A3B8',
+    textAlign: 'center',
+    marginTop: 16,
+  },
+  retryLink: {
+    marginTop: 10,
+    paddingVertical: 6,
+  },
+  retryLinkText: {
+    color: '#00B5B8',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+});

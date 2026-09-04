@@ -32,6 +32,14 @@
       "expo-audio",
       "expo-secure-store",
       [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Sensoria mengakses lokasi untuk memantau keberadaan anak.",
+          "locationAlwaysAndWhenInUsePermission": "Sensoria mengakses lokasi di latar belakang agar orang tua tetap dapat memantau anak.",
+          "isAndroidBackgroundLocationEnabled": true
+        }
+      ],
+      [
         "@sentry/react-native/expo",
         {
           "organization": "sensoria-org",

@@ -1,9 +1,11 @@
+import { useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, AppState } from 'react-native';
 import * as Sentry from '@sentry/react-native';
 import Toast, { BaseToast, ErrorToast } from 'react-native-toast-message';
 import AppNavigator from './src/navigation/AppNavigator';
+import { useAACStore } from './src/store/useAACStore';
 
 Sentry.init({
   dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
@@ -56,10 +58,68 @@ const toastConfig = {
   )
 };
 
+/**
+ * Root premium-entitlement lifecycle (Master Blueprint — Phase 4/5 wiring).
+ *
+ * Trigger points for `refreshEntitlement()`:
+ *  1. App mount (or rehydration) once role + deviceId exist.
+ *  2. Role/deviceId transitions — every setup path commits through `setRole`
+ *     (fresh Child setup AFTER the trial injection, Parent setup, profile
+ *     recovery), so this single effect covers "immediately post-setup".
+ *  3. Foreground resume — catches trial expiry and payments settled off-app
+ *     (user scans the QRIS in a bank app, returns, entitlement re-reads).
+ *
+ * Offline-first ("Compassionate Child"): on a COLD START the persisted raw
+ * boundaries must survive untouched until a refresh succeeds — an offline
+ * launch of a premium Child/Parent reads local state, so `resetPremium()` is
+ * only called on a REAL in-session role/device switch, never on boot.
+ */
+function EntitlementLifecycle() {
+  const role = useAACStore((s) => s.role);
+  const deviceId = useAACStore((s) => s.deviceId);
+  const refreshEntitlement = useAACStore((s) => s.refreshEntitlement);
+  const resetPremium = useAACStore((s) => s.resetPremium);
+
+  // Tracks the last-seen identity so a change can be told apart from boot.
+  const prevRef = useRef<{ role: string | null; deviceId: string | null }>({
+    role: null,
+    deviceId: null,
+  });
+
+  useEffect(() => {
+    const prev = prevRef.current;
+    prevRef.current = { role, deviceId };
+
+    if (!deviceId || role === 'None') {
+      resetPremium();
+      return;
+    }
+
+    const isColdStart = prev.role === null && prev.deviceId === null;
+    if (!isColdStart && (prev.role !== role || prev.deviceId !== deviceId)) {
+      resetPremium(); // drop any gate left over from a previous role/device
+    }
+
+    void refreshEntitlement();
+  }, [role, deviceId, refreshEntitlement, resetPremium]);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next !== 'active') return;
+      const { role: r, deviceId: d } = useAACStore.getState();
+      if (d && r !== 'None') void refreshEntitlement();
+    });
+    return () => sub.remove();
+  }, [refreshEntitlement]);
+
+  return null;
+}
+
 function App() {
   return (
     <SafeAreaProvider>
       <StatusBar style="auto" />
+      <EntitlementLifecycle />
       <Sentry.ErrorBoundary fallback={ErrorFallbackScreen}>
         <AppNavigator />
       </Sentry.ErrorBoundary>

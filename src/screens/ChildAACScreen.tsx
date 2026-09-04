@@ -4,6 +4,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { useAACStore, AACWord } from '../store/useAACStore';
+import { evaluateAccess } from '../services/db/entitlement';
 import { initDB, getAllWords, addCustomWord, updateWord } from '../services/db/sqlite';
 import { tagImageWithBilingualNames } from '../services/ai/gemini';
 import { logger } from '../utils/logger';
@@ -17,6 +18,12 @@ import * as Haptics from 'expo-haptics';
 import { playTTS, clearAudioCache } from '../services/ai/audioManager';
 import SettingsScreen from './SettingsScreen';
 import { supabase, sendAACMessage, subscribeToAACMessages } from '../services/db/supabase';
+import {
+  ensureBackgroundTracking,
+  stopBackgroundTracking,
+  requestImmediateLocation,
+  writeLocationSnapshot,
+} from '../services/location/backgroundLocation';
 import { FontAwesome5 } from '@expo/vector-icons';
 
 export default function ChildAACScreen() {
@@ -25,8 +32,30 @@ export default function ChildAACScreen() {
     currentSentence, clearSentence, addToSentence, setRole, 
     language, childProfile, pairingCode, deviceId, 
     setSpeechRate,
-    cardSize, cardSpacing, speakOnTap
+    cardSize, cardSpacing, speakOnTap,
+    premium
   } = useAACStore();
+
+  // ── Compassionate Child access ("Compassionate Child, Strict Parent") ──
+  // Evaluated at render time from PERSISTED raw boundaries + Date.now(), so an
+  // offline child inside its grace window is never disrupted. Phases:
+  //   grace  → full access + tiny non-blocking nudge banner
+  //   locked → full access denied only AFTER the grace window; soft-lock.
+  // The Child device NEVER sees pricing or the Paywall.
+  const childAccess = evaluateAccess(premium, 'Child', Date.now());
+  const childInGrace = childAccess.phase === 'grace';
+  const childSoftLocked = childAccess.phase === 'locked';
+
+  // ── True Background Location (Roadmap #3) — entitlement-gated ───────────
+  // premium/grace (or unknown-yet) → tracker keeps running; the moment the
+  // phase flips to locked the task is stopped immediately (battery + paywall).
+  useEffect(() => {
+    if (childSoftLocked) {
+      void stopBackgroundTracking();
+    } else {
+      void ensureBackgroundTracking();
+    }
+  }, [childSoftLocked]);
   const [words, setWords] = useState<AACWord[]>([]);
   const [loading, setLoading] = useState(true);
   const [isProcessingAI, setIsProcessingAI] = useState(false);
@@ -129,10 +158,23 @@ export default function ChildAACScreen() {
       )
       .subscribe();
 
+    // Parent "refresh location" ping → force one immediate GPS write.
+    const pingChannel = supabase.channel(`location-ping-${deviceId}`)
+      .on('broadcast', { event: 'refresh-location' }, () => {
+        requestImmediateLocation()
+          .then(() => {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            Toast.show({ type: 'success', text1: 'Lokasi Diperbarui', text2: 'Kiriman lokasi terbaru telah dikirim.', position: 'top' });
+          })
+          .catch((e) => console.warn('[LocationPing] refresh failed:', e));
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(channel);
       supabase.removeChannel(settingsChannel);
       supabase.removeChannel(familyLinksChannel);
+      supabase.removeChannel(pingChannel);
     };
   }, []);
 
@@ -142,29 +184,9 @@ export default function ChildAACScreen() {
       let loc = await Location.getCurrentPositionAsync({});
       setLocation(loc);
       
-      // The Pusher: Reverse Geocode once and update Supabase
-      if (deviceId) {
-        let addressStr = 'Lokasi tidak diketahui';
-        try {
-          const geocode = await Location.reverseGeocodeAsync({
-            latitude: loc.coords.latitude,
-            longitude: loc.coords.longitude
-          });
-          if (geocode && geocode.length > 0) {
-            addressStr = `${geocode[0].street || geocode[0].name}, ${geocode[0].city || geocode[0].region}`;
-          }
-        } catch (e) {}
-
-        await supabase
-          .from('devices')
-          .update({ 
-            latitude: loc.coords.latitude, 
-            longitude: loc.coords.longitude,
-            last_address: addressStr, // Push raw address string directly to DB
-            last_seen: new Date().toISOString()
-          })
-          .eq('id', deviceId);
-      }
+      // The Pusher: shared snapshot writer (reverse-geocode + locations row +
+      // devices presence update) so background and foreground share one path.
+      await writeLocationSnapshot(loc, true);
     }
   };
 
@@ -392,6 +414,14 @@ export default function ChildAACScreen() {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Compassionate grace: subtle, non-blocking subscription nudge */}
+      {childInGrace ? (
+        <View style={styles.graceBanner}>
+          <Text style={styles.graceBannerText}>Ayah/Bunda, yuk perbarui langganan 🙏</Text>
+        </View>
+      ) : null}
+
       {/* Sentence Strip & Actions */}
       <View style={styles.topActionsContainer}>
         <SentenceStrip />
@@ -411,6 +441,17 @@ export default function ChildAACScreen() {
       {/* Grid */}
       <View style={styles.gridContainer}>
         <AACGrid words={filteredWords} onWordPress={handleCardPress} onWordLongPress={handleWordLongPress} />
+
+        {/* Soft-lock past the grace window: dim + friendly offline-safe message.
+            Never a paywall — parents renew from THEIR phone. */}
+        {childSoftLocked ? (
+          <View style={styles.softLockOverlay} pointerEvents="auto">
+            <Text style={styles.softLockEmoji}>🤗</Text>
+            <Text style={styles.softLockText}>
+              Minta tolong Ayah/Bunda untuk mengaktifkan kembali dari HP mereka ya!
+            </Text>
+          </View>
+        ) : null}
       </View>
 
       {/* Word Options Modal */}
@@ -547,6 +588,40 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 10,
     backgroundColor: '#F8FAFC',
+  },
+  graceBanner: {
+    backgroundColor: '#FFF3D6',
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  graceBannerText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#B45309',
+  },
+  softLockOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(248, 250, 252, 0.82)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+    zIndex: 10,
+  },
+  softLockEmoji: {
+    fontSize: 42,
+    marginBottom: 12,
+  },
+  softLockText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#475569',
+    textAlign: 'center',
+    lineHeight: 23,
   },
   topActionsContainer: {
     backgroundColor: '#F8FAFC',

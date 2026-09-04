@@ -40,6 +40,13 @@ export interface AppSettingsRow {
   web_payment_active: boolean;
   /** Free-trial length in days, dynamic from the setup table (default 1). */
   trial_duration_days: number;
+  /**
+   * Compassionate-Child grace: extra days of FULL offline AAC access a Child
+   * node keeps AFTER its trial/plan end date passes (default 3). Parent nodes
+   * receive zero grace — strictly gated. Mirrors column added in
+   * `20260905_child_grace_period_days.sql`.
+   */
+  child_grace_period_days: number;
   updated_at: string;
 }
 
@@ -56,6 +63,18 @@ export interface SubscriptionPlanRow {
   currency: string;
   is_active: boolean;
   created_at: string;
+}
+
+/** Row shape of `public.locations` — append-only GPS history (Child node). */
+export interface LocationRow {
+  id: string;
+  /** Which child this fix belongs to — the realtime filter key. */
+  child_device_id: string;
+  latitude: number;
+  longitude: number;
+  accuracy: number | null;
+  address: string | null;
+  recorded_at: string;
 }
 
 export type SubscriptionStatus = 'trial' | 'active' | 'expired' | 'cancelled';
