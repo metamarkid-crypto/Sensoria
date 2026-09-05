@@ -179,7 +179,7 @@ export default function ParentHomeScreen() {
             activeOpacity={0.9}
           >
             <LinearGradient
-              colors={['#F59E0B', '#D97706']}
+              colors={['#FBBF24', '#F59E0B', '#D97706']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.upgradeGradient}
@@ -480,10 +480,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     overflow: 'hidden',
     elevation: 3,
-    shadowColor: '#D97706',
+    shadowColor: '#92400E',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
+    shadowOpacity: 0.14,
+    shadowRadius: 8,
   },
   upgradeGradient: {
     flexDirection: 'row',
@@ -505,13 +505,13 @@ const styles = StyleSheet.create({
   upgradeTitle: {
     color: '#FFFFFF',
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '700',
     lineHeight: 19,
   },
   upgradeSub: {
     color: 'rgba(255,255,255,0.85)',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '500',
     marginTop: 2,
   },
   messageHeader: {

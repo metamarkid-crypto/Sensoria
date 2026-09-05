@@ -78,15 +78,25 @@ export default function ParentSettingsListScreen() {
         disabled: true,
       };
 
-  const settingsItems: SettingsItem[] = [
-    subscriptionItem,
+  // Hierarchy: billing sits LOW in the list — directly above "Tentang Sensoria
+  // AAC" and slightly separated from the functional settings — so an
+  // accessibility/medical app never opens on a sales pitch.
+  const mainSettingsItems: SettingsItem[] = [
     { id: '1', title: 'Profil Pengguna', icon: 'user', iconColor: '#11427B', iconBg: '#F0F9FF', route: 'UserProfile' },
     { id: '2', title: 'Suara & Bicara', icon: 'volume-up', iconColor: '#11427B', iconBg: '#F0F9FF', route: 'VoiceSettings' },
     { id: '3', title: 'Tampilan', icon: 'palette', iconColor: '#11427B', iconBg: '#F0F9FF', route: 'AppearanceSettings' },
     { id: '4', title: 'Aksesibilitas', icon: 'universal-access', iconColor: '#11427B', iconBg: '#F0F9FF', route: 'AccessibilitySettings' },
     { id: '5', title: 'Koneksi & Perangkat', icon: 'link', iconColor: '#11427B', iconBg: '#F0F9FF', route: 'ConnectionModal' },
-    { id: '6', title: 'Tentang Sensoria AAC', icon: 'info-circle', iconColor: '#11427B', iconBg: '#F0F9FF', route: 'AboutScreen' },
   ];
+
+  const aboutItem: SettingsItem = {
+    id: '6',
+    title: 'Tentang Sensoria AAC',
+    icon: 'info-circle',
+    iconColor: '#11427B',
+    iconBg: '#F0F9FF',
+    route: 'AboutScreen',
+  };
 
   const handlePress = (item: SettingsItem) => {
     if (item.disabled || !item.route) return;
@@ -97,41 +107,52 @@ export default function ParentSettingsListScreen() {
     }
   };
 
+  const renderRow = (item: SettingsItem, showDivider: boolean) => (
+    <TouchableOpacity
+      key={item.id}
+      style={[styles.itemRow, showDivider && styles.borderBottom]}
+      onPress={() => handlePress(item)}
+      activeOpacity={0.7}
+      disabled={item.disabled}
+    >
+      <View style={styles.itemLeft}>
+        <View style={[styles.iconBox, { backgroundColor: item.iconBg }]}>
+          <FontAwesome5 name={item.icon} size={16} color={item.iconColor} />
+        </View>
+        <View style={styles.itemText}>
+          <Text style={[styles.itemTitle, item.disabled && styles.itemTitleDisabled]}>{item.title}</Text>
+          {item.subtitle ? (
+            <Text style={styles.itemSubtitle} numberOfLines={1}>{item.subtitle}</Text>
+          ) : null}
+        </View>
+      </View>
+      {item.disabled ? (
+        <View style={styles.soonBadge}>
+          <Text style={styles.soonBadgeText}>Segera</Text>
+        </View>
+      ) : (
+        <FontAwesome5 name="chevron-right" size={14} color="#CBD5E1" />
+      )}
+    </TouchableOpacity>
+  );
+
   return (
     <View style={styles.container}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
         
+        {/* Functional settings — the core of the app, first. */}
         <View style={styles.card}>
-          {settingsItems.map((item, index) => (
-            <TouchableOpacity 
-              key={item.id} 
-              style={[styles.itemRow, index !== settingsItems.length - 1 && styles.borderBottom]}
-              onPress={() => handlePress(item)}
-              activeOpacity={0.7}
-              disabled={item.disabled}
-            >
-              <View style={styles.itemLeft}>
-                <View style={[styles.iconBox, { backgroundColor: item.iconBg }]}>
-                  <FontAwesome5 name={item.icon} size={16} color={item.iconColor} />
-                </View>
-                <View style={styles.itemText}>
-                  <Text style={[styles.itemTitle, item.disabled && styles.itemTitleDisabled]}>{item.title}</Text>
-                  {item.subtitle ? (
-                    <Text style={styles.itemSubtitle} numberOfLines={1}>{item.subtitle}</Text>
-                  ) : null}
-                </View>
-              </View>
-              {item.disabled ? (
-                <View style={styles.soonBadge}>
-                  <Text style={styles.soonBadgeText}>Segera</Text>
-                </View>
-              ) : (
-                <FontAwesome5 name="chevron-right" size={14} color="#CBD5E1" />
-              )}
-            </TouchableOpacity>
-          ))}
+          {mainSettingsItems.map((item, index) =>
+            renderRow(item, index !== mainSettingsItems.length - 1)
+          )}
         </View>
-        
+
+        {/* Account & billing, deliberately quiet and low in the hierarchy. */}
+        <View style={[styles.card, styles.groupGap]}>
+          {renderRow(subscriptionItem, true)}
+          {renderRow(aboutItem, false)}
+        </View>
+
       </ScrollView>
 
       {/* The Exception: Connections and Devices uses the existing Modal Bottom Sheet */}
@@ -221,5 +242,8 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#94A3B8',
+  },
+  groupGap: {
+    marginTop: 16,
   }
 });
