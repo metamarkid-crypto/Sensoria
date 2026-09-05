@@ -3,7 +3,9 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'rea
 import { FontAwesome5 } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { supabase, sendAACMessage } from '../../services/db/supabase';
+import { fetchPaywallSettings } from '../../services/db/paywall';
 import { useAACStore } from '../../store/useAACStore';
+import { formatDate } from '../../utils/format';
 import { playTTS } from '../../services/ai/audioManager';
 import { LinearGradient } from 'expo-linear-gradient';
 import Toast from 'react-native-toast-message';
@@ -26,6 +28,27 @@ export default function ParentHomeScreen() {
   const [todayUniqueWords, setTodayUniqueWords] = useState<number>(0);
   const [chartData, setChartData] = useState<number[]>(new Array(24).fill(0));
   const [activeTab, setActiveTab] = useState<TabType>('Hari Ini');
+
+  // ── Proactive Upgrade Banner (stealth kill-switch) ──────────────────────────
+  // `web_payment_active` is fetched fresh per mount and FAILS SAFE to `false`
+  // (missing row / DB error / unapplied migration) — the banner can therefore
+  // never exist during App Review. Parents receive ZERO grace, so the only
+  // eligible proactive window on this node is an ACTIVE free trial.
+  const premium = useAACStore((s) => s.premium);
+  const [webPaymentActive, setWebPaymentActive] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    void fetchPaywallSettings().then((s) => {
+      if (mounted) setWebPaymentActive(s.web_payment_active);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const showUpgradeBanner =
+    webPaymentActive && premium.isPremium && premium.status === 'trial';
 
   useEffect(() => {
     if (!pairingCode) return;
@@ -148,6 +171,37 @@ export default function ParentHomeScreen() {
       <View style={styles.overlapWrapper}>
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} bounces={false}>
         
+        {/* PROACTIVE UPGRADE BANNER — trial-only, hard-gated by web_payment_active */}
+        {showUpgradeBanner ? (
+          <TouchableOpacity
+            style={styles.upgradeCard}
+            onPress={() => navigation.navigate('Paywall')}
+            activeOpacity={0.9}
+          >
+            <LinearGradient
+              colors={['#F59E0B', '#D97706']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.upgradeGradient}
+            >
+              <View style={styles.upgradeIcon}>
+                <FontAwesome5 name="crown" size={18} color="#FFF" />
+              </View>
+              <View style={styles.upgradeTextWrap}>
+                <Text style={styles.upgradeTitle}>
+                  Suka dengan Sensoria? Upgrade ke Premium sekarang.
+                </Text>
+                {premium.trialEndsAt ? (
+                  <Text style={styles.upgradeSub}>
+                    Masa coba aktif hingga {formatDate(premium.trialEndsAt)}.
+                  </Text>
+                ) : null}
+              </View>
+              <FontAwesome5 name="chevron-right" size={16} color="#FFF" />
+            </LinearGradient>
+          </TouchableOpacity>
+        ) : null}
+
         {/* WIDGET A: Pesan Terbaru */}
       <View style={styles.card}>
         <View style={styles.messageHeader}>
@@ -420,6 +474,45 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 6,
+  },
+  upgradeCard: {
+    borderRadius: 20,
+    marginBottom: 16,
+    overflow: 'hidden',
+    elevation: 3,
+    shadowColor: '#D97706',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+  },
+  upgradeGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    gap: 12,
+  },
+  upgradeIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  upgradeTextWrap: {
+    flex: 1,
+  },
+  upgradeTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+    lineHeight: 19,
+  },
+  upgradeSub: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
   },
   messageHeader: {
     flexDirection: 'row',

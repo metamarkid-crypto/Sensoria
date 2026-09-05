@@ -1,27 +1,99 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import PairingBottomSheet from '../../components/PairingBottomSheet';
+import { fetchPaywallSettings } from '../../services/db/paywall';
+import { useAACStore } from '../../store/useAACStore';
+import { formatDate } from '../../utils/format';
+
+type FontAwesomeIconName = React.ComponentProps<typeof FontAwesome5>['name'];
+
+interface SettingsItem {
+  id: string;
+  title: string;
+  subtitle?: string;
+  icon: FontAwesomeIconName;
+  iconColor: string;
+  iconBg: string;
+  route?: string;
+  /** Review-mode placeholder row: rendered but never navigates. */
+  disabled?: boolean;
+}
 
 export default function ParentSettingsListScreen() {
   const navigation = useNavigation<any>();
   const [showPairing, setShowPairing] = useState(false);
 
-  const settingsItems = [
-    { id: '1', title: 'Profil Pengguna', icon: 'user', route: 'UserProfile' },
-    { id: '2', title: 'Suara & Bicara', icon: 'volume-up', route: 'VoiceSettings' },
-    { id: '3', title: 'Tampilan', icon: 'palette', route: 'AppearanceSettings' },
-    { id: '4', title: 'Aksesibilitas', icon: 'universal-access', route: 'AccessibilitySettings' },
-    { id: '5', title: 'Koneksi & Perangkat', icon: 'link', route: 'ConnectionModal' },
-    { id: '6', title: 'Tentang Sensoria AAC', icon: 'info-circle', route: 'AboutScreen' },
+  // ── Stealth kill-switch (App Review mandate) ───────────────────────────────
+  // `web_payment_active` is fetched fresh on every mount. `fetchPaywallSettings`
+  // FAILS SAFE to `false` (missing row / DB error / unapplied migration) — so
+  // any unknown state renders the inert placeholder below and NEVER the paywall.
+  const [webPaymentActive, setWebPaymentActive] = useState<boolean | null>(null);
+  const premium = useAACStore((s) => s.premium);
+
+  useEffect(() => {
+    let mounted = true;
+    void fetchPaywallSettings().then((s) => {
+      if (mounted) setWebPaymentActive(s.web_payment_active);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const liveMode = webPaymentActive === true;
+
+  // Optional status subtitle (live mode only — never surfaces in review).
+  const subscriptionSubtitle = liveMode
+    ? premium.status === 'trial' && premium.isPremium
+      ? `Masa Coba Gratis · aktif sampai ${formatDate(premium.trialEndsAt)}`
+      : premium.status === 'active' && premium.isPremium
+        ? `Aktif sampai ${formatDate(premium.expiresAt)}`
+        : premium.loaded
+          ? 'Langganan belum aktif'
+          : 'Lihat paket langganan'
+    : 'Segera Hadir';
+
+  // Live mode → tappable row that opens the Paywall (which independently
+  // re-verifies the kill-switch before ever showing pricing).
+  // Review mode → inert, non-clickable placeholder. No route, no navigation.
+  const subscriptionItem: SettingsItem = liveMode
+    ? {
+        id: 'premium',
+        title: 'Status Langganan',
+        subtitle: subscriptionSubtitle,
+        icon: 'crown',
+        iconColor: '#D97706',
+        iconBg: '#FFFBEB',
+        route: 'Paywall',
+      }
+    : {
+        id: 'premium',
+        title: 'Premium',
+        subtitle: subscriptionSubtitle,
+        icon: 'lock',
+        iconColor: '#94A3B8',
+        iconBg: '#F8FAFC',
+        disabled: true,
+      };
+
+  const settingsItems: SettingsItem[] = [
+    subscriptionItem,
+    { id: '1', title: 'Profil Pengguna', icon: 'user', iconColor: '#11427B', iconBg: '#F0F9FF', route: 'UserProfile' },
+    { id: '2', title: 'Suara & Bicara', icon: 'volume-up', iconColor: '#11427B', iconBg: '#F0F9FF', route: 'VoiceSettings' },
+    { id: '3', title: 'Tampilan', icon: 'palette', iconColor: '#11427B', iconBg: '#F0F9FF', route: 'AppearanceSettings' },
+    { id: '4', title: 'Aksesibilitas', icon: 'universal-access', iconColor: '#11427B', iconBg: '#F0F9FF', route: 'AccessibilitySettings' },
+    { id: '5', title: 'Koneksi & Perangkat', icon: 'link', iconColor: '#11427B', iconBg: '#F0F9FF', route: 'ConnectionModal' },
+    { id: '6', title: 'Tentang Sensoria AAC', icon: 'info-circle', iconColor: '#11427B', iconBg: '#F0F9FF', route: 'AboutScreen' },
   ];
 
-  const handlePress = (route: string) => {
-    if (route === 'ConnectionModal') {
+  const handlePress = (item: SettingsItem) => {
+    if (item.disabled || !item.route) return;
+    if (item.route === 'ConnectionModal') {
       setShowPairing(true);
-    } else if (route) {
-      navigation.navigate(route);
+    } else {
+      navigation.navigate(item.route);
     }
   };
 
@@ -34,16 +106,28 @@ export default function ParentSettingsListScreen() {
             <TouchableOpacity 
               key={item.id} 
               style={[styles.itemRow, index !== settingsItems.length - 1 && styles.borderBottom]}
-              onPress={() => handlePress(item.route)}
+              onPress={() => handlePress(item)}
               activeOpacity={0.7}
+              disabled={item.disabled}
             >
               <View style={styles.itemLeft}>
-                <View style={styles.iconBox}>
-                  <FontAwesome5 name={item.icon} size={16} color="#11427B" />
+                <View style={[styles.iconBox, { backgroundColor: item.iconBg }]}>
+                  <FontAwesome5 name={item.icon} size={16} color={item.iconColor} />
                 </View>
-                <Text style={styles.itemTitle}>{item.title}</Text>
+                <View style={styles.itemText}>
+                  <Text style={[styles.itemTitle, item.disabled && styles.itemTitleDisabled]}>{item.title}</Text>
+                  {item.subtitle ? (
+                    <Text style={styles.itemSubtitle} numberOfLines={1}>{item.subtitle}</Text>
+                  ) : null}
+                </View>
               </View>
-              <FontAwesome5 name="chevron-right" size={14} color="#CBD5E1" />
+              {item.disabled ? (
+                <View style={styles.soonBadge}>
+                  <Text style={styles.soonBadgeText}>Segera</Text>
+                </View>
+              ) : (
+                <FontAwesome5 name="chevron-right" size={14} color="#CBD5E1" />
+              )}
             </TouchableOpacity>
           ))}
         </View>
@@ -115,5 +199,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#0F172A',
+  },
+  itemText: {
+    flex: 1,
+  },
+  itemSubtitle: {
+    fontSize: 12,
+    color: '#94A3B8',
+    marginTop: 2,
+  },
+  itemTitleDisabled: {
+    color: '#94A3B8',
+  },
+  soonBadge: {
+    backgroundColor: '#F1F5F9',
+    borderRadius: 10,
+    paddingVertical: 3,
+    paddingHorizontal: 10,
+  },
+  soonBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#94A3B8',
   }
 });
