@@ -9,6 +9,7 @@ import { playTTS } from '../../services/ai/audioManager';
 import { LinearGradient } from 'expo-linear-gradient';
 import Toast from 'react-native-toast-message';
 import * as Haptics from 'expo-haptics';
+import { useAccessibleAction } from '../../hooks/useAccessibleAction';
 
 export default function ParentHomeScreen() {
   const navigation = useNavigation<any>();
@@ -156,6 +157,13 @@ export default function ParentHomeScreen() {
     }
   };
 
+  // ── AAC-Safe Tremor Filter on Quick Replies ─────────────────────────────
+  // One filter per surface (NOT per pill): Oke/Ya/Tidak share the same
+  // handler, and rapid ghost-taps between adjacent pills must be absorbed
+  // too. haptics:false — handleQuickReply already fires its own Medium
+  // impact on the accepted send, so the hook's Light impact would double-buzz.
+  const quickReplyFiltered = useAccessibleAction(handleQuickReply, { haptics: false });
+
   return (
     <View style={styles.container}>
       <View style={styles.overlapWrapper}>
@@ -226,17 +234,17 @@ export default function ParentHomeScreen() {
             </View>
 
             <View style={styles.quickReplyRow}>
-              <TouchableOpacity style={styles.flexBtn} onPress={() => handleQuickReply('Oke')} activeOpacity={0.8}>
+              <TouchableOpacity style={styles.flexBtn} onPress={() => quickReplyFiltered('Oke')} activeOpacity={0.8}>
                 <LinearGradient colors={['#FF9800', '#F57C00']} style={styles.btnGradient}>
                   <Text style={styles.btnText}>Oke</Text>
                 </LinearGradient>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.flexBtn} onPress={() => handleQuickReply('Ya')} activeOpacity={0.8}>
+              <TouchableOpacity style={styles.flexBtn} onPress={() => quickReplyFiltered('Ya')} activeOpacity={0.8}>
                 <LinearGradient colors={['#34D399', '#10B981']} style={styles.btnGradient}>
                   <Text style={styles.btnText}>Ya</Text>
                 </LinearGradient>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.flexBtn} onPress={() => handleQuickReply('Tidak')} activeOpacity={0.8}>
+              <TouchableOpacity style={styles.flexBtn} onPress={() => quickReplyFiltered('Tidak')} activeOpacity={0.8}>
                 <LinearGradient colors={['#F87171', '#EF4444']} style={styles.btnGradient}>
                   <Text style={styles.btnText}>Tidak</Text>
                 </LinearGradient>

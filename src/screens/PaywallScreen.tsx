@@ -17,6 +17,8 @@ import {
   createQrisCheckout,
   fetchActivePlans,
 } from '../services/db/paywall';
+import { computeRenewalPreview } from '../services/db/entitlement';
+import { useAccessibleAction } from '../hooks/useAccessibleAction';
 import type { SubscriptionPlanRow } from '../services/db/types';
 
 /**
@@ -89,6 +91,11 @@ export default function PaywallScreen() {
   const [qrExpiresAt, setQrExpiresAt] = useState<string | null>(null);
   const [verifyPending, setVerifyPending] = useState(false);
 
+  // Renewal mode: a premium user pressing the Upgrade/Perpanjang CTA on the
+  // success view reopens the plan list (normally that view has no exit into
+  // plans — it renders whenever isPremium && stage === 'idle').
+  const [renewalMode, setRenewalMode] = useState(false);
+
   const load = useCallback(async () => {
     if (!webPaymentLoaded) return; // kill-switch not resolved yet
     setBooting(true);
@@ -157,6 +164,19 @@ export default function PaywallScreen() {
 
   const busy = stage === 'requesting' || stage === 'verifying';
 
+  // ── Subscription Upgrade CTA (stacking preview) ───────────────────────────
+  // The SAME pure math the QRIS backend will apply (apply_plan_purchase SQL):
+  // a live end date (trial → trial_ends_at, active → expires_at) is APPENDED
+  // to — never burned — an expired/missing one restarts from NOW(). The
+  // 1-month example below is illustrative; a real purchase stacks the CHOSEN
+  // plan's duration. Wrapped in the AAC tremor filter (visually active, no
+  // disabled prop) with its own light haptic on the accepted tap.
+  const renewalPreview = computeRenewalPreview(
+    { status: premium.status, trialEndsAt: premium.trialEndsAt, expiresAt: premium.expiresAt },
+    1,
+  );
+  const openRenewalPlans = useAccessibleAction(() => setRenewalMode(true));
+
   // ────────────────────────────── Renders ──────────────────────────────
 
   const renderHeader = () => (
@@ -199,6 +219,33 @@ export default function PaywallScreen() {
           Langganan aktif hingga {formatDate(premium.expiresAt)}.
         </Text>
       )}
+
+      {/* Stacking promise — the EXACT math the backend will apply. Only in
+          live mode: the review build never surfaces purchasing affordances. */}
+      {webPaymentActive ? (
+        <View style={styles.stackingCard}>
+          <FontAwesome5 name="layer-group" size={16} color="#D97706" solid />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.stackingTitle}>Masa aktif ditambahkan, tidak hangus</Text>
+            <Text style={styles.stackingText}>
+              {renewalPreview.stacks
+                ? `Beli paket kapan pun — durasinya DITAMBAHKAN ke akhir masa aktif Anda. Contoh: Paket 1 Bulan dibeli sekarang berlaku hingga ${formatDate(renewalPreview.newExpiresAt)}.`
+                : 'Masa langganan Anda telah berakhir. Paket baru akan aktif segera setelah pembayaran terverifikasi.'}
+            </Text>
+          </View>
+        </View>
+      ) : null}
+
+      {/* Upgrade / Perpanjang CTA — tremor-filtered, never visually disabled. */}
+      {webPaymentActive ? (
+        <TouchableOpacity style={styles.renewCta} onPress={openRenewalPlans} activeOpacity={0.85}>
+          <FontAwesome5 name="crown" size={15} color="#FFF" solid />
+          <Text style={styles.renewCtaText}>
+            {premium.status === 'active' ? 'Perpanjang Langganan' : 'Upgrade ke Premium'}
+          </Text>
+        </TouchableOpacity>
+      ) : null}
+
       <TouchableOpacity style={styles.primaryBtn} onPress={goBack}>
         <Text style={styles.primaryBtnText}>Kembali</Text>
       </TouchableOpacity>
@@ -343,7 +390,7 @@ export default function PaywallScreen() {
         </TouchableOpacity>
       </View>
     );
-  } else if (premium.isPremium && stage === 'idle') {
+  } else if (premium.isPremium && stage === 'idle' && !renewalMode) {
     body = renderSuccess();
   } else if (!webPaymentActive) {
     body = renderReviewMode();
@@ -679,6 +726,52 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     paddingHorizontal: 12,
     lineHeight: 17,
+  },
+
+  // Stacking preview + Upgrade/Perpanjang CTA
+  stackingCard: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 16,
+    gap: 10,
+  },
+  stackingTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#92400E',
+    marginBottom: 3,
+  },
+  stackingText: {
+    fontSize: 12,
+    color: '#B45309',
+    lineHeight: 17,
+  },
+  renewCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#D97706',
+    borderRadius: 14,
+    paddingVertical: 15,
+    marginBottom: 10,
+    gap: 8,
+    width: '100%',
+    elevation: 2,
+    shadowColor: '#92400E',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+  },
+  renewCtaText: {
+    color: '#FFF',
+    fontWeight: '800',
+    fontSize: 15,
   },
 
   // Buttons

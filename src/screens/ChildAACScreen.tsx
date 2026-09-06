@@ -16,6 +16,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import * as Haptics from 'expo-haptics';
 import { playTTS, clearAudioCache } from '../services/ai/audioManager';
+import { useAccessibleAction } from '../hooks/useAccessibleAction';
 import SettingsScreen from './SettingsScreen';
 import { supabase, sendAACMessage, subscribeToAACMessages } from '../services/db/supabase';
 import {
@@ -355,6 +356,26 @@ export default function ChildAACScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
+  // ── AAC-Safe Tremor Filter (useAccessibleAction) ─────────────────────────
+  // Applied ONLY to the action strip. Per-instance: filtering "Bicara" never
+  // blocks "Kirim" (and vice versa).
+  //
+  //  • "Bicara"/"Kirim" get haptics:false — both handlers already fire their
+  //    own Success notification haptic on accept, so adding the hook's Light
+  //    impact would double-buzz the child.
+  //  • The hook wraps ONLY the touch callback: TTS inside these handlers
+  //    (playTTS → audioManager queue/interrupt logic) is untouched, and the
+  //    holdDuration / ignoreRepeat / releaseToSpeak protocol in AACCard is
+  //    orthogonal — word cards below are deliberately NOT wrapped, because
+  //    repeated taps there are intentional AAC expression.
+  //  • "Hapus" also stays unwrapped: deleting a word is a precise correction,
+  //    not a high-frequency spam target, and raw taps keep it latency-free.
+  //  • No `disabled` prop, no opacity, no contrast change — during the 300ms
+  //    absorb window every button remains fully styled and screen-reader
+  //    active. Ghost-taps are simply swallowed in the callback.
+  const speakAllFiltered = useAccessibleAction(handleSpeakAll, { haptics: false });
+  const sendToParentFiltered = useAccessibleAction(() => handleSendToParent(), { haptics: false });
+
   if (loading || isProcessingAI) {
     return (
       <View style={styles.center}>
@@ -429,10 +450,10 @@ export default function ChildAACScreen() {
           <TouchableOpacity style={styles.actionBtnRed} onPress={clearSentence}>
             <Text style={styles.actionBtnText}>🗑️ Hapus</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtnBlue} onPress={handleSpeakAll}>
+          <TouchableOpacity style={styles.actionBtnBlue} onPress={speakAllFiltered}>
             <Text style={styles.actionBtnText}>🔊 Bicara</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtnOrange} onPress={handleSendToParent}>
+          <TouchableOpacity style={styles.actionBtnOrange} onPress={sendToParentFiltered}>
             <Text style={styles.actionBtnText}>🚀 Kirim</Text>
           </TouchableOpacity>
         </View>

@@ -8,6 +8,7 @@ import { FontAwesome5 } from '@expo/vector-icons';
 import { supabase, sendAACMessage } from '../../services/db/supabase';
 import { useAACStore } from '../../store/useAACStore';
 import * as Haptics from 'expo-haptics';
+import { useAccessibleAction } from '../../hooks/useAccessibleAction';
 
 export default function ParentMessagesScreen() {
   const insets = useSafeAreaInsets();
@@ -103,6 +104,13 @@ export default function ParentMessagesScreen() {
     );
   };
 
+  // ── AAC-Safe Tremor Filter on Quick Replies ─────────────────────────────
+  // ONE filter shared by every custom pill (a per-pill instance would let a
+  // trembling finger fire the same reply from several pills in one burst).
+  // haptics:false — handleSend already fires its own Light impact on accept.
+  // Long-press delete stays unwrapped: a precise, low-frequency action.
+  const quickReplyFiltered = useAccessibleAction(handleSend, { haptics: false });
+
   const renderMessage = ({ item }: { item: any }) => {
     const isChild = item.sender_role === 'Child';
     const isCurrentUser = item.senderName === localParentName;
@@ -185,7 +193,7 @@ export default function ParentMessagesScreen() {
               <TouchableOpacity 
                 key={index} 
                 style={styles.quickReplyPill} 
-                onPress={() => handleSend(reply)}
+                onPress={() => quickReplyFiltered(reply)}
                 onLongPress={() => handleLongPressReply(reply)}
                 delayLongPress={500}
               >
@@ -229,7 +237,7 @@ export default function ParentMessagesScreen() {
               />
               <TouchableOpacity 
                 style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]} 
-                onPress={() => handleSend(inputText)}
+                onPress={() => quickReplyFiltered(inputText)}
                 disabled={!inputText.trim()}
               >
                 <FontAwesome5 name="paper-plane" size={18} color="#FFF" />

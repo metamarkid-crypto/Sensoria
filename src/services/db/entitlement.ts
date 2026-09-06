@@ -123,6 +123,75 @@ export const isSubscriptionEntitled = (row: SubscriptionRow | null): boolean => 
   return new Date(endAt).getTime() > Date.now();
 };
 
+// ── Stacking math (Subscription Upgrade CTA) ───────────────────────────────
+// The shared definition of "what happens when a plan is added to an existing
+// subscription". Used by the PaywallScreen CTA preview NOW and by the QRIS
+// backend webhook LATER — one pure function so the UI can never promise a
+// different expiry than the backend will actually write.
+
+const AVG_DAYS_PER_MONTH = 30.4375; // 365.25 / 12
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+/**
+ * Stack `durationMonths` onto `currentEndAt`:
+ *   • current end in the FUTURE (or trial with a future trial_ends_at) →
+ *     the new period is APPENDED to the existing end (no value burned),
+ *   • expired / no current end → the new period starts from `now`.
+ *
+ * A month is computed as an average-calendar month (30.4375 days) so six
+ * consecutive 1-month renewals land within hours of one 6-month purchase —
+ * time-zone-proof, DST-proof, and identical on server and client.
+ *
+ * Pure — no I/O, unit-testable.
+ */
+export const computeStackedExpiry = (
+  currentEndAt: string | null,
+  durationMonths: number,
+  now: number = Date.now(),
+): string => {
+  const baseMs =
+    currentEndAt && new Date(currentEndAt).getTime() > now
+      ? new Date(currentEndAt).getTime()
+      : now;
+  return new Date(baseMs + durationMonths * AVG_DAYS_PER_MONTH * MS_PER_DAY).toISOString();
+};
+
+export interface StackingInput {
+  status: SubscriptionRow['status'] | null;
+  trialEndsAt: string | null;
+  expiresAt: string | null;
+}
+
+export interface StackingPreview {
+  /** Current entitlement boundary the stacking math was based on. */
+  currentEndAt: string | null;
+  /** True when the new period APPENDS to existing time (nothing is lost). */
+  stacks: boolean;
+  /** The expires_at the backend should write after a successful purchase. */
+  newExpiresAt: string;
+}
+
+/**
+ * Preview the stacking outcome for THIS device's current subscription row.
+ * The judged boundary follows the entitlement rule: a trial row's clock is
+ * `trial_ends_at` (buying DURING the trial appends to the trial end), an
+ * active row's clock is `expires_at`, anything else stacks from `now`.
+ */
+export const computeRenewalPreview = (
+  current: StackingInput,
+  durationMonths: number,
+  now: number = Date.now(),
+): StackingPreview => {
+  const currentEndAt = current.status === 'trial' ? current.trialEndsAt : current.expiresAt;
+  const endMs = currentEndAt ? new Date(currentEndAt).getTime() : NaN;
+  const stacks = Number.isFinite(endMs) && endMs > now;
+  return {
+    currentEndAt: stacks ? currentEndAt : null,
+    stacks,
+    newExpiresAt: computeStackedExpiry(currentEndAt, durationMonths, now),
+  };
+};
+
 export interface EntitlementSnapshot {
   /** Gate value: does THIS device currently have premium access? */
   isPremium: boolean;
