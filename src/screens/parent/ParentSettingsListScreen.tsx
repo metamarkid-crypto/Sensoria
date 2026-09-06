@@ -1,9 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import PairingBottomSheet from '../../components/PairingBottomSheet';
-import { fetchPaywallSettings } from '../../services/db/paywall';
 import { useAACStore } from '../../store/useAACStore';
 import { formatDate } from '../../utils/format';
 
@@ -26,23 +25,14 @@ export default function ParentSettingsListScreen() {
   const [showPairing, setShowPairing] = useState(false);
 
   // ── Stealth kill-switch (App Review mandate) ───────────────────────────────
-  // `web_payment_active` is fetched fresh on every mount. `fetchPaywallSettings`
-  // FAILS SAFE to `false` (missing row / DB error / unapplied migration) — so
-  // any unknown state renders the inert placeholder below and NEVER the paywall.
-  const [webPaymentActive, setWebPaymentActive] = useState<boolean | null>(null);
+  // Reads the SHARED store flag, refreshed by the app lifecycle on boot and
+  // every foreground resume (see App.tsx / useAACStore). Fails safe to the
+  // inert placeholder below — an unknown state NEVER surfaces the paywall.
+  const webPaymentActive = useAACStore((s) => s.webPaymentActive);
+  const webPaymentLoaded = useAACStore((s) => s.webPaymentLoaded);
   const premium = useAACStore((s) => s.premium);
 
-  useEffect(() => {
-    let mounted = true;
-    void fetchPaywallSettings().then((s) => {
-      if (mounted) setWebPaymentActive(s.web_payment_active);
-    });
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  const liveMode = webPaymentActive === true;
+  const liveMode = webPaymentActive === true && webPaymentLoaded;
 
   // Optional status subtitle (live mode only — never surfaces in review).
   const subscriptionSubtitle = liveMode

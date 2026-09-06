@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'rea
 import { FontAwesome5 } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { supabase, sendAACMessage } from '../../services/db/supabase';
-import { fetchPaywallSettings } from '../../services/db/paywall';
 import { useAACStore } from '../../store/useAACStore';
 import { formatDate } from '../../utils/format';
 import { playTTS } from '../../services/ai/audioManager';
@@ -30,22 +29,13 @@ export default function ParentHomeScreen() {
   const [activeTab, setActiveTab] = useState<TabType>('Hari Ini');
 
   // ── Proactive Upgrade Banner (stealth kill-switch) ──────────────────────────
-  // `web_payment_active` is fetched fresh per mount and FAILS SAFE to `false`
+  // Reads the SHARED store flag, refreshed by the app lifecycle on boot and
+  // every foreground resume (see App.tsx / useAACStore). FAILS SAFE to `false`
   // (missing row / DB error / unapplied migration) — the banner can therefore
   // never exist during App Review. Parents receive ZERO grace, so the only
   // eligible proactive window on this node is an ACTIVE free trial.
   const premium = useAACStore((s) => s.premium);
-  const [webPaymentActive, setWebPaymentActive] = useState(false);
-
-  useEffect(() => {
-    let mounted = true;
-    void fetchPaywallSettings().then((s) => {
-      if (mounted) setWebPaymentActive(s.web_payment_active);
-    });
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  const webPaymentActive = useAACStore((s) => s.webPaymentActive);
 
   const showUpgradeBanner =
     webPaymentActive && premium.isPremium && premium.status === 'trial';

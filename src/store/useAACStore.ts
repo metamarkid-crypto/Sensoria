@@ -6,6 +6,7 @@ import {
   evaluateAccess,
   fetchPremiumEntitlement,
 } from '../services/db/entitlement';
+import { fetchPaywallSettings } from '../services/db/paywall';
 import type { SubscriptionStatus } from '../services/db/types';
 import type { EntitlementRole } from '../services/db/entitlement';
 
@@ -114,6 +115,15 @@ export interface AACState {
   // Parent Identity
   localParentName: string;
 
+  /**
+   * Stealth kill-switch from `app_settings.web_payment_active`. EPHEMERAL by
+   * design — NEVER persisted: a cached "live" flag surviving a restart would
+   * let the paywall render while App Review mode is on. Unknown state is
+   * represented by `false` + `webPaymentLoaded: false` (stealth-safe default).
+   */
+  webPaymentActive: boolean;
+  webPaymentLoaded: boolean;
+
   // Premium Entitlement (Combo rule — evaluated for Child or linked Parent)
   premium: PremiumState;
 
@@ -147,6 +157,8 @@ export interface AACState {
   
   setChildStatus: (status: Partial<AACState['childStatus']>) => void;
   setLocalParentName: (name: string) => void;
+  /** Re-reads the stealth kill-switch; fails safe to `false`. */
+  refreshWebPaymentActive: () => Promise<void>;
   refreshEntitlement: () => Promise<void>;
   resetPremium: () => void;
 }
@@ -210,6 +222,8 @@ export const useAACStore = create<AACState>()(
       customQuickReplies: ['Mama di sini', 'Tunggu sebentar ya', 'Makan dulu yuk'],
       childStatus: { isOnline: false, lastSeen: null, lat: null, lng: null, lastAddress: null },
       localParentName: 'Orang Tua',
+      webPaymentActive: false,
+      webPaymentLoaded: false,
       premium: INITIAL_PREMIUM(),
       
       setHasSeenOnboarding: (status) => set({ hasSeenOnboarding: status }),
@@ -248,6 +262,19 @@ export const useAACStore = create<AACState>()(
         childStatus: { ...state.childStatus, ...status } 
       })),
       setLocalParentName: (name) => set({ localParentName: name }),
+
+      // --- Stealth kill-switch (web_payment_active) ---
+      // Shared single source of truth so Paywall / Home banner / Settings row
+      // all flip together, and a foreground resume can re-apply the switch
+      // live without an app restart. Errors degrade to stealth (false).
+      refreshWebPaymentActive: async () => {
+        try {
+          const settings = await fetchPaywallSettings();
+          set({ webPaymentActive: settings.web_payment_active, webPaymentLoaded: true });
+        } catch {
+          set({ webPaymentActive: false, webPaymentLoaded: true });
+        }
+      },
 
       // --- Premium Entitlement ---
       // Child device → evaluates its own subscription row.
@@ -311,6 +338,10 @@ export const useAACStore = create<AACState>()(
         } as unknown as AACState['premium'];
         delete (persisted as Partial<AACState> & { refreshEntitlement?: unknown }).refreshEntitlement;
         delete (persisted as Partial<AACState> & { resetPremium?: unknown }).resetPremium;
+        // Ephemeral kill-switch: never survives a restart (stealth mandate).
+        delete (persisted as Partial<AACState> & { webPaymentActive?: unknown }).webPaymentActive;
+        delete (persisted as Partial<AACState> & { webPaymentLoaded?: unknown }).webPaymentLoaded;
+        delete (persisted as Partial<AACState> & { refreshWebPaymentActive?: unknown }).refreshWebPaymentActive;
         return persisted;
       },
       // Restore the raw boundaries into a FULL PremiumState and recompute the

@@ -69,6 +69,11 @@ const toastConfig = {
  *  3. Foreground resume — catches trial expiry and payments settled off-app
  *     (user scans the QRIS in a bank app, returns, entitlement re-reads).
  *
+ * The stealth kill-switch (`webPaymentActive`) follows the same lifecycle:
+ * fetched on boot and re-fetched on every foreground resume so flipping
+ * `app_settings.web_payment_active` in Supabase applies live without a
+ * restart. It is ephemeral store state — never persisted.
+ *
  * Offline-first ("Compassionate Child"): on a COLD START the persisted raw
  * boundaries must survive untouched until a refresh succeeds — an offline
  * launch of a premium Child/Parent reads local state, so `resetPremium()` is
@@ -79,6 +84,7 @@ function EntitlementLifecycle() {
   const deviceId = useAACStore((s) => s.deviceId);
   const refreshEntitlement = useAACStore((s) => s.refreshEntitlement);
   const resetPremium = useAACStore((s) => s.resetPremium);
+  const refreshWebPaymentActive = useAACStore((s) => s.refreshWebPaymentActive);
 
   // Tracks the last-seen identity so a change can be told apart from boot.
   const prevRef = useRef<{ role: string | null; deviceId: string | null }>({
@@ -103,11 +109,20 @@ function EntitlementLifecycle() {
     void refreshEntitlement();
   }, [role, deviceId, refreshEntitlement, resetPremium]);
 
+  // Stealth kill-switch: re-read on boot AND on every foreground resume, so
+  // flipping `web_payment_active` in Supabase applies live — no app restart,
+  // no stale cached "live" state. Fails safe to stealth on any error.
+  useEffect(() => {
+    void refreshWebPaymentActive();
+  }, [refreshWebPaymentActive]);
+
   useEffect(() => {
     const sub = AppState.addEventListener('change', (next) => {
       if (next !== 'active') return;
-      const { role: r, deviceId: d } = useAACStore.getState();
-      if (d && r !== 'None') void refreshEntitlement();
+      const { role: r, deviceId: d, refreshEntitlement: refresh, refreshWebPaymentActive: refreshSwitch } =
+        useAACStore.getState();
+      if (d && r !== 'None') void refresh();
+      void refreshSwitch();
     });
     return () => sub.remove();
   }, [refreshEntitlement]);

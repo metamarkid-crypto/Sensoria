@@ -16,7 +16,6 @@ import { useAACStore } from '../store/useAACStore';
 import {
   createQrisCheckout,
   fetchActivePlans,
-  fetchPaywallSettings,
 } from '../services/db/paywall';
 import type { SubscriptionPlanRow } from '../services/db/types';
 
@@ -72,9 +71,14 @@ export default function PaywallScreen() {
   const premium = useAACStore((s) => s.premium);
   const refreshEntitlement = useAACStore((s) => s.refreshEntitlement);
 
-  // --- Data load (settings kill-switch + active plans) ---
+  // --- Data load (kill-switch + active plans) ---
+  // The kill-switch is SHARED store state, refreshed by the app lifecycle on
+  // boot and every foreground resume (see App.tsx / useAACStore) — this screen
+  // no longer holds its own copy, so Home banner / Settings row / Paywall can
+  // never disagree. Fails safe: unknown state ⇒ review mode, never pricing.
   const [booting, setBooting] = useState(true);
-  const [webPaymentActive, setWebPaymentActive] = useState(false);
+  const webPaymentActive = useAACStore((s) => s.webPaymentActive);
+  const webPaymentLoaded = useAACStore((s) => s.webPaymentLoaded);
   const [plans, setPlans] = useState<SubscriptionPlanRow[]>([]);
 
   // --- Checkout flow ---
@@ -86,18 +90,16 @@ export default function PaywallScreen() {
   const [verifyPending, setVerifyPending] = useState(false);
 
   const load = useCallback(async () => {
+    if (!webPaymentLoaded) return; // kill-switch not resolved yet
     setBooting(true);
-    const settings = await fetchPaywallSettings();
-    setWebPaymentActive(settings.web_payment_active);
-
-    if (settings.web_payment_active) {
+    if (webPaymentActive) {
       const activePlans = await fetchActivePlans();
       setPlans(activePlans);
     } else {
       setPlans([]);
     }
     setBooting(false);
-  }, []);
+  }, [webPaymentActive, webPaymentLoaded]);
 
   useEffect(() => {
     void load();

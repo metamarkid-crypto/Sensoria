@@ -87,13 +87,48 @@ export default function ParentLocationScreen() {
     if (role !== 'Parent' || !deviceId) return;
 
     const resolveChild = async () => {
-      const { data: link } = await supabase
+      // .limit(1) (NOT .single()): a multi-parent setup with several link rows
+      // makes .single() return an error object — the whole pipeline would die
+      // silently. We only need one link to subscribe to.
+      const { data: links } = await supabase
         .from('family_links')
         .select('child_device_id')
         .eq('parent_device_id', deviceId)
-        .single();
+        .limit(1);
+      const link = links?.[0];
       if (!link) return;
       childIdRef.current = link.child_device_id;
+
+      // Initial map load: fetch the child's last known location so the marker
+      // renders real history instead of defaulting to the Jakarta fallback
+      // when the child has rows in the `locations` table.
+      const { data: lastLoc } = await supabase
+        .from('locations')
+        .select('latitude, longitude, address, recorded_at')
+        .eq('child_device_id', link.child_device_id)
+        .order('recorded_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (
+        lastLoc &&
+        typeof lastLoc.latitude === 'number' &&
+        typeof lastLoc.longitude === 'number'
+      ) {
+        const coord = { latitude: lastLoc.latitude, longitude: lastLoc.longitude };
+        coordsRef.current = coord;
+        setLiveAddress(lastLoc.address ?? null);
+        setLiveTimestamp(formatLastSeen(lastLoc.recorded_at ?? null));
+        setChildStatus({
+          lastSeen: formatLastSeen(lastLoc.recorded_at ?? null),
+          lat: lastLoc.latitude,
+          lng: lastLoc.longitude,
+          lastAddress: lastLoc.address ?? null,
+        });
+        mapRef.current?.animateToRegion(
+          { ...coord, latitudeDelta: 0.005, longitudeDelta: 0.005 },
+          800,
+        );
+      }
 
       const channel = supabase
         .channel(`parent-locations-${link.child_device_id}`)
@@ -111,7 +146,7 @@ export default function ParentLocationScreen() {
             const coord = { latitude: row.latitude, longitude: row.longitude };
             coordsRef.current = coord;
             setLiveAddress(row.address ?? null);
-            setLiveTimestamp(row.recorded_at ?? null);
+            setLiveTimestamp(formatLastSeen(row.recorded_at ?? null));
             // Keep the shared store fresh for the other tabs + global header.
             setChildStatus({
               isOnline: true,
@@ -128,7 +163,15 @@ export default function ParentLocationScreen() {
             );
           },
         )
-        .subscribe();
+        .subscribe((status) => {
+          // Visibility into the previously-silent realtime transport: RLS
+          // blocks or a missing publication used to fail with zero signal.
+          if (status === 'SUBSCRIBED') {
+            console.log('[Realtime] locations channel SUBSCRIBED for', link.child_device_id);
+          } else if (status !== 'CLOSED') {
+            console.warn('[Realtime] locations channel status:', status);
+          }
+        });
       channelRef.current = channel;
     };
 
@@ -147,18 +190,20 @@ export default function ParentLocationScreen() {
     const ping = async () => {
       let childId = childIdRef.current;
       if (!childId && deviceId) {
-        const { data: link } = await supabase
+        const { data: links } = await supabase
           .from('family_links')
           .select('child_device_id')
           .eq('parent_device_id', deviceId)
-          .single();
-        childId = link?.child_device_id ?? null;
+          .limit(1);
+        childId = links?.[0]?.child_device_id ?? null;
         childIdRef.current = childId;
       }
       if (childId) {
-        // One-shot broadcast channel: the child's app hears it and forces an
-        // immediate GPS fix + write (see ChildAACScreen).
-        const pingChannel = supabase.channel(`location-ping-${childId}-${Date.now()}`);
+        // Broadcast ping — the channel name MUST match the child's listener
+        // exactly: `location-ping-${deviceId}` with NO timestamp suffix. The
+        // child subscribes once at mount, so a suffixed name broadcasts into
+        // an empty room (the original bug).
+        const pingChannel = supabase.channel(`location-ping-${childId}`);
         pingChannel.subscribe((status) => {
           if (status === 'SUBSCRIBED') {
             void pingChannel.send({ type: 'broadcast', event: 'refresh-location', payload: {} });
