@@ -188,6 +188,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 18,
+    // Keep trailing elements (chevron / "Segera" badge) inside the screen:
+    // rows fill the card's content box minus a small inner gutter.
+    paddingHorizontal: 4,
   },
   borderBottom: {
     borderBottomWidth: 1,
@@ -196,6 +199,12 @@ const styles = StyleSheet.create({
   itemLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+    // CRITICAL: bound the left cluster to the row width. Without flex:1 a
+    // long subtitle (e.g. "Masa Coba Gratis · aktif sampai 12 September")
+    // expands itemLeft past the card and pushes the chevron/badge off-screen.
+    // itemText (flex:1) then truncates instead of overflowing.
+    flex: 1,
+    marginRight: 8,
   },
   iconBox: {
     width: 40,

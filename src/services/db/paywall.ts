@@ -43,7 +43,30 @@ export const fetchPaywallSettings = async (): Promise<PaywallSettings> => {
       trial_duration_days: data?.trial_duration_days ?? null,
     };
   } catch (e) {
-    console.warn('fetchPaywallSettings failed — staying stealth-safe:', e);
+    // LOUD diagnostic — this failure mode is indistinguishable from intentional
+    // stealth mode in the UI, so the exact PostgREST error MUST reach the logs.
+    // Typical culprits when web_payment_active=true but the app still shows
+    // "Segera Hadir":
+    //   • RLS: `new row violates row-level security policy` / error code 42501
+    //     (no SELECT policy on app_settings for role anon)
+    //   • 401/403: wrong or missing SUPABASE_ANON_KEY
+    //   • 404 / PGRST205: table missing — migration never applied
+    //   • TypeError: fetch failed — offline / bad SUPABASE_URL
+    console.error(
+      '[PaywallSettings] fetchPaywallSettings FAILED — degrading to stealth-safe. ' +
+        'If web_payment_active is TRUE in Supabase but this fires, check RLS on ' +
+        'public.app_settings for the anon role. Raw error follows:',
+      JSON.stringify(
+        {
+          message: e instanceof Error ? e.message : String(e),
+          code: (e as { code?: string } | null)?.code ?? null,
+          details: (e as { details?: string } | null)?.details ?? null,
+          hint: (e as { hint?: string } | null)?.hint ?? null,
+        },
+        null,
+        2,
+      ),
+    );
     return STEALTH_SAFE;
   }
 };
