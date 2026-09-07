@@ -26,6 +26,17 @@ export const initDB = async () => {
       );
     `);
     
+    // Migration: preserve a word's real category while it sits in Favorites
+    // (unfavorite restores it exactly). ALTER TABLE throws when the column
+    // already exists — expected on every launch after the first.
+    try {
+      await db.execAsync('ALTER TABLE aac_words ADD COLUMN previous_category_id TEXT;');
+    } catch (e) {
+      if (!String(e).includes('duplicate column name')) {
+        console.warn('previous_category_id migration skipped:', e);
+      }
+    }
+
     // Migration: Update dictionary to full 57 core words and ENFORCE SORTING (keep custom words safe)
     const defaultWordsCount = await db.getAllAsync<{ count: number }>("SELECT COUNT(*) as count FROM aac_words WHERE isCustom = 0");
     const mauCheck = await db.getAllAsync<{ id: string }>("SELECT id FROM aac_words WHERE word_id = 'Mau' AND isCustom = 0 LIMIT 1");
@@ -112,6 +123,49 @@ export const updateWord = async (id: string, updates: Partial<AACWord>) => {
   values.push(id);
   
   await db.runAsync(query, values);
+};
+
+// --- FAVORITES LIFECYCLE ---
+// A card is "favorite" iff categoryId === 'favorit'; its real category is
+// preserved in previous_category_id so unfavoriting restores it exactly.
+// Legacy favorites (created before the column existed) fall back to the
+// ARASAAC seed category, 'custom' for custom words, or 'noun' as a last
+// resort — a card can never get stuck in Favorites.
+
+const findSeedCategory = (id: string): string | null => {
+  try {
+    const seedData: AACWord[] = require('../../../assets/data/arasaac.json');
+    return seedData.find((w) => w.id === id)?.categoryId ?? null;
+  } catch {
+    return null;
+  }
+};
+
+export const setWordFavorite = async (id: string, favorite: boolean): Promise<void> => {
+  if (!db) return;
+  const rows = await db.getAllAsync<any>(
+    'SELECT categoryId, isCustom, previous_category_id FROM aac_words WHERE id = ?',
+    [id]
+  );
+  const row = rows[0];
+  if (!row) return;
+
+  if (favorite) {
+    if (row.categoryId === 'favorit') return; // already favorite — nothing to persist
+    await db.runAsync(
+      'UPDATE aac_words SET previous_category_id = ?, categoryId = ? WHERE id = ?',
+      [row.categoryId, 'favorit', id]
+    );
+  } else {
+    if (row.categoryId !== 'favorit') return; // not favorite — nothing to restore
+    const restore =
+      row.previous_category_id ||
+      (row.isCustom === 1 ? 'custom' : findSeedCategory(id) || 'noun');
+    await db.runAsync(
+      'UPDATE aac_words SET categoryId = ?, previous_category_id = NULL WHERE id = ?',
+      [restore, id]
+    );
+  }
 };
 
 // --- AUDIO CACHE METADATA (LRU) ---

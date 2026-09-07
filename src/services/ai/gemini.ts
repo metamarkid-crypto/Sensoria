@@ -94,7 +94,21 @@ export const transcribeAudio = async (audioUri: string): Promise<string> => {
   });
 };
 
-export const tagImageWithBilingualNames = async (imageUri: string): Promise<{ id: string, zh: string }> => {
+/** Categories a custom card can belong to (mirrors the Child tab bar ids). */
+export type ImageTagCategory = 'pronoun' | 'verb' | 'noun' | 'emotion' | 'social';
+
+export type ImageTagResult = { id: string; zh: string; category: ImageTagCategory };
+
+const VALID_TAG_CATEGORIES: readonly string[] = ['pronoun', 'verb', 'noun', 'emotion', 'social'];
+
+/**
+ * Returned when the model answer cannot be trusted (parse failure / missing
+ * fields). Callers MUST treat this exact pair as "no confidence" and fall
+ * back to the manual form instead of saving it as a real card name.
+ */
+const NO_CONFIDENCE_TAG: ImageTagResult = { id: 'Benda', zh: '东西', category: 'noun' };
+
+export const tagImageWithBilingualNames = async (imageUri: string): Promise<ImageTagResult> => {
   const base64Data = await FileSystem.readAsStringAsync(imageUri, {
     encoding: FileSystem.EncodingType.Base64,
   });
@@ -113,7 +127,7 @@ export const tagImageWithBilingualNames = async (imageUri: string): Promise<{ id
               },
             },
             {
-              text: 'Identify the main object in this image with a single, simple word suitable for a child. Return ONLY a JSON object in this exact format, with no markdown formatting or backticks: {"id": "word in indonesian", "zh": "word in mandarin"}',
+              text: 'Identify the main object in this image with a single, simple word suitable for a child. Also classify it into exactly one AAC category. Return ONLY a JSON object in this exact format, with no markdown formatting or backticks: {"id": "word in indonesian", "zh": "word in mandarin", "category": "pronoun|verb|noun|emotion|social"}',
             },
           ],
         },
@@ -123,15 +137,21 @@ export const tagImageWithBilingualNames = async (imageUri: string): Promise<{ id
     try {
       const result = JSON.parse(response.text || '{}');
       if (result.id && result.zh) {
-        return result;
+        return {
+          id: result.id,
+          zh: result.zh,
+          category: VALID_TAG_CATEGORIES.includes(result.category)
+            ? (result.category as ImageTagCategory)
+            : 'noun',
+        };
       }
-      return { id: 'Benda', zh: '东西' };
+      return NO_CONFIDENCE_TAG;
     } catch (error) {
       console.error('Error parsing Gemini Vision response', error);
       logger.logError(error, { 
         action: 'ai_image_tagging',
       });
-      return { id: 'Benda', zh: '东西' };
+      return NO_CONFIDENCE_TAG;
     }
   });
 };

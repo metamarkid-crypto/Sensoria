@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { useAACStore, AACWord } from '../store/useAACStore';
 import { evaluateAccess } from '../services/db/entitlement';
-import { initDB, getAllWords, addCustomWord, updateWord } from '../services/db/sqlite';
+import { initDB, getAllWords, addCustomWord, updateWord, setWordFavorite } from '../services/db/sqlite';
 import { tagImageWithBilingualNames } from '../services/ai/gemini';
 import { logger } from '../utils/logger';
 import Toast from 'react-native-toast-message';
@@ -26,6 +26,30 @@ import {
   writeLocationSnapshot,
 } from '../services/location/backgroundLocation';
 import { FontAwesome5 } from '@expo/vector-icons';
+
+// ── Human-in-the-loop AI auto-tag ──────────────────────────────────────
+// Hard ceiling on the vision call: a hanging request must never trap the
+// child in the "AI Sedang Menganalisis" spinner — it degrades to manual.
+const AI_TAG_TIMEOUT_MS = 15000;
+
+const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> =>
+  new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('AI tagger timeout')), ms);
+    promise.then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      (error) => { clearTimeout(timer); reject(error); },
+    );
+  });
+
+// Category choices for a new custom card — ids mirror the Child tab bar so
+// a saved card lands in the right tab immediately.
+const AUTO_TAG_CATEGORIES = [
+  { id: 'pronoun', label: 'Orang', icon: 'user', color: '#FFB6C1' },
+  { id: 'verb', label: 'Aksi', icon: 'running', color: '#22C55E' },
+  { id: 'noun', label: 'Benda', icon: 'apple-alt', color: '#3B82F6' },
+  { id: 'emotion', label: 'Sifat', icon: 'smile', color: '#F59E0B' },
+  { id: 'social', label: 'Sosial', icon: 'hands-helping', color: '#8B5CF6' },
+] as const;
 
 export default function ChildAACScreen() {
   const navigation = useNavigation<any>();
@@ -73,6 +97,16 @@ export default function ChildAACScreen() {
   const [showEditName, setShowEditName] = useState(false);
   const [editNameId, setEditNameId] = useState('');
   const [editNameZh, setEditNameZh] = useState('');
+
+  // ── AI Auto-Tag confirmation draft ─────────────────────────────────
+  // The AI result is NEVER auto-saved: it only pre-fills this editable
+  // draft. Any failure (network / timeout / no-confidence placeholder)
+  // opens the same form blank — the human always has the final word.
+  const [showAutoTagConfirm, setShowAutoTagConfirm] = useState(false);
+  const [pendingImageUri, setPendingImageUri] = useState<string | null>(null);
+  const [pendingNameId, setPendingNameId] = useState('');
+  const [pendingNameZh, setPendingNameZh] = useState('');
+  const [pendingCategory, setPendingCategory] = useState<string>('noun');
 
   useEffect(() => {
     loadDatabase();
@@ -255,9 +289,7 @@ export default function ChildAACScreen() {
     } else {
       Toast.show({ type: 'error', text1: 'Gagal', text2: 'Belum tersambung ke perangkat orang tua.', position: 'top' });
     }
-  };
-
-  const handleAddCustomWord = async () => {
+  };  const handleAddCustomWord = async () => {
     let result = await ImagePicker.launchCameraAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
@@ -266,28 +298,74 @@ export default function ChildAACScreen() {
     });
 
     if (!result.canceled && result.assets[0]) {
+      const imageUri = result.assets[0].uri;
       setIsProcessingAI(true);
+
+      let aiPrefill: { id: string; zh: string; category: string } | null = null;
       try {
-        const imageUri = result.assets[0].uri;
-        const tags = await tagImageWithBilingualNames(imageUri);
-        const newWord: AACWord = {
-          id: Date.now().toString(),
-          word_id: tags.id,
-          word_zh: tags.zh,
-          imageUrl: imageUri,
-          categoryId: 'custom',
-          isCustom: true
-        };
-        await addCustomWord(newWord);
-        await loadDatabase(); 
-        Toast.show({ type: 'success', text1: 'Berhasil', text2: `AI mengenali benda ini sebagai "${tags.id}" / "${tags.zh}"`, position: 'top' });
-      } catch (e: any) {
-        logger.logError(e, { action: 'Failed to process image with AI', role: 'Child' });
-        Toast.show({ type: 'error', text1: 'Error', text2: 'Gagal memproses gambar dengan AI.', position: 'top' });
+        const tags = await withTimeout(tagImageWithBilingualNames(imageUri), AI_TAG_TIMEOUT_MS);
+        // gemini.ts answers with the generic placeholder { id: 'Benda',
+        // zh: '东西' } whenever it cannot parse a confident response — treat
+        // that exact pair as "no confidence" so the user always lands on the
+        // editable manual form instead of a junk card name.
+        const noConfidence = tags.id === 'Benda' && tags.zh === '东西';
+        if (!noConfidence) {
+          aiPrefill = { id: tags.id, zh: tags.zh, category: tags.category };
+        }
+      } catch (e) {
+        logger.logError(e, { action: 'AI auto-tag failed — manual fallback', role: 'Child' });
       } finally {
         setIsProcessingAI(false);
       }
+
+      if (aiPrefill) {
+        setPendingNameId(aiPrefill.id);
+        setPendingNameZh(aiPrefill.zh);
+        setPendingCategory(aiPrefill.category);
+      } else {
+        setPendingNameId('');
+        setPendingNameZh('');
+        setPendingCategory('noun');
+        Toast.show({
+          type: 'info',
+          text1: 'Deteksi Otomatis',
+          text2: 'Gagal deteksi otomatis. Silakan isi manual',
+          position: 'top',
+        });
+      }
+
+      setPendingImageUri(imageUri);
+      setShowAutoTagConfirm(true);
     }
+  };
+
+  const handleConfirmAutoTag = async () => {
+    if (!pendingImageUri) return;
+    if (!pendingNameId.trim() || !pendingNameZh.trim()) {
+      Toast.show({ type: 'error', text1: 'Error', text2: 'Nama tidak boleh kosong', position: 'top' });
+      return;
+    }
+
+    const newWord: AACWord = {
+      id: Date.now().toString(),
+      word_id: pendingNameId.trim(),
+      word_zh: pendingNameZh.trim(),
+      imageUrl: pendingImageUri,
+      categoryId: pendingCategory,
+      isCustom: true
+    };
+
+    await addCustomWord(newWord);
+    await loadDatabase();
+    setShowAutoTagConfirm(false);
+    setPendingImageUri(null);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Toast.show({ type: 'success', text1: 'Berhasil', text2: `Kartu "${newWord.word_id}" ditambahkan`, position: 'top' });
+  };
+
+  const handleCancelAutoTag = () => {
+    setShowAutoTagConfirm(false);
+    setPendingImageUri(null);
   };
 
   const handleWordLongPress = useCallback((word: AACWord) => {
@@ -308,10 +386,19 @@ export default function ChildAACScreen() {
 
   const handleToggleFavorite = async () => {
     if (!selectedWord) return;
+    const isFavorite = selectedWord.categoryId === 'favorit';
     setShowWordOptions(false);
-    await updateWord(selectedWord.id, { categoryId: 'favorit' });
+    // Persisted immediately in SQLite: favoriting stores the real category
+    // in previous_category_id; unfavoriting restores it — never lost.
+    await setWordFavorite(selectedWord.id, !isFavorite);
     await loadDatabase();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Toast.show({
+      type: 'success',
+      text1: isFavorite ? 'Dihapus dari Favorit' : 'Ditambahkan ke Favorit',
+      text2: isFavorite ? 'Kartu kembali ke kategori asalnya' : 'Cek tab ⭐ Favorit',
+      position: 'top',
+    });
   };
 
   const handleChangeImage = async () => {
@@ -492,10 +579,17 @@ export default function ChildAACScreen() {
               <Text style={styles.optionEmoji}>🖼️</Text>
               <Text style={styles.optionText}>Ubah Gambar</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.optionBtn} onPress={handleToggleFavorite}>
-              <Text style={styles.optionEmoji}>⭐</Text>
-              <Text style={styles.optionText}>Jadikan Favorit</Text>
-            </TouchableOpacity>
+            {selectedWord?.categoryId === 'favorit' ? (
+              <TouchableOpacity style={styles.optionBtn} onPress={handleToggleFavorite}>
+                <Text style={styles.optionEmoji}>💔</Text>
+                <Text style={[styles.optionText, styles.optionTextDanger]}>Hapus dari Favorit</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={styles.optionBtn} onPress={handleToggleFavorite}>
+                <Text style={styles.optionEmoji}>⭐</Text>
+                <Text style={styles.optionText}>Tambah ke Favorit</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </TouchableOpacity>
       </Modal>
@@ -527,6 +621,69 @@ export default function ChildAACScreen() {
             </View>
           </View>
         </View>
+      </Modal>
+
+      {/* AI Auto-Tag Confirmation (human-in-the-loop) — every field editable */}
+      <Modal visible={showAutoTagConfirm} transparent animationType="slide">
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalOverlay}
+        >
+          <ScrollView contentContainerStyle={styles.autoTagScroll} bounces={false}>
+            <View style={styles.autoTagModal}>
+              <Text style={styles.optionsTitle}>Konfirmasi Kartu Baru</Text>
+              {pendingImageUri ? (
+                <Image source={{ uri: pendingImageUri }} style={styles.autoTagImage} />
+              ) : null}
+              <Text style={styles.autoTagHint}>
+                Periksa hasil deteksi AI — ubah sesukamu sebelum menyimpan.
+              </Text>
+              <Text style={styles.editLabel}>Nama (Indonesia):</Text>
+              <TextInput
+                style={styles.editInput}
+                value={pendingNameId}
+                onChangeText={setPendingNameId}
+                placeholder="Contoh: Bola"
+                placeholderTextColor="#94A3B8"
+              />
+              <Text style={styles.editLabel}>Nama (Mandarin):</Text>
+              <TextInput
+                style={styles.editInput}
+                value={pendingNameZh}
+                onChangeText={setPendingNameZh}
+                placeholder="例：球"
+                placeholderTextColor="#94A3B8"
+              />
+              <Text style={styles.editLabel}>Kategori:</Text>
+              <View style={styles.chipRow}>
+                {AUTO_TAG_CATEGORIES.map((cat) => {
+                  const isActive = pendingCategory === cat.id;
+                  return (
+                    <TouchableOpacity
+                      key={cat.id}
+                      style={[styles.chip, isActive && styles.chipActive]}
+                      onPress={() => {
+                        setPendingCategory(cat.id);
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      }}
+                    >
+                      <FontAwesome5 name={cat.icon} size={12} color={isActive ? '#FFF' : cat.color} solid />
+                      <Text style={[styles.chipText, isActive && styles.chipTextActive]}>{cat.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <View style={styles.editActions}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={handleCancelAutoTag}>
+                  <Text style={styles.cancelBtnText}>Batal</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.saveBtn} onPress={handleConfirmAutoTag}>
+                  <Text style={styles.saveBtnText}>Gunakan Hasil</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Category Tab Bar (Motor Planning Standard) */}
@@ -717,5 +874,17 @@ const styles = StyleSheet.create({
   cancelBtn: { paddingVertical: 12, paddingHorizontal: 20 },
   cancelBtnText: { color: '#94A3B8', fontWeight: 'bold', fontSize: 16 },
   saveBtn: { backgroundColor: '#00B5B8', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12 },
-  saveBtnText: { color: '#FFF', fontWeight: 'bold', fontSize: 16 }
+  saveBtnText: { color: '#FFF', fontWeight: 'bold', fontSize: 16 },
+
+  optionTextDanger: { color: '#EF4444' },
+
+  autoTagScroll: { flexGrow: 1, justifyContent: 'center' },
+  autoTagModal: { backgroundColor: '#FFF', padding: 24, borderRadius: 24, width: '88%', alignSelf: 'center' },
+  autoTagImage: { width: 88, height: 88, borderRadius: 16, alignSelf: 'center', marginBottom: 10, backgroundColor: '#F1F5F9' },
+  autoTagHint: { fontSize: 13, color: '#64748B', textAlign: 'center', marginBottom: 4 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4, marginBottom: 8 },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0' },
+  chipActive: { backgroundColor: '#00B5B8', borderColor: '#00B5B8' },
+  chipText: { fontSize: 13, fontWeight: '600', color: '#475569' },
+  chipTextActive: { color: '#FFF', fontWeight: '800' }
 });
