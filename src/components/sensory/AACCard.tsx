@@ -164,6 +164,11 @@ const AACCard = React.memo(({ item, onPress, onLongPress }: AACCardProps) => {
         backgroundColor: bgColor,
         borderColor: borderColor,
       }]}>
+        {item.isFavorite ? (
+          <View style={styles.favBadge} pointerEvents="none">
+            <Text style={styles.favBadgeText}>⭐</Text>
+          </View>
+        ) : null}
         <Image 
           source={imageSource} 
           style={styles.image} 
@@ -203,5 +208,25 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#11427B',
     textAlign: 'center',
+  },
+  favBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+  },
+  favBadgeText: {
+    fontSize: 12,
+    lineHeight: 14,
   },
 });

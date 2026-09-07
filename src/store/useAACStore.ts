@@ -24,9 +24,16 @@ export type ChildProfile = {
 export interface AACWord {
   id: string;
   word_id: string; // Indonesian
+  word_en?: string; // English (optional — legacy rows / trilingual fill)
   word_zh: string; // Mandarin
   imageUrl?: string;
   categoryId: string;
+  /**
+   * Non-destructive favorite flag (SQLite `is_favorite`). Purely additive:
+   * favoriting NEVER touches categoryId, so the card stays in its original
+   * tab and the child's motor memory is preserved.
+   */
+  isFavorite?: boolean;
   isCustom?: boolean;
 }
 

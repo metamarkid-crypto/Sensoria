@@ -97,7 +97,7 @@ export const transcribeAudio = async (audioUri: string): Promise<string> => {
 /** Categories a custom card can belong to (mirrors the Child tab bar ids). */
 export type ImageTagCategory = 'pronoun' | 'verb' | 'noun' | 'emotion' | 'social';
 
-export type ImageTagResult = { id: string; zh: string; category: ImageTagCategory };
+export type ImageTagResult = { id: string; en: string; zh: string; category: ImageTagCategory };
 
 const VALID_TAG_CATEGORIES: readonly string[] = ['pronoun', 'verb', 'noun', 'emotion', 'social'];
 
@@ -106,7 +106,10 @@ const VALID_TAG_CATEGORIES: readonly string[] = ['pronoun', 'verb', 'noun', 'emo
  * fields). Callers MUST treat this exact pair as "no confidence" and fall
  * back to the manual form instead of saving it as a real card name.
  */
-const NO_CONFIDENCE_TAG: ImageTagResult = { id: 'Benda', zh: '东西', category: 'noun' };
+const NO_CONFIDENCE_TAG: ImageTagResult = { id: 'Benda', en: 'Thing', zh: '东西', category: 'noun' };
+
+const isNoConfidenceTag = (t: ImageTagResult): boolean =>
+  t.id === 'Benda' && t.en === 'Thing' && t.zh === '东西';
 
 export const tagImageWithBilingualNames = async (imageUri: string): Promise<ImageTagResult> => {
   const base64Data = await FileSystem.readAsStringAsync(imageUri, {
@@ -127,7 +130,7 @@ export const tagImageWithBilingualNames = async (imageUri: string): Promise<Imag
               },
             },
             {
-              text: 'Identify the main object in this image with a single, simple word suitable for a child. Also classify it into exactly one AAC category. Return ONLY a JSON object in this exact format, with no markdown formatting or backticks: {"id": "word in indonesian", "zh": "word in mandarin", "category": "pronoun|verb|noun|emotion|social"}',
+              text: 'Identify the main object in this image with a single, simple word suitable for a child. Give the word in Indonesian, English, and Mandarin, and classify it into exactly one AAC category. Return ONLY a JSON object in this exact format, with no markdown formatting or backticks: {"id": "word in indonesian", "en": "word in english", "zh": "word in mandarin", "category": "pronoun|verb|noun|emotion|social"}',
             },
           ],
         },
@@ -139,6 +142,7 @@ export const tagImageWithBilingualNames = async (imageUri: string): Promise<Imag
       if (result.id && result.zh) {
         return {
           id: result.id,
+          en: result.en || result.id,
           zh: result.zh,
           category: VALID_TAG_CATEGORIES.includes(result.category)
             ? (result.category as ImageTagCategory)
@@ -152,6 +156,46 @@ export const tagImageWithBilingualNames = async (imageUri: string): Promise<Imag
         action: 'ai_image_tagging',
       });
       return NO_CONFIDENCE_TAG;
+    }
+  });
+};
+
+export { isNoConfidenceTag };
+
+/**
+ * Background one-shot translation used by the frictionless trilingual flow:
+ * after a manual fallback save (all three labels = the user's typed word),
+ * this fills the two missing languages. Fire-and-forget — NEVER awaited by
+ * the UI path. `from` is the language the user actually typed.
+ */
+export const translateWordBilingual = async (
+  word: string,
+  from: 'id' | 'en' | 'zh'
+): Promise<{ id: string; en: string; zh: string }> => {
+  return executeWithFallback(async (ai) => {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            {
+              text: `Translate the word "${word}" (it is written in ${from === 'id' ? 'Indonesian' : from === 'en' ? 'English' : 'Mandarin'}) into the other two languages. Use a single, simple, child-friendly word for each. Return ONLY a JSON object in this exact format, with no markdown formatting or backticks: {"id": "indonesian", "en": "english", "zh": "mandarin"}`,
+            },
+          ],
+        },
+      ],
+    });
+
+    try {
+      const result = JSON.parse(response.text || '{}');
+      if (result.id && result.en && result.zh) {
+        return { id: result.id, en: result.en, zh: result.zh };
+      }
+      throw new Error('Translation response missing fields');
+    } catch (error) {
+      logger.logError(error, { action: 'ai_background_translation' });
+      throw error;
     }
   });
 };

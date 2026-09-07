@@ -26,16 +26,27 @@ export const initDB = async () => {
       );
     `);
     
-    // Migration: preserve a word's real category while it sits in Favorites
-    // (unfavorite restores it exactly). ALTER TABLE throws when the column
-    // already exists — expected on every launch after the first.
+    // Migration: NON-DESTRUCTIVE favorites. `is_favorite` is a pure boolean
+    // overlay — favoriting NEVER touches categoryId, so a card always stays
+    // visible in its original tab (spatial motor memory is sacred).
+    // ALTER TABLE throws when the column already exists — expected on every
+    // launch after the first.
     try {
-      await db.execAsync('ALTER TABLE aac_words ADD COLUMN previous_category_id TEXT;');
+      await db.execAsync('ALTER TABLE aac_words ADD COLUMN is_favorite INTEGER DEFAULT 0;');
     } catch (e) {
       if (!String(e).includes('duplicate column name')) {
-        console.warn('previous_category_id migration skipped:', e);
+        console.warn('is_favorite migration skipped:', e);
       }
     }
+    // Trilingual: English label column (optional — legacy rows stay valid).
+    try {
+      await db.execAsync('ALTER TABLE aac_words ADD COLUMN word_en TEXT;');
+    } catch (e) {
+      if (!String(e).includes('duplicate column name')) {
+        console.warn('word_en migration skipped:', e);
+      }
+    }
+    await migrateLegacyFavorites();
 
     // Migration: Update dictionary to full 57 core words and ENFORCE SORTING (keep custom words safe)
     const defaultWordsCount = await db.getAllAsync<{ count: number }>("SELECT COUNT(*) as count FROM aac_words WHERE isCustom = 0");
@@ -48,6 +59,15 @@ export const initDB = async () => {
     }
   } catch (error) {
     console.error('Error initializing SQLite:', error);
+  }
+};
+
+const findSeedCategory = (id: string): string | null => {
+  try {
+    const seedData: AACWord[] = require('../../../assets/data/arasaac.json');
+    return seedData.find((w) => w.id === id)?.categoryId ?? null;
+  } catch {
+    return null;
   }
 };
 
@@ -74,15 +94,45 @@ const seedDefaultARASAACWords = async () => {
   }
 };
 
+/**
+ * One-time conversion of the previous band-aid favorites (categoryId was
+ * MOVED to 'favorit' with the real category parked in previous_category_id).
+ * Restores every affected row's true category and flips is_favorite on.
+ */
+const migrateLegacyFavorites = async () => {
+  if (!db) return;
+  try {
+    const legacy = await db.getAllAsync<any>(
+      "SELECT id, isCustom, previous_category_id FROM aac_words WHERE categoryId = 'favorit'"
+    );
+    for (const row of legacy) {
+      const restore =
+        row.previous_category_id ||
+        (row.isCustom === 1 ? 'custom' : findSeedCategory(row.id) || 'noun');
+      await db.runAsync(
+        "UPDATE aac_words SET categoryId = ?, previous_category_id = NULL, is_favorite = 1 WHERE id = ?",
+        [restore, row.id]
+      );
+    }
+  } catch (e) {
+    // First launch ever: previous_category_id doesn't exist yet — nothing to convert.
+    if (!String(e).includes('no such column')) {
+      console.warn('Legacy favorite migration skipped:', e);
+    }
+  }
+};
+
 export const getAllWords = async (): Promise<AACWord[]> => {
   if (!db) return [];
   const rows = await db.getAllAsync<any>('SELECT * FROM aac_words');
   return rows.map(r => ({
     id: r.id,
     word_id: r.word_id,
+    word_en: r.word_en ?? undefined,
     word_zh: r.word_zh,
     imageUrl: r.imageUrl,
     categoryId: r.categoryId,
+    isFavorite: r.is_favorite === 1,
     isCustom: r.isCustom === 1
   }));
 };
@@ -90,8 +140,8 @@ export const getAllWords = async (): Promise<AACWord[]> => {
 export const addCustomWord = async (word: AACWord) => {
   if (!db) return;
   await db.runAsync(
-    'INSERT INTO aac_words (id, word_id, word_zh, imageUrl, categoryId, isCustom) VALUES (?, ?, ?, ?, ?, 1)',
-    [word.id, word.word_id, word.word_zh, word.imageUrl || null, word.categoryId]
+    'INSERT INTO aac_words (id, word_id, word_en, word_zh, imageUrl, categoryId, isCustom) VALUES (?, ?, ?, ?, ?, ?, 1)',
+    [word.id, word.word_id, word.word_en ?? null, word.word_zh, word.imageUrl || null, word.categoryId]
   );
 };
 
@@ -103,6 +153,10 @@ export const updateWord = async (id: string, updates: Partial<AACWord>) => {
   if (updates.word_id !== undefined) {
     setClauses.push('word_id = ?');
     values.push(updates.word_id);
+  }
+  if (updates.word_en !== undefined) {
+    setClauses.push('word_en = ?');
+    values.push(updates.word_en);
   }
   if (updates.word_zh !== undefined) {
     setClauses.push('word_zh = ?');
@@ -125,47 +179,17 @@ export const updateWord = async (id: string, updates: Partial<AACWord>) => {
   await db.runAsync(query, values);
 };
 
-// --- FAVORITES LIFECYCLE ---
-// A card is "favorite" iff categoryId === 'favorit'; its real category is
-// preserved in previous_category_id so unfavoriting restores it exactly.
-// Legacy favorites (created before the column existed) fall back to the
-// ARASAAC seed category, 'custom' for custom words, or 'noun' as a last
-// resort — a card can never get stuck in Favorites.
-
-const findSeedCategory = (id: string): string | null => {
-  try {
-    const seedData: AACWord[] = require('../../../assets/data/arasaac.json');
-    return seedData.find((w) => w.id === id)?.categoryId ?? null;
-  } catch {
-    return null;
-  }
-};
+// --- FAVORITES LIFECYCLE (non-destructive) ---
+// `is_favorite` is a pure overlay: toggling it NEVER touches categoryId.
+// "Apel" stays in Benda whether it is favorited or not — the Favorit tab is
+// just a filter (WHERE is_favorite = 1), not a physical location.
 
 export const setWordFavorite = async (id: string, favorite: boolean): Promise<void> => {
   if (!db) return;
-  const rows = await db.getAllAsync<any>(
-    'SELECT categoryId, isCustom, previous_category_id FROM aac_words WHERE id = ?',
-    [id]
-  );
-  const row = rows[0];
-  if (!row) return;
-
-  if (favorite) {
-    if (row.categoryId === 'favorit') return; // already favorite — nothing to persist
-    await db.runAsync(
-      'UPDATE aac_words SET previous_category_id = ?, categoryId = ? WHERE id = ?',
-      [row.categoryId, 'favorit', id]
-    );
-  } else {
-    if (row.categoryId !== 'favorit') return; // not favorite — nothing to restore
-    const restore =
-      row.previous_category_id ||
-      (row.isCustom === 1 ? 'custom' : findSeedCategory(id) || 'noun');
-    await db.runAsync(
-      'UPDATE aac_words SET categoryId = ?, previous_category_id = NULL WHERE id = ?',
-      [restore, id]
-    );
-  }
+  await db.runAsync('UPDATE aac_words SET is_favorite = ? WHERE id = ?', [
+    favorite ? 1 : 0,
+    id,
+  ]);
 };
 
 // --- AUDIO CACHE METADATA (LRU) ---

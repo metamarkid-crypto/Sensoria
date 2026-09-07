@@ -1,5 +1,6 @@
 import 'react-native-url-polyfill/auto';
 import { createClient } from '@supabase/supabase-js';
+import { AACWord } from '../../store/useAACStore';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -28,6 +29,40 @@ export const sendAACMessage = async (channelId: string, payload: any) => {
 
   if (error) {
     console.error('Gagal menyimpan pesan ke database:', error);
+  }
+};
+
+/**
+ * Cloud backup for a custom card (fire-and-forget — the UI never awaits this).
+ * Writes into `custom_words` keyed on the device; a tampered client can only
+ * ever touch its own rows.
+ */
+export const syncCustomWordToCloud = async (
+  word: AACWord,
+  deviceId: string | null
+): Promise<void> => {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.warn('Supabase not configured. Custom card cloud sync skipped.');
+    return;
+  }
+  if (!deviceId) return; // unlinked device — SQLite alone is the source of truth
+
+  const { error } = await supabase.from('custom_words').upsert(
+    {
+      id: word.id,
+      child_device_id: deviceId,
+      word_id: word.word_id,
+      word_en: word.word_en ?? null,
+      word_zh: word.word_zh,
+      image_url: word.imageUrl ?? null,
+      category_id: word.categoryId,
+      is_favorite: word.isFavorite ? 1 : 0,
+    },
+    { onConflict: 'id' }
+  );
+
+  if (error) {
+    console.error('[CustomWords] cloud sync failed (offline-safe):', error);
   }
 };
 

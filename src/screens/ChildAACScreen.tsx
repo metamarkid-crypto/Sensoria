@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { View, StyleSheet, ActivityIndicator, Text, TouchableOpacity, ScrollView, Modal, TextInput, KeyboardAvoidingView, Platform, Image } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -6,7 +6,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useAACStore, AACWord } from '../store/useAACStore';
 import { evaluateAccess } from '../services/db/entitlement';
 import { initDB, getAllWords, addCustomWord, updateWord, setWordFavorite } from '../services/db/sqlite';
-import { tagImageWithBilingualNames } from '../services/ai/gemini';
+import { tagImageWithBilingualNames, translateWordBilingual, isNoConfidenceTag } from '../services/ai/gemini';
 import { logger } from '../utils/logger';
 import Toast from 'react-native-toast-message';
 import AACGrid from '../components/sensory/AACGrid';
@@ -18,7 +18,7 @@ import * as Haptics from 'expo-haptics';
 import { playTTS, clearAudioCache } from '../services/ai/audioManager';
 import { useAccessibleAction } from '../hooks/useAccessibleAction';
 import SettingsScreen from './SettingsScreen';
-import { supabase, sendAACMessage, subscribeToAACMessages } from '../services/db/supabase';
+import { supabase, sendAACMessage, subscribeToAACMessages, syncCustomWordToCloud } from '../services/db/supabase';
 import {
   ensureBackgroundTracking,
   stopBackgroundTracking,
@@ -98,15 +98,33 @@ export default function ChildAACScreen() {
   const [editNameId, setEditNameId] = useState('');
   const [editNameZh, setEditNameZh] = useState('');
 
-  // ── AI Auto-Tag confirmation draft ─────────────────────────────────
+  // ── AI Auto-Tag confirmation draft (frictionless trilingual) ────────
   // The AI result is NEVER auto-saved: it only pre-fills this editable
-  // draft. Any failure (network / timeout / no-confidence placeholder)
-  // opens the same form blank — the human always has the final word.
+  // draft. The user sees and edits ONE input — their active app language —
+  // while the other two languages are stored silently and auto-filled in
+  // background. Any failure (network / timeout / no-confidence) opens the
+  // same form blank — the human always has the final word.
   const [showAutoTagConfirm, setShowAutoTagConfirm] = useState(false);
   const [pendingImageUri, setPendingImageUri] = useState<string | null>(null);
-  const [pendingNameId, setPendingNameId] = useState('');
-  const [pendingNameZh, setPendingNameZh] = useState('');
+  const [pendingId, setPendingId] = useState('');
+  const [pendingEn, setPendingEn] = useState('');
+  const [pendingZh, setPendingZh] = useState('');
   const [pendingCategory, setPendingCategory] = useState<string>('noun');
+
+  // The single visible input binds to the ACTIVE app language.
+  const activeLang = language;
+  const pendingLabel =
+    activeLang === 'id' ? pendingId : activeLang === 'en' ? pendingEn : pendingZh;
+  const setPendingLabel = (text: string) => {
+    if (activeLang === 'id') setPendingId(text);
+    else if (activeLang === 'en') setPendingEn(text);
+    else setPendingZh(text);
+  };
+  const activeLanguageLabel = activeLang === 'id' ? 'Indonesia' : activeLang === 'en' ? 'English' : 'Mandarin';
+  const activeLanguagePlaceholder = activeLang === 'id' ? 'Bola' : activeLang === 'en' ? 'Ball' : '球';
+  // What the AI proposed for the ACTIVE language (null = manual fallback).
+  // Used to detect "user corrected the AI word" → siblings need re-translation.
+  const aiOriginalRef = useRef<string | null>(null);
 
   useEffect(() => {
     loadDatabase();
@@ -289,7 +307,9 @@ export default function ChildAACScreen() {
     } else {
       Toast.show({ type: 'error', text1: 'Gagal', text2: 'Belum tersambung ke perangkat orang tua.', position: 'top' });
     }
-  };  const handleAddCustomWord = async () => {
+  };
+
+  const handleAddCustomWord = async () => {
     let result = await ImagePicker.launchCameraAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
@@ -301,16 +321,15 @@ export default function ChildAACScreen() {
       const imageUri = result.assets[0].uri;
       setIsProcessingAI(true);
 
-      let aiPrefill: { id: string; zh: string; category: string } | null = null;
+      let aiPrefill: { id: string; en: string; zh: string; category: string } | null = null;
       try {
         const tags = await withTimeout(tagImageWithBilingualNames(imageUri), AI_TAG_TIMEOUT_MS);
-        // gemini.ts answers with the generic placeholder { id: 'Benda',
-        // zh: '东西' } whenever it cannot parse a confident response — treat
-        // that exact pair as "no confidence" so the user always lands on the
-        // editable manual form instead of a junk card name.
-        const noConfidence = tags.id === 'Benda' && tags.zh === '东西';
-        if (!noConfidence) {
-          aiPrefill = { id: tags.id, zh: tags.zh, category: tags.category };
+        // gemini.ts answers with a generic placeholder whenever it cannot
+        // parse a confident response — treat that as "no confidence" so the
+        // user always lands on the editable manual form instead of a junk
+        // card name.
+        if (!isNoConfidenceTag(tags)) {
+          aiPrefill = { id: tags.id, en: tags.en, zh: tags.zh, category: tags.category };
         }
       } catch (e) {
         logger.logError(e, { action: 'AI auto-tag failed — manual fallback', role: 'Child' });
@@ -319,13 +338,20 @@ export default function ChildAACScreen() {
       }
 
       if (aiPrefill) {
-        setPendingNameId(aiPrefill.id);
-        setPendingNameZh(aiPrefill.zh);
+        // Trilingual stored silently; the UI only shows ONE editable input
+        // bound to the user's active language.
+        setPendingId(aiPrefill.id);
+        setPendingEn(aiPrefill.en);
+        setPendingZh(aiPrefill.zh);
         setPendingCategory(aiPrefill.category);
+        aiOriginalRef.current =
+          activeLang === 'id' ? aiPrefill.id : activeLang === 'en' ? aiPrefill.en : aiPrefill.zh;
       } else {
-        setPendingNameId('');
-        setPendingNameZh('');
+        setPendingId('');
+        setPendingEn('');
+        setPendingZh('');
         setPendingCategory('noun');
+        aiOriginalRef.current = null;
         Toast.show({
           type: 'info',
           text1: 'Deteksi Otomatis',
@@ -341,15 +367,24 @@ export default function ChildAACScreen() {
 
   const handleConfirmAutoTag = async () => {
     if (!pendingImageUri) return;
-    if (!pendingNameId.trim() || !pendingNameZh.trim()) {
+    if (!pendingLabel.trim()) {
       Toast.show({ type: 'error', text1: 'Error', text2: 'Nama tidak boleh kosong', position: 'top' });
       return;
     }
 
+    // One-input rule: the user edits ONLY the label in their active language.
+    // The other two keep their silent AI prediction, or — when there is none
+    // (manual fallback) — start as the SAME typed word (never empty), and are
+    // auto-translated in background without blocking the UI.
+    const label = pendingLabel.trim();
+    const nameId = activeLang === 'id' ? label : (pendingId || label);
+    const nameEn = activeLang === 'en' ? label : (pendingEn || label);
+    const nameZh = activeLang === 'zh' ? label : (pendingZh || label);
     const newWord: AACWord = {
       id: Date.now().toString(),
-      word_id: pendingNameId.trim(),
-      word_zh: pendingNameZh.trim(),
+      word_id: nameId,
+      word_en: nameEn,
+      word_zh: nameZh,
       imageUrl: pendingImageUri,
       categoryId: pendingCategory,
       isCustom: true
@@ -360,7 +395,33 @@ export default function ChildAACScreen() {
     setShowAutoTagConfirm(false);
     setPendingImageUri(null);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Toast.show({ type: 'success', text1: 'Berhasil', text2: `Kartu "${newWord.word_id}" ditambahkan`, position: 'top' });
+    Toast.show({ type: 'success', text1: 'Berhasil', text2: `Kartu "${label}" ditambahkan`, position: 'top' });
+
+    // Non-blocking background tasks: cloud backup + translation of the
+    // languages the user did not type. Failures are logged, never surfaced
+    // as blocking errors — the card is already saved and usable offline.
+    void syncCustomWordToCloud(newWord, deviceId).catch((e: any) => {
+      logger.logError(e, { action: 'custom_words cloud sync failed', role: 'Child' });
+    });
+    // Translate when the save did NOT originate from a trusted AI prefill
+    // (manual fallback), or when the user corrected the AI's word — in both
+    // cases the silent siblings are placeholders/stale. The human's typed
+    // label is never overwritten: only the OTHER two languages are patched.
+    const needsTranslation =
+      aiOriginalRef.current === null || label !== aiOriginalRef.current;
+    if (needsTranslation) {
+      void translateWordBilingual(label, activeLang)
+        .then((trilingual) => {
+          const patch: Partial<AACWord> = {};
+          if (activeLang !== 'id') patch.word_id = trilingual.id;
+          if (activeLang !== 'en') patch.word_en = trilingual.en;
+          if (activeLang !== 'zh') patch.word_zh = trilingual.zh;
+          return updateWord(newWord.id, patch).then(() => loadDatabase());
+        })
+        .catch((e: any) => {
+          logger.logError(e, { action: 'background trilingual fill failed', role: 'Child' });
+        });
+    }
   };
 
   const handleCancelAutoTag = () => {
@@ -386,17 +447,18 @@ export default function ChildAACScreen() {
 
   const handleToggleFavorite = async () => {
     if (!selectedWord) return;
-    const isFavorite = selectedWord.categoryId === 'favorit';
+    const isFavorite = selectedWord.isFavorite === true;
     setShowWordOptions(false);
-    // Persisted immediately in SQLite: favoriting stores the real category
-    // in previous_category_id; unfavoriting restores it — never lost.
+    // Non-destructive toggle: flips only the `is_favorite` boolean. The
+    // card's categoryId is untouched, so it stays in its original tab and
+    // the child's motor memory of "Apel is in Benda" is preserved.
     await setWordFavorite(selectedWord.id, !isFavorite);
     await loadDatabase();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     Toast.show({
       type: 'success',
       text1: isFavorite ? 'Dihapus dari Favorit' : 'Ditambahkan ke Favorit',
-      text2: isFavorite ? 'Kartu kembali ke kategori asalnya' : 'Cek tab ⭐ Favorit',
+      text2: isFavorite ? 'Kartu tetap tampil di tab asalnya' : 'Cek tab ⭐ Favorit',
       position: 'top',
     });
   };
@@ -472,9 +534,11 @@ export default function ChildAACScreen() {
     );
   }
 
-  const filteredWords = activeCategory === 'all' 
-    ? words 
-    : words.filter(w => w.categoryId === activeCategory);
+  const filteredWords = words.filter((w) => {
+    if (activeCategory === 'all') return true;
+    if (activeCategory === 'favorit') return w.isFavorite === true;
+    return w.categoryId === activeCategory;
+  });
 
   const categoriesConfig = [
     { id: 'all', label: 'Semua', icon: 'shapes', color: '#00B5B8', rgba: '0, 181, 184' },
@@ -638,22 +702,17 @@ export default function ChildAACScreen() {
               <Text style={styles.autoTagHint}>
                 Periksa hasil deteksi AI — ubah sesukamu sebelum menyimpan.
               </Text>
-              <Text style={styles.editLabel}>Nama (Indonesia):</Text>
+              <Text style={styles.editLabel}>Nome ({activeLanguageLabel}):</Text>
               <TextInput
                 style={styles.editInput}
-                value={pendingNameId}
-                onChangeText={setPendingNameId}
-                placeholder="Contoh: Bola"
+                value={pendingLabel}
+                onChangeText={setPendingLabel}
+                placeholder={`Contoh: ${activeLanguagePlaceholder}`}
                 placeholderTextColor="#94A3B8"
               />
-              <Text style={styles.editLabel}>Nama (Mandarin):</Text>
-              <TextInput
-                style={styles.editInput}
-                value={pendingNameZh}
-                onChangeText={setPendingNameZh}
-                placeholder="例：球"
-                placeholderTextColor="#94A3B8"
-              />
+              <Text style={styles.autoTagHint}>
+                Bahasa lain dilengkapi otomatis di belakang layar.
+              </Text>
               <Text style={styles.editLabel}>Kategori:</Text>
               <View style={styles.chipRow}>
                 {AUTO_TAG_CATEGORIES.map((cat) => {
