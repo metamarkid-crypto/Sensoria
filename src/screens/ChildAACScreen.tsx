@@ -97,8 +97,9 @@ export default function ChildAACScreen() {
   const [selectedWord, setSelectedWord] = useState<AACWord | null>(null);
   const [showWordOptions, setShowWordOptions] = useState(false);
   const [showEditName, setShowEditName] = useState(false);
-  const [editNameId, setEditNameId] = useState('');
-  const [editNameZh, setEditNameZh] = useState('');
+  // Single editable field bound to the ACTIVE app language — resolved with
+  // the SAME resolver cards and TTS use, so what you see/edit is what speaks.
+  const [editNameLabel, setEditNameLabel] = useState('');
 
   // ── AI Auto-Tag confirmation draft (frictionless trilingual) ────────
   // The AI result is NEVER auto-saved: it only pre-fills this editable
@@ -484,27 +485,60 @@ export default function ChildAACScreen() {
 
   const handleOpenEditName = () => {
     if (!selectedWord) return;
-    setEditNameId(selectedWord.word_id);
-    setEditNameZh(selectedWord.word_zh);
+    setEditNameLabel(resolveWordText(selectedWord, language));
     setShowWordOptions(false);
     setShowEditName(true);
   };
 
   const handleSaveEditName = async () => {
     if (!selectedWord) return;
-    if (!editNameId.trim() || !editNameZh.trim()) {
+    const label = editNameLabel.trim();
+    if (!label) {
       Toast.show({ type: 'error', text1: t('common.error'), text2: t('aac.toastNameRequired'), position: 'top' });
       return;
     }
-    
-    await clearAudioCache(selectedWord.word_id, 'id', 'Child');
-    await clearAudioCache(selectedWord.word_zh, 'zh', 'Child');
-    
-    await updateWord(selectedWord.id, { word_id: editNameId.trim(), word_zh: editNameZh.trim() });
+
+    const previousLabel = resolveWordText(selectedWord, activeLang);
+
+    // Patch ONLY the active language now — the human's typed label is never
+    // overwritten by the background translation (mirrors handleConfirmAutoTag).
+    const patch: Partial<AACWord> = {};
+    if (activeLang === 'id') patch.word_id = label;
+    else if (activeLang === 'en') patch.word_en = label;
+    else patch.word_zh = label;
+
+    // The old label's cached AI voice is stale after a rename — evict it.
+    await clearAudioCache(previousLabel, activeLang, 'Child');
+
+    await updateWord(selectedWord.id, patch);
     await loadDatabase();
-    
+
     setShowEditName(false);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+    // Keep the trilingual dataset sealed: when the label actually changed,
+    // refresh the OTHER two languages in the background so word_en and
+    // word_zh stay in sync in SQLite. Fire-and-forget — never blocks the UI;
+    // failures are logged, the renamed card is already saved and usable.
+    if (label !== previousLabel) {
+      void translateWordBilingual(label, activeLang)
+        .then(async (trilingual) => {
+          // Evict the pre-edit sibling caches so the next playback fetches
+          // a voice for the NEW name instead of playing the stale one.
+          if (activeLang !== 'id' && selectedWord.word_id) await clearAudioCache(selectedWord.word_id, 'id', 'Child');
+          if (activeLang !== 'en' && selectedWord.word_en) await clearAudioCache(selectedWord.word_en, 'en', 'Child');
+          if (activeLang !== 'zh' && selectedWord.word_zh) await clearAudioCache(selectedWord.word_zh, 'zh', 'Child');
+
+          const siblingPatch: Partial<AACWord> = {};
+          if (activeLang !== 'id') siblingPatch.word_id = trilingual.id;
+          if (activeLang !== 'en') siblingPatch.word_en = trilingual.en;
+          if (activeLang !== 'zh') siblingPatch.word_zh = trilingual.zh;
+          return updateWord(selectedWord.id, siblingPatch).then(() => loadDatabase());
+        })
+        .catch((e: any) => {
+          logger.logError(e, { action: 'background trilingual rename failed', role: 'Child' });
+        });
+    }
   };
 
   // ── AAC-Safe Tremor Filter (useAccessibleAction) ─────────────────────────
@@ -665,17 +699,11 @@ export default function ChildAACScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.editNameModal}>
             <Text style={styles.optionsTitle}>{t('aac.editNameTitle')}</Text>
-            <Text style={styles.editLabel}>{t('aac.editLabelId')}</Text>
+            <Text style={styles.editLabel}>{t('aac.autoTagNameLabel', { lang: activeLanguageLabel })}</Text>
             <TextInput 
               style={styles.editInput} 
-              value={editNameId} 
-              onChangeText={setEditNameId} 
-            />
-            <Text style={styles.editLabel}>{t('aac.editLabelZh')}</Text>
-            <TextInput 
-              style={styles.editInput} 
-              value={editNameZh} 
-              onChangeText={setEditNameZh} 
+              value={editNameLabel} 
+              onChangeText={setEditNameLabel} 
             />
             <View style={styles.editActions}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowEditName(false)}>

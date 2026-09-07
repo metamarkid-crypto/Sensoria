@@ -2,6 +2,7 @@
   {
     "id": "1",
     "word_id": "Saya",
+    "word_en": "I",
     "word_zh": "我",
     "imageUrl": "https://static.arasaac.org/pictograms/6632/6632_300.png",
     "categoryId": "pronoun"
@@ -9,6 +10,7 @@
   {
     "id": "2",
     "word_id": "Kamu",
+    "word_en": "You",
     "word_zh": "你",
     "imageUrl": "https://static.arasaac.org/pictograms/6625/6625_300.png",
     "categoryId": "pronoun"
@@ -16,6 +18,7 @@
   {
     "id": "3",
     "word_id": "Mau",
+    "word_en": "Want",
     "word_zh": "想要",
     "imageUrl": "https://static.arasaac.org/pictograms/5441/5441_300.png",
     "categoryId": "verb"
@@ -23,6 +26,7 @@
   {
     "id": "4",
     "word_id": "Suka",
+    "word_en": "Like",
     "word_zh": "喜欢",
     "imageUrl": "https://static.arasaac.org/pictograms/37826/37826_300.png",
     "categoryId": "verb"
@@ -30,6 +34,7 @@
   {
     "id": "5",
     "word_id": "Makan",
+    "word_en": "Eat",
     "word_zh": "吃",
     "imageUrl": "https://static.arasaac.org/pictograms/6456/6456_300.png",
     "categoryId": "verb"
@@ -37,6 +42,7 @@
   {
     "id": "6",
     "word_id": "Minum",
+    "word_en": "Drink",
     "word_zh": "喝",
     "imageUrl": "https://static.arasaac.org/pictograms/6061/6061_300.png",
     "categoryId": "verb"
@@ -44,6 +50,7 @@
   {
     "id": "7",
     "word_id": "Tolong",
+    "word_en": "Help",
     "word_zh": "帮忙",
     "imageUrl": "https://static.arasaac.org/pictograms/32648/32648_300.png",
     "categoryId": "verb"
@@ -51,6 +58,7 @@
   {
     "id": "8",
     "word_id": "Tolong",
+    "word_en": "Please",
     "word_zh": "请",
     "imageUrl": "https://static.arasaac.org/pictograms/8195/8195_300.png",
     "categoryId": "social"
@@ -58,6 +66,7 @@
   {
     "id": "9",
     "word_id": "Berhenti",
+    "word_en": "Stop",
     "word_zh": "停",
     "imageUrl": "https://static.arasaac.org/pictograms/7196/7196_300.png",
     "categoryId": "verb"
@@ -65,6 +74,7 @@
   {
     "id": "10",
     "word_id": "Selesai",
+    "word_en": "Done",
     "word_zh": "完成",
     "imageUrl": "https://static.arasaac.org/pictograms/28429/28429_300.png",
     "categoryId": "social"
@@ -72,6 +82,7 @@
   {
     "id": "11",
     "word_id": "Lagi",
+    "word_en": "More",
     "word_zh": "更多",
     "imageUrl": "https://static.arasaac.org/pictograms/5508/5508_300.png",
     "categoryId": "social"
@@ -79,6 +90,7 @@
   {
     "id": "12",
     "word_id": "Ya",
+    "word_en": "Yes",
     "word_zh": "是",
     "imageUrl": "https://static.arasaac.org/pictograms/5584/5584_300.png",
     "categoryId": "social"
@@ -86,6 +98,7 @@
   {
     "id": "13",
     "word_id": "Tidak",
+    "word_en": "No",
     "word_zh": "不是",
     "imageUrl": "https://static.arasaac.org/pictograms/5526/5526_300.png",
     "categoryId": "social"
@@ -93,6 +106,7 @@
   {
     "id": "14",
     "word_id": "Toilet",
+    "word_en": "Toilet",
     "word_zh": "厕所",
     "imageUrl": "https://static.arasaac.org/pictograms/5921/5921_300.png",
     "categoryId": "noun"
@@ -100,6 +114,7 @@
   {
     "id": "15",
     "word_id": "Main",
+    "word_en": "Play",
     "word_zh": "玩",
     "imageUrl": "https://static.arasaac.org/pictograms/23392/23392_300.png",
     "categoryId": "verb"
@@ -107,6 +122,7 @@
   {
     "id": "16",
     "word_id": "Tidur",
+    "word_en": "Sleep",
     "word_zh": "睡觉",
     "imageUrl": "https://static.arasaac.org/pictograms/6479/6479_300.png",
     "categoryId": "verb"
@@ -114,6 +130,7 @@
   {
     "id": "17",
     "word_id": "Sakit",
+    "word_en": "Sick",
     "word_zh": "生病",
     "imageUrl": "https://static.arasaac.org/pictograms/7040/7040_300.png",
     "categoryId": "emotion"
@@ -121,6 +138,7 @@
   {
     "id": "18",
     "word_id": "Bagus",
+    "word_en": "Good",
     "word_zh": "好",
     "imageUrl": "https://static.arasaac.org/pictograms/4581/4581_300.png",
     "categoryId": "emotion"
@@ -128,6 +146,7 @@
   {
     "id": "19",
     "word_id": "Dia (L)",
+    "word_en": "He",
     "word_zh": "他",
     "imageUrl": "https://static.arasaac.org/pictograms/6480/6480_300.png",
     "categoryId": "pronoun"
@@ -135,6 +154,7 @@
   {
     "id": "20",
     "word_id": "Dia (P)",
+    "word_en": "She",
     "word_zh": "她",
     "imageUrl": "https://static.arasaac.org/pictograms/7028/7028_300.png",
     "categoryId": "pronoun"
@@ -142,6 +162,7 @@
   {
     "id": "21",
     "word_id": "Kami",
+    "word_en": "We",
     "word_zh": "我们",
     "imageUrl": "https://static.arasaac.org/pictograms/7185/7185_300.png",
     "categoryId": "pronoun"
@@ -149,6 +170,7 @@
   {
     "id": "22",
     "word_id": "Mereka",
+    "word_en": "They",
     "word_zh": "他们",
     "imageUrl": "https://static.arasaac.org/pictograms/7032/7032_300.png",
     "categoryId": "pronoun"
@@ -156,6 +178,7 @@
   {
     "id": "23",
     "word_id": "Ibu",
+    "word_en": "Mom",
     "word_zh": "妈妈",
     "imageUrl": "https://static.arasaac.org/pictograms/2458/2458_300.png",
     "categoryId": "noun"
@@ -163,6 +186,7 @@
   {
     "id": "24",
     "word_id": "Ayah",
+    "word_en": "Dad",
     "word_zh": "爸爸",
     "imageUrl": "https://static.arasaac.org/pictograms/2497/2497_300.png",
     "categoryId": "noun"
@@ -170,6 +194,7 @@
   {
     "id": "25",
     "word_id": "Keluarga",
+    "word_en": "Family",
     "word_zh": "家人",
     "imageUrl": "https://static.arasaac.org/pictograms/38351/38351_300.png",
     "categoryId": "noun"
@@ -177,6 +202,7 @@
   {
     "id": "26",
     "word_id": "Rumah",
+    "word_en": "House",
     "word_zh": "家",
     "imageUrl": "https://static.arasaac.org/pictograms/6964/6964_300.png",
     "categoryId": "noun"
@@ -184,6 +210,7 @@
   {
     "id": "27",
     "word_id": "Sekolah",
+    "word_en": "School",
     "word_zh": "学校",
     "imageUrl": "https://static.arasaac.org/pictograms/32446/32446_300.png",
     "categoryId": "noun"
@@ -191,6 +218,7 @@
   {
     "id": "28",
     "word_id": "Mobil",
+    "word_en": "Car",
     "word_zh": "汽车",
     "imageUrl": "https://static.arasaac.org/pictograms/2339/2339_300.png",
     "categoryId": "noun"
@@ -198,6 +226,7 @@
   {
     "id": "29",
     "word_id": "Air",
+    "word_en": "Water",
     "word_zh": "水",
     "imageUrl": "https://static.arasaac.org/pictograms/32464/32464_300.png",
     "categoryId": "noun"
@@ -205,6 +234,7 @@
   {
     "id": "30",
     "word_id": "Makanan",
+    "word_en": "Food",
     "word_zh": "食物",
     "imageUrl": "https://static.arasaac.org/pictograms/4610/4610_300.png",
     "categoryId": "noun"
@@ -212,6 +242,7 @@
   {
     "id": "31",
     "word_id": "Buku",
+    "word_en": "Book",
     "word_zh": "书",
     "imageUrl": "https://static.arasaac.org/pictograms/25191/25191_300.png",
     "categoryId": "noun"
@@ -219,6 +250,7 @@
   {
     "id": "32",
     "word_id": "Mainan",
+    "word_en": "Toy",
     "word_zh": "玩具",
     "imageUrl": "https://static.arasaac.org/pictograms/9813/9813_300.png",
     "categoryId": "noun"
@@ -226,6 +258,7 @@
   {
     "id": "33",
     "word_id": "Kasur",
+    "word_en": "Bed",
     "word_zh": "床",
     "imageUrl": "https://static.arasaac.org/pictograms/25900/25900_300.png",
     "categoryId": "noun"
@@ -233,6 +266,7 @@
   {
     "id": "34",
     "word_id": "Pergi",
+    "word_en": "Go",
     "word_zh": "去",
     "imageUrl": "https://static.arasaac.org/pictograms/8142/8142_300.png",
     "categoryId": "verb"
@@ -240,6 +274,7 @@
   {
     "id": "35",
     "word_id": "Lihat",
+    "word_en": "See",
     "word_zh": "看",
     "imageUrl": "https://static.arasaac.org/pictograms/6564/6564_300.png",
     "categoryId": "verb"
@@ -247,6 +282,7 @@
   {
     "id": "36",
     "word_id": "Dengar",
+    "word_en": "Listen",
     "word_zh": "听",
     "imageUrl": "https://static.arasaac.org/pictograms/6572/6572_300.png",
     "categoryId": "verb"
@@ -254,6 +290,7 @@
   {
     "id": "37",
     "word_id": "Bicara",
+    "word_en": "Talk",
     "word_zh": "说",
     "imageUrl": "https://static.arasaac.org/pictograms/9693/9693_300.png",
     "categoryId": "verb"
@@ -261,6 +298,7 @@
   {
     "id": "38",
     "word_id": "Kasih",
+    "word_en": "Give",
     "word_zh": "给",
     "imageUrl": "https://static.arasaac.org/pictograms/28431/28431_300.png",
     "categoryId": "verb"
@@ -268,6 +306,7 @@
   {
     "id": "39",
     "word_id": "Buka",
+    "word_en": "Open",
     "word_zh": "打开",
     "imageUrl": "https://static.arasaac.org/pictograms/24825/24825_300.png",
     "categoryId": "verb"
@@ -275,6 +314,7 @@
   {
     "id": "40",
     "word_id": "Tutup",
+    "word_en": "Close",
     "word_zh": "关上",
     "imageUrl": "https://static.arasaac.org/pictograms/30383/30383_300.png",
     "categoryId": "verb"
@@ -282,6 +322,7 @@
   {
     "id": "41",
     "word_id": "Mandi",
+    "word_en": "Bath",
     "word_zh": "洗澡",
     "imageUrl": "https://static.arasaac.org/pictograms/34826/34826_300.png",
     "categoryId": "verb"
@@ -289,6 +330,7 @@
   {
     "id": "42",
     "word_id": "Jelek",
+    "word_en": "Bad",
     "word_zh": "坏",
     "imageUrl": "https://static.arasaac.org/pictograms/5504/5504_300.png",
     "categoryId": "emotion"
@@ -296,6 +338,7 @@
   {
     "id": "43",
     "word_id": "Senang",
+    "word_en": "Happy",
     "word_zh": "开心",
     "imageUrl": "https://static.arasaac.org/pictograms/35533/35533_300.png",
     "categoryId": "emotion"
@@ -303,6 +346,7 @@
   {
     "id": "44",
     "word_id": "Sedih",
+    "word_en": "Sad",
     "word_zh": "伤心",
     "imageUrl": "https://static.arasaac.org/pictograms/35545/35545_300.png",
     "categoryId": "emotion"
@@ -310,6 +354,7 @@
   {
     "id": "45",
     "word_id": "Marah",
+    "word_en": "Angry",
     "word_zh": "生气",
     "imageUrl": "https://static.arasaac.org/pictograms/35539/35539_300.png",
     "categoryId": "emotion"
@@ -317,6 +362,7 @@
   {
     "id": "46",
     "word_id": "Panas",
+    "word_en": "Hot",
     "word_zh": "热",
     "imageUrl": "https://static.arasaac.org/pictograms/2300/2300_300.png",
     "categoryId": "emotion"
@@ -324,6 +370,7 @@
   {
     "id": "47",
     "word_id": "Dingin",
+    "word_en": "Cold",
     "word_zh": "冷",
     "imageUrl": "https://static.arasaac.org/pictograms/4652/4652_300.png",
     "categoryId": "emotion"
@@ -331,6 +378,7 @@
   {
     "id": "48",
     "word_id": "Besar",
+    "word_en": "Big",
     "word_zh": "大",
     "imageUrl": "https://static.arasaac.org/pictograms/4658/4658_300.png",
     "categoryId": "emotion"
@@ -338,6 +386,7 @@
   {
     "id": "49",
     "word_id": "Kecil",
+    "word_en": "Small",
     "word_zh": "小",
     "imageUrl": "https://static.arasaac.org/pictograms/4716/4716_300.png",
     "categoryId": "emotion"
@@ -345,6 +394,7 @@
   {
     "id": "50",
     "word_id": "Lapar",
+    "word_en": "Hungry",
     "word_zh": "饿",
     "imageUrl": "https://static.arasaac.org/pictograms/4962/4962_300.png",
     "categoryId": "emotion"
@@ -352,6 +402,7 @@
   {
     "id": "51",
     "word_id": "Haus",
+    "word_en": "Thirsty",
     "word_zh": "渴",
     "imageUrl": "https://static.arasaac.org/pictograms/4963/4963_300.png",
     "categoryId": "emotion"
@@ -359,6 +410,7 @@
   {
     "id": "52",
     "word_id": "Capek",
+    "word_en": "Tired",
     "word_zh": "累",
     "imageUrl": "https://static.arasaac.org/pictograms/35537/35537_300.png",
     "categoryId": "emotion"
@@ -366,6 +418,7 @@
   {
     "id": "53",
     "word_id": "Terima Kasih",
+    "word_en": "Thank You",
     "word_zh": "谢谢",
     "imageUrl": "https://static.arasaac.org/pictograms/8129/8129_300.png",
     "categoryId": "social"
@@ -373,6 +426,7 @@
   {
     "id": "54",
     "word_id": "Maaf",
+    "word_en": "Sorry",
     "word_zh": "对不起",
     "imageUrl": "https://static.arasaac.org/pictograms/11625/11625_300.png",
     "categoryId": "social"
@@ -380,6 +434,7 @@
   {
     "id": "55",
     "word_id": "Halo",
+    "word_en": "Hello",
     "word_zh": "你好",
     "imageUrl": "https://static.arasaac.org/pictograms/6522/6522_300.png",
     "categoryId": "social"
@@ -387,6 +442,7 @@
   {
     "id": "56",
     "word_id": "Dadah",
+    "word_en": "Bye",
     "word_zh": "再见",
     "imageUrl": "https://static.arasaac.org/pictograms/6028/6028_300.png",
     "categoryId": "social"
@@ -394,6 +450,7 @@
   {
     "id": "57",
     "word_id": "Tunggu",
+    "word_en": "Wait",
     "word_zh": "等",
     "imageUrl": "https://static.arasaac.org/pictograms/36914/36914_300.png",
     "categoryId": "social"

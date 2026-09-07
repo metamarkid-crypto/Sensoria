@@ -104,8 +104,6 @@ export const id = {
   'aac.optionUnfavorite': 'Hapus dari Favorit',
   'aac.optionFavorite': 'Tambah ke Favorit',
   'aac.editNameTitle': 'Ubah Nama Kata',
-  'aac.editLabelId': 'Bahasa Indonesia:',
-  'aac.editLabelZh': 'Mandarin:',
   'aac.autoTagTitle': 'Konfirmasi Kartu Baru',
   'aac.autoTagHint': 'Periksa hasil deteksi AI — ubah sesukamu sebelum menyimpan.',
   'aac.autoTagNameLabel': 'Nama ({lang}):',

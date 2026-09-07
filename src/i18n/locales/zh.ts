@@ -100,8 +100,6 @@ export const zh: Record<TranslationKey, string> = {
   'aac.optionUnfavorite': '取消收藏',
   'aac.optionFavorite': '添加到收藏',
   'aac.editNameTitle': '更改词语名称',
-  'aac.editLabelId': '印尼语：',
-  'aac.editLabelZh': '中文：',
   'aac.autoTagTitle': '确认新卡片',
   'aac.autoTagHint': '检查 AI 检测结果——保存前可随意修改。',
   'aac.autoTagNameLabel': '名称（{lang}）：',

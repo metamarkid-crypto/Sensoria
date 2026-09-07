@@ -100,8 +100,6 @@ export const en: Record<TranslationKey, string> = {
   'aac.optionUnfavorite': 'Remove from Favorites',
   'aac.optionFavorite': 'Add to Favorites',
   'aac.editNameTitle': 'Change Word Name',
-  'aac.editLabelId': 'Indonesian:',
-  'aac.editLabelZh': 'Mandarin:',
   'aac.autoTagTitle': 'Confirm New Card',
   'aac.autoTagHint': 'Review the AI detection result — feel free to edit before saving.',
   'aac.autoTagNameLabel': 'Name ({lang}):',

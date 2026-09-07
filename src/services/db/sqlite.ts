@@ -48,6 +48,30 @@ export const initDB = async () => {
     }
     await migrateLegacyFavorites();
 
+    // Migration: BACKFILL word_en for seeded rows (installs created before
+    // the dataset became trilingual — the seed re-run above only fires when
+    // the dictionary is missing/malformed). Non-destructive by construction:
+    // matches the canonical seed id, never touches custom cards, and never
+    // overwrites a value that already exists (a parent's AI-filled English
+    // label is sacred).
+    try {
+      const missingEn = await db.getAllAsync<{ count: number }>(
+        "SELECT COUNT(*) as count FROM aac_words WHERE isCustom = 0 AND (word_en IS NULL OR word_en = '')"
+      );
+      if (missingEn && missingEn[0].count > 0) {
+        const seedData: AACWord[] = require('../../../assets/data/arasaac.json');
+        for (const word of seedData) {
+          if (!word.word_en) continue;
+          await db.runAsync(
+            "UPDATE aac_words SET word_en = ? WHERE id = ? AND isCustom = 0 AND (word_en IS NULL OR word_en = '')",
+            [word.word_en, word.id]
+          );
+        }
+      }
+    } catch (e) {
+      console.warn('word_en backfill skipped:', e);
+    }
+
     // Migration: Update dictionary to full 57 core words and ENFORCE SORTING (keep custom words safe)
     const defaultWordsCount = await db.getAllAsync<{ count: number }>("SELECT COUNT(*) as count FROM aac_words WHERE isCustom = 0");
     const mauCheck = await db.getAllAsync<{ id: string }>("SELECT id FROM aac_words WHERE word_id = 'Mau' AND isCustom = 0 LIMIT 1");
@@ -75,14 +99,15 @@ const seedDefaultARASAACWords = async () => {
   if (!db) return;
   
   try {
-    // Memuat JSON Data Bilingual
+    // Memuat JSON Data Trilingual
     const seedData: AACWord[] = require('../../../assets/data/arasaac.json');
     
-    const statement = await db.prepareAsync('INSERT INTO aac_words (id, word_id, word_zh, imageUrl, categoryId, isCustom) VALUES ($id, $word_id, $word_zh, $img, $cat, 0)');
+    const statement = await db.prepareAsync('INSERT INTO aac_words (id, word_id, word_en, word_zh, imageUrl, categoryId, isCustom) VALUES ($id, $word_id, $word_en, $word_zh, $img, $cat, 0)');
     for (const word of seedData) {
       await statement.executeAsync({
         $id: word.id,
         $word_id: word.word_id,
+        $word_en: word.word_en || null,
         $word_zh: word.word_zh,
         $img: word.imageUrl || null,
         $cat: word.categoryId
