@@ -7,6 +7,7 @@ import { FontAwesome5 } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { supabase } from '../../services/db/supabase';
 import { useAACStore } from '../../store/useAACStore';
+import { useTranslation, translate } from '../../i18n';
 import AvatarPin from '../../components/parent/AvatarPin';
 import LocationBottomSheet from '../../components/parent/LocationBottomSheet';
 
@@ -29,10 +30,11 @@ function getDistanceFromLatLonInMeters(lat1: number, lon1: number, lat2: number,
 
 /** "Sekarang" / "X menit lalu" — mirrors the dashboard's presence formatting. */
 function formatLastSeen(iso: string | null): string {
-  if (!iso) return 'Belum diketahui';
+  const lang = useAACStore.getState().language;
+  if (!iso) return translate(lang, 'common.unknown');
   const diffMins = Math.floor((new Date().getTime() - new Date(iso).getTime()) / 60000);
-  if (diffMins < 1) return 'Sekarang';
-  return `${diffMins} menit lalu`;
+  if (diffMins < 1) return translate(lang, 'header.now');
+  return translate(lang, 'header.minutesAgo', { n: diffMins });
 }
 
 const DEFAULT_COORD = { latitude: -6.200000, longitude: 106.816666 };
@@ -47,6 +49,7 @@ const CARD_TOP_OFFSET = 16;
 
 export default function ParentLocationScreen() {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { childProfile, childStatus, deviceId, role, setChildStatus } = useAACStore();
 
   // JSONB Global State: Read from childProfile.settings.safeZones
@@ -77,7 +80,7 @@ export default function ParentLocationScreen() {
 
   const currentCoord = coordsRef.current ?? DEFAULT_COORD;
   const avatarSource = require('../../../assets/icon.png');
-  const fullName = childProfile?.fullName || childProfile?.full_name || childProfile?.nickname || 'Anak';
+  const fullName = childProfile?.fullName || childProfile?.full_name || childProfile?.nickname || t('aac.childFallback');
 
   // Bottom tab bar floats absolutely over this screen (see ParentDashboardScreen).
   const tabBarHeight = 70 + insets.bottom;
@@ -210,9 +213,9 @@ export default function ParentLocationScreen() {
             setTimeout(() => supabase.removeChannel(pingChannel), 2000);
           }
         });
-        Alert.alert('Permintaan Terkirim', 'Meminta pembaruan lokasi dari perangkat anak...');
+        Alert.alert(t('location.requestSent'), t('location.requestSentDesc'));
       } else {
-        Alert.alert('Belum Tertaut', 'Perangkat anak belum terhubung ke akun ini.');
+        Alert.alert(t('location.notLinked'), t('location.notLinkedDesc'));
       }
     };
 
@@ -244,12 +247,12 @@ export default function ParentLocationScreen() {
 
   const handleSaveZone = async () => {
     if (!newZoneName.trim() || !newZoneLat || !newZoneLng || !newZoneRadius) {
-      Alert.alert('Error', 'Harap isi semua kolom.');
+      Alert.alert(t('common.error'), t('location.fillAllFields'));
       return;
     }
 
     if (!childProfile?.device_id) {
-      Alert.alert('Error', 'Profil anak tidak ditemukan.');
+      Alert.alert(t('common.error'), t('location.childProfileMissing'));
       return;
     }
 
@@ -280,7 +283,7 @@ export default function ParentLocationScreen() {
 
     } catch (error) {
       console.error('Failed to sync Safe Zones:', error);
-      Alert.alert('Gagal', 'Tidak dapat menyimpan Area Aman ke server.');
+      Alert.alert(t('common.failed'), t('location.saveFailedDesc'));
     }
 
     setAddModalVisible(false);
@@ -288,12 +291,12 @@ export default function ParentLocationScreen() {
 
   const handleDeleteZone = async (zoneId: string) => {
     Alert.alert(
-      'Hapus Area Aman',
-      'Apakah Anda yakin ingin menghapus area ini?',
+      t('location.deleteZoneTitle'),
+      t('location.deleteZoneConfirm'),
       [
-        { text: 'Batal', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Hapus',
+          text: t('location.delete'),
           style: 'destructive',
           onPress: async () => {
             if (!childProfile?.device_id) return;
@@ -316,7 +319,7 @@ export default function ParentLocationScreen() {
 
             } catch (error) {
               console.error('Failed to delete Safe Zone:', error);
-              Alert.alert('Gagal', 'Tidak dapat menghapus Area Aman dari server.');
+              Alert.alert(t('common.failed'), t('location.deleteFailedDesc'));
             }
           }
         }
@@ -331,9 +334,9 @@ export default function ParentLocationScreen() {
 
   const zonesHeader = (
     <View style={styles.zonesHeaderRow}>
-      <Text style={styles.zonesTitle}>Area Aman</Text>
+      <Text style={styles.zonesTitle}>{t('location.safeZones')}</Text>
       <TouchableOpacity style={styles.manageBtn} onPress={openAddModal}>
-        <Text style={styles.manageBtnText}>Kelola</Text>
+        <Text style={styles.manageBtnText}>{t('location.manage')}</Text>
         <FontAwesome5 name="cog" size={12} color="#3B82F6" />
       </TouchableOpacity>
     </View>
@@ -356,7 +359,7 @@ export default function ParentLocationScreen() {
         end={{ x: 1, y: 1 }}
         style={[styles.header, { paddingTop: insets.top + 10, height: insets.top + HEADER_BASE_HEIGHT }]}
       >
-        <Text style={styles.headerTitle}>Lokasi</Text>
+        <Text style={styles.headerTitle}>{t('header.locationTitle')}</Text>
       </LinearGradient>
 
       {/* ================================================================
@@ -413,12 +416,12 @@ export default function ParentLocationScreen() {
                 {activeZone ? (
                   <>
                     <FontAwesome5 name="check-circle" size={13} color="#059669" />
-                    <Text style={styles.statusBadgeTextSafe} numberOfLines={1}>Di area aman: {activeZone.name}</Text>
+                    <Text style={styles.statusBadgeTextSafe} numberOfLines={1}>{t('location.inSafeZone', { zone: activeZone.name })}</Text>
                   </>
                 ) : (
                   <>
                     <FontAwesome5 name="exclamation-circle" size={13} color="#DC2626" />
-                    <Text style={styles.statusBadgeTextDanger} numberOfLines={1}>Di luar area aman</Text>
+                    <Text style={styles.statusBadgeTextDanger} numberOfLines={1}>{t('location.outsideSafeZone')}</Text>
                   </>
                 )}
               </View>
@@ -434,12 +437,12 @@ export default function ParentLocationScreen() {
 
           <View style={styles.divider} />
 
-          <Text style={styles.locationLabel}>Lokasi Terakhir</Text>
+          <Text style={styles.locationLabel}>{t('location.lastLocation')}</Text>
           <Text style={styles.locationAddress} numberOfLines={1}>
-            {liveAddress || 'Belum ada data alamat'}
+            {liveAddress || t('location.noAddress')}
           </Text>
           <Text style={styles.timestamp} numberOfLines={1}>
-            Pembaruan terakhir: {liveTimestamp || 'Belum diketahui'}
+            {t('location.lastUpdate', { time: liveTimestamp || t('common.unknown') })}
           </Text>
         </View>
       </View>
@@ -467,11 +470,11 @@ export default function ParentLocationScreen() {
                 </View>
                 <View style={styles.zoneInfo}>
                   <Text style={styles.zoneName}>{zone.name}</Text>
-                  <Text style={styles.zoneRadius}>Radius: {zone.radius} meter</Text>
+                  <Text style={styles.zoneRadius}>{t('location.radius', { n: zone.radius })}</Text>
                 </View>
                 {isCurrentlyHere && (
                   <View style={styles.activeZoneTag}>
-                    <Text style={styles.activeZoneText}>Aktif</Text>
+                    <Text style={styles.activeZoneText}>{t('location.active')}</Text>
                   </View>
                 )}
                 <TouchableOpacity onPress={() => handleDeleteZone(zone.id)} style={styles.deleteZoneBtn}>
@@ -488,23 +491,23 @@ export default function ParentLocationScreen() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Tambah Area Aman</Text>
+              <Text style={styles.modalTitle}>{t('location.addZone')}</Text>
               <TouchableOpacity onPress={() => setAddModalVisible(false)}>
                 <FontAwesome5 name="times" size={20} color="#94A3B8" />
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.inputLabel}>Nama Tempat</Text>
+            <Text style={styles.inputLabel}>{t('location.placeName')}</Text>
             <TextInput
               style={styles.modalInput}
-              placeholder="Misal: Rumah Nenek"
+              placeholder={t('location.placeNamePlaceholder')}
               value={newZoneName}
               onChangeText={setNewZoneName}
             />
 
             <View style={styles.rowInputs}>
               <View style={styles.flex1}>
-                <Text style={styles.inputLabel}>Latitude</Text>
+                <Text style={styles.inputLabel}>{t('location.latitude')}</Text>
                 <TextInput
                   style={[styles.modalInput, styles.inputDisabled]}
                   value={newZoneLat}
@@ -515,7 +518,7 @@ export default function ParentLocationScreen() {
               </View>
               <View style={{ width: 12 }} />
               <View style={styles.flex1}>
-                <Text style={styles.inputLabel}>Longitude</Text>
+                <Text style={styles.inputLabel}>{t('location.longitude')}</Text>
                 <TextInput
                   style={[styles.modalInput, styles.inputDisabled]}
                   value={newZoneLng}
@@ -526,7 +529,7 @@ export default function ParentLocationScreen() {
               </View>
             </View>
 
-            <Text style={styles.inputLabel}>Radius (Meter)</Text>
+            <Text style={styles.inputLabel}>{t('location.radiusLabel')}</Text>
             <TextInput
               style={styles.modalInput}
               value={newZoneRadius}
@@ -535,7 +538,7 @@ export default function ParentLocationScreen() {
             />
 
             <TouchableOpacity style={styles.saveBtn} onPress={handleSaveZone}>
-              <Text style={styles.saveBtnText}>Simpan Area</Text>
+              <Text style={styles.saveBtnText}>{t('location.saveZone')}</Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>

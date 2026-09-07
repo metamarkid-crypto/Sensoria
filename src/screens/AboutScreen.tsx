@@ -5,15 +5,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../services/db/supabase';
 import { useAACStore, AboutContent } from '../store/useAACStore';
+import { useTranslation } from '../i18n';
 
 export default function AboutScreen() {
   const navigation = useNavigation<any>();
+  const { t } = useTranslation();
   const { aboutContent, setAboutContent } = useAACStore();
   const [isFetching, setIsFetching] = useState(false);
 
   // Fallback content if completely offline and store is empty
   const defaultContent: AboutContent = {
-    description: "Sensoria AAC adalah aplikasi komunikasi alternatif dan argumentatif yang dirancang khusus untuk memfasilitasi anak-anak dengan spektrum autisme atau tantangan komunikasi lainnya. Kami percaya setiap suara pantas didengar.",
+    description: t('about.defaultDescription'),
     contactEmail: "support@aacsensoria.id",
     version: "v1.0.0 (Beta)",
     privacyPolicyUrl: "https://aacsensoria.id/privacy"
@@ -69,7 +71,7 @@ export default function AboutScreen() {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color="#1A2980" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Tentang Sensoria</Text>
+        <Text style={styles.headerTitle}>{t('about.title')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -107,7 +109,7 @@ export default function AboutScreen() {
                 onPress={() => Linking.openURL(displayContent.privacyPolicyUrl)}
               >
                 <Ionicons name="shield-checkmark" size={20} color="#2488FF" />
-                <Text style={styles.linkText}>Kebijakan Privasi</Text>
+                <Text style={styles.linkText}>{t('about.privacyPolicy')}</Text>
               </TouchableOpacity>
             </>
           )}
@@ -118,7 +120,7 @@ export default function AboutScreen() {
       {/* Footer Area */}
       <View style={styles.footer}>
         <Text style={styles.versionText}>{displayContent.version}</Text>
-        <Text style={styles.footerText}>Developed in Medan, Indonesia 🇮🇩</Text>
+        <Text style={styles.footerText}>{t('about.developedIn')}</Text>
       </View>
 
     </SafeAreaView>

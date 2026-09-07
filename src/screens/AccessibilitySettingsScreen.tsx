@@ -6,9 +6,11 @@ import { useNavigation } from '@react-navigation/native';
 import Slider from '@react-native-community/slider';
 import { supabase } from '../services/db/supabase';
 import { useAACStore } from '../store/useAACStore';
+import { useTranslation } from '../i18n';
 
 export default function AccessibilitySettingsScreen() {
   const navigation = useNavigation<any>();
+  const { t } = useTranslation();
   const { 
     childProfile, 
     holdDuration, setHoldDuration,
@@ -68,7 +70,7 @@ export default function AccessibilitySettingsScreen() {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color="#1A2980" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Aksesibilitas</Text>
+        <Text style={styles.headerTitle}>{t('accessibility.title')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -76,11 +78,13 @@ export default function AccessibilitySettingsScreen() {
         
         {/* Waktu Tahan */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Waktu Tahan (Hold Duration)</Text>
-          <Text style={styles.sectionDesc}>Atur seberapa lama kartu harus ditekan sebelum berbunyi.</Text>
+          <Text style={styles.sectionTitle}>{t('accessibility.holdDuration')}</Text>
+          <Text style={styles.sectionDesc}>{t('accessibility.holdDurationDesc')}</Text>
           
           <View style={styles.sliderHeader}>
-            <Text style={styles.sliderValueText}>{holdDuration > 0 ? `${holdDuration.toFixed(1)} Detik` : 'Mati'}</Text>
+            <Text style={styles.sliderValueText}>
+              {holdDuration > 0 ? t('accessibility.seconds', { n: holdDuration.toFixed(1) }) : t('accessibility.off')}
+            </Text>
           </View>
           
           <Slider
@@ -101,8 +105,8 @@ export default function AccessibilitySettingsScreen() {
         {/* Toggles */}
         <View style={styles.toggleRow}>
           <View style={styles.toggleTextContainer}>
-            <Text style={styles.toggleLabel}>Abaikan Sentuhan Berulang</Text>
-            <Text style={styles.toggleDesc}>Mencegah kartu tertekan berkali-kali secara tidak sengaja dalam waktu singkat.</Text>
+            <Text style={styles.toggleLabel}>{t('accessibility.ignoreRepeat')}</Text>
+            <Text style={styles.toggleDesc}>{t('accessibility.ignoreRepeatDesc')}</Text>
           </View>
           <Switch
             value={ignoreRepeat}
@@ -114,8 +118,8 @@ export default function AccessibilitySettingsScreen() {
 
         <View style={styles.toggleRow}>
           <View style={styles.toggleTextContainer}>
-            <Text style={styles.toggleLabel}>Bicara Saat Jari Dilepas</Text>
-            <Text style={styles.toggleDesc}>Kartu hanya akan dibacakan ketika anak mengangkat jarinya dari layar.</Text>
+            <Text style={styles.toggleLabel}>{t('accessibility.releaseToSpeak')}</Text>
+            <Text style={styles.toggleDesc}>{t('accessibility.releaseToSpeakDesc')}</Text>
           </View>
           <Switch
             value={releaseToSpeak}

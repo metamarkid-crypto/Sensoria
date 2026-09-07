@@ -7,9 +7,11 @@ import Slider from '@react-native-community/slider';
 import Toast from 'react-native-toast-message';
 import { supabase } from '../services/db/supabase';
 import { useAACStore } from '../store/useAACStore';
+import { useTranslation } from '../i18n';
 
 export default function AppearanceSettingsScreen() {
   const navigation = useNavigation<any>();
+  const { t } = useTranslation();
   const { 
     childProfile, 
     cardSize, setCardSize, 
@@ -86,7 +88,7 @@ export default function AppearanceSettingsScreen() {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color="#1A2980" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Tampilan</Text>
+        <Text style={styles.headerTitle}>{t('appearance.title')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -94,7 +96,7 @@ export default function AppearanceSettingsScreen() {
         
         {/* Ukuran Kartu */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Ukuran Kartu</Text>
+          <Text style={styles.sectionTitle}>{t('appearance.cardSize')}</Text>
           <View style={styles.segmentedControl}>
             {['S', 'M', 'L', 'XL'].map((size) => (
               <TouchableOpacity 
@@ -110,7 +112,7 @@ export default function AppearanceSettingsScreen() {
 
         {/* Ukuran Teks */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Ukuran Teks</Text>
+          <Text style={styles.sectionTitle}>{t('appearance.textSize')}</Text>
           <View style={styles.segmentedControl}>
             {['A-', 'A', 'A+'].map((size) => (
               <TouchableOpacity 
@@ -126,7 +128,7 @@ export default function AppearanceSettingsScreen() {
 
         {/* Jarak Kartu */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Jarak Kartu</Text>
+          <Text style={styles.sectionTitle}>{t('appearance.cardSpacing')}</Text>
           <Slider
             style={styles.slider}
             minimumValue={0}
@@ -144,7 +146,7 @@ export default function AppearanceSettingsScreen() {
 
         {/* Toggles */}
         <View style={styles.toggleRow}>
-          <Text style={styles.toggleLabel}>Warna Kategori Kartu</Text>
+          <Text style={styles.toggleLabel}>{t('appearance.categoryColors')}</Text>
           <Switch
             value={enableCategoryColors}
             onValueChange={toggleCategoryColors}
@@ -154,7 +156,7 @@ export default function AppearanceSettingsScreen() {
         </View>
 
         <View style={styles.toggleRow}>
-          <Text style={styles.toggleLabel}>Kontras Tinggi</Text>
+          <Text style={styles.toggleLabel}>{t('appearance.highContrast')}</Text>
           <Switch
             value={highContrast}
             onValueChange={toggleHighContrast}

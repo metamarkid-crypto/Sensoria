@@ -7,9 +7,11 @@ import Toast from 'react-native-toast-message';
 import { supabase } from '../services/db/supabase';
 import { logger } from '../utils/logger';
 import { useAACStore } from '../store/useAACStore';
+import { useTranslation } from '../i18n';
 
 export default function UserProfileScreen() {
   const navigation = useNavigation<any>();
+  const { t } = useTranslation();
   const { childProfile, setChildProfile } = useAACStore();
 
   const [fullName, setFullName] = useState('');
@@ -28,13 +30,13 @@ export default function UserProfileScreen() {
 
   const handleSave = async () => {
     if (!fullName.trim() || !nickname.trim()) {
-      Toast.show({ type: 'error', text1: 'Data tidak lengkap', text2: 'Nama lengkap dan panggilan harus diisi.' });
+      Toast.show({ type: 'error', text1: t('profile.toastIncomplete'), text2: t('profile.toastIncompleteDesc') });
       return;
     }
 
     setIsSaving(true);
     try {
-      if (!childProfile?.device_id) throw new Error("Device ID tidak ditemukan.");
+      if (!childProfile?.device_id) throw new Error(t('profile.deviceIdMissing'));
 
       // SAFEGUARD 3: Strict Gender Payload
       const updatedSettings = { ...childProfile.settings, childProfileGender: gender };
@@ -63,8 +65,8 @@ export default function UserProfileScreen() {
 
       Toast.show({
         type: 'success',
-        text1: 'Berhasil Disimpan',
-        text2: 'Profil pengguna telah diperbarui.',
+        text1: t('profile.toastSaved'),
+        text2: t('profile.toastSavedDesc'),
         position: 'top'
       });
       
@@ -74,8 +76,8 @@ export default function UserProfileScreen() {
       logger.logError('Failed to save User Profile', err);
       Toast.show({
         type: 'error',
-        text1: 'Gagal Menyimpan',
-        text2: err.message || 'Terjadi kesalahan sistem.',
+        text1: t('profile.toastFailed'),
+        text2: err.message || t('profile.toastSystemError'),
       });
     } finally {
       setIsSaving(false);
@@ -89,9 +91,9 @@ export default function UserProfileScreen() {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color="#1A2980" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Profil Pengguna</Text>
+        <Text style={styles.headerTitle}>{t('profile.title')}</Text>
         <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={isSaving}>
-          {isSaving ? <ActivityIndicator size="small" color="#2488FF" /> : <Text style={styles.saveButtonText}>Simpan</Text>}
+          {isSaving ? <ActivityIndicator size="small" color="#2488FF" /> : <Text style={styles.saveButtonText}>{t('common.save')}</Text>}
         </TouchableOpacity>
       </View>
 
@@ -109,33 +111,33 @@ export default function UserProfileScreen() {
                 <Ionicons name="camera" size={16} color="#FFF" />
               </TouchableOpacity>
             </View>
-            <Text style={styles.avatarLabel}>Ubah Foto Profil</Text>
+            <Text style={styles.avatarLabel}>{t('profile.changePhoto')}</Text>
           </View>
 
           {/* Form Fields */}
           <View style={styles.formGroup}>
-            <Text style={styles.label}>Nama Lengkap</Text>
+            <Text style={styles.label}>{t('profile.fullName')}</Text>
             <View style={styles.inputContainer}>
               <Ionicons name="person-outline" size={20} color="#94A3B8" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 value={fullName}
                 onChangeText={setFullName}
-                placeholder="Masukkan nama lengkap"
+                placeholder={t('profile.fullNamePlaceholder')}
                 placeholderTextColor="#94A3B8"
               />
             </View>
           </View>
 
           <View style={styles.formGroup}>
-            <Text style={styles.label}>Nama Panggilan</Text>
+            <Text style={styles.label}>{t('profile.nickname')}</Text>
             <View style={styles.inputContainer}>
               <Ionicons name="happy-outline" size={20} color="#94A3B8" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 value={nickname}
                 onChangeText={setNickname}
-                placeholder="Masukkan nama panggilan"
+                placeholder={t('profile.nicknamePlaceholder')}
                 placeholderTextColor="#94A3B8"
               />
             </View>
@@ -143,21 +145,21 @@ export default function UserProfileScreen() {
 
           {/* Gender Toggle */}
           <View style={styles.formGroup}>
-            <Text style={styles.label}>Jenis Kelamin</Text>
+            <Text style={styles.label}>{t('profile.gender')}</Text>
             <View style={styles.genderRow}>
               <TouchableOpacity 
                 style={[styles.genderCard, gender === 'Boy' && styles.genderCardActive]}
                 onPress={() => setGender('Boy')}
               >
                 <Text style={{ fontSize: 32, marginBottom: 8 }}>👦🏻</Text>
-                <Text style={[styles.genderText, gender === 'Boy' && styles.genderTextActive]}>Laki-laki</Text>
+                <Text style={[styles.genderText, gender === 'Boy' && styles.genderTextActive]}>{t('profile.boy')}</Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={[styles.genderCard, gender === 'Girl' && styles.genderCardActiveFemale]}
                 onPress={() => setGender('Girl')}
               >
                 <Text style={{ fontSize: 32, marginBottom: 8 }}>👧🏻</Text>
-                <Text style={[styles.genderText, gender === 'Girl' && styles.genderTextActiveFemale]}>Perempuan</Text>
+                <Text style={[styles.genderText, gender === 'Girl' && styles.genderTextActiveFemale]}>{t('profile.girl')}</Text>
               </TouchableOpacity>
             </View>
           </View>

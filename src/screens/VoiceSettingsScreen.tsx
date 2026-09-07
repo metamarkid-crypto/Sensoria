@@ -7,16 +7,18 @@ import Slider from '@react-native-community/slider';
 import { supabase } from '../services/db/supabase';
 import { useAACStore } from '../store/useAACStore';
 import { playTTS } from '../services/ai/audioManager';
+import { useTranslation } from '../i18n';
 
 const AVAILABLE_VOICES = [
-  { id: 'id-female-1', label: 'Perempuan 1 (Lembut)' },
-  { id: 'id-female-2', label: 'Perempuan 2 (Ceria)' },
-  { id: 'id-male-1', label: 'Laki-laki 1 (Tenang)' },
-  { id: 'id-male-2', label: 'Laki-laki 2 (Tegas)' },
+  { id: 'id-female-1', labelKey: 'voice.female1' as const },
+  { id: 'id-female-2', labelKey: 'voice.female2' as const },
+  { id: 'id-male-1', labelKey: 'voice.male1' as const },
+  { id: 'id-male-2', labelKey: 'voice.male2' as const },
 ];
 
 export default function VoiceSettingsScreen() {
   const navigation = useNavigation<any>();
+  const { t } = useTranslation();
   const { 
     childProfile, 
     language,
@@ -63,7 +65,7 @@ export default function VoiceSettingsScreen() {
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
         {
-          options: ['Batal', ...AVAILABLE_VOICES.map(v => v.label)],
+          options: [t('common.cancel'), ...AVAILABLE_VOICES.map(v => t(v.labelKey))],
           cancelButtonIndex: 0,
         },
         (buttonIndex) => {
@@ -105,10 +107,11 @@ export default function VoiceSettingsScreen() {
   };
 
   const handleTestVoice = () => {
-    playTTS('Halo, ini suara saya.', language, 'Child');
+    playTTS(t('voice.testSentence'), language, 'Child');
   };
 
-  const activeVoiceLabel = AVAILABLE_VOICES.find(v => v.id === selectedVoice)?.label || 'Pilih Suara';
+  const activeVoice = AVAILABLE_VOICES.find(v => v.id === selectedVoice);
+  const activeVoiceLabel = activeVoice ? t(activeVoice.labelKey) : t('voice.choosePlaceholder');
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -116,7 +119,7 @@ export default function VoiceSettingsScreen() {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color="#1A2980" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Suara & Bicara</Text>
+        <Text style={styles.headerTitle}>{t('voice.title')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -124,7 +127,7 @@ export default function VoiceSettingsScreen() {
         
         {/* Pilih Suara */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Pilih Suara</Text>
+          <Text style={styles.sectionTitle}>{t('voice.selectTitle')}</Text>
           <TouchableOpacity style={styles.dropdownBtn} onPress={handleSelectVoice}>
             <View style={styles.dropdownLeft}>
               <View style={styles.avatarIconBox}>
@@ -138,7 +141,7 @@ export default function VoiceSettingsScreen() {
 
         {/* Kecepatan Bicara */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Kecepatan Bicara</Text>
+          <Text style={styles.sectionTitle}>{t('voice.speechRate')}</Text>
           <Slider
             style={styles.slider}
             minimumValue={0.5}
@@ -151,14 +154,14 @@ export default function VoiceSettingsScreen() {
             thumbTintColor="#2488FF"
           />
           <View style={styles.sliderLabels}>
-            <Text style={styles.sliderLabelText}>Lambat</Text>
-            <Text style={styles.sliderLabelText}>Cepat</Text>
+            <Text style={styles.sliderLabelText}>{t('voice.slow')}</Text>
+            <Text style={styles.sliderLabelText}>{t('voice.fast')}</Text>
           </View>
         </View>
 
         {/* Volume */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Volume</Text>
+          <Text style={styles.sectionTitle}>{t('voice.volume')}</Text>
           <Slider
             style={styles.slider}
             minimumValue={0}
@@ -176,7 +179,7 @@ export default function VoiceSettingsScreen() {
 
         {/* Toggles */}
         <View style={styles.toggleRow}>
-          <Text style={styles.toggleLabel}>Baca Saat Tombol Ditekan</Text>
+          <Text style={styles.toggleLabel}>{t('voice.speakOnTap')}</Text>
           <Switch
             value={speakOnTap}
             onValueChange={toggleSpeakOnTap}
@@ -186,7 +189,7 @@ export default function VoiceSettingsScreen() {
         </View>
 
         <View style={styles.toggleRow}>
-          <Text style={styles.toggleLabel}>Bunyi Feedback</Text>
+          <Text style={styles.toggleLabel}>{t('voice.soundFeedback')}</Text>
           <Switch
             value={soundFeedback}
             onValueChange={toggleSoundFeedback}
@@ -201,7 +204,7 @@ export default function VoiceSettingsScreen() {
       <View style={styles.footer}>
         <TouchableOpacity style={styles.testBtn} onPress={handleTestVoice}>
           <Ionicons name="volume-medium" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-          <Text style={styles.testBtnText}>Tes Suara</Text>
+          <Text style={styles.testBtnText}>{t('voice.test')}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
