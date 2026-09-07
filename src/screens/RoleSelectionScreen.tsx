@@ -97,7 +97,7 @@ export default function RoleSelectionScreen() {
 
   const handleRecoverProfile = async () => {
     if (!recoveryCode || recoveryCode.length !== 6) {
-      Toast.show({ type: 'error', text1: 'Gagal', text2: 'Masukkan 6 digit kode pemulihan yang valid.', position: 'top' });
+      Toast.show({ type: 'error', text1: t('common.failed'), text2: t('role.recoveryInvalidCode'), position: 'top' });
       return;
     }
     
@@ -112,7 +112,7 @@ export default function RoleSelectionScreen() {
         .single();
         
       if (deviceError || !devices) {
-        Toast.show({ type: 'error', text1: 'Gagal', text2: 'Kode tidak ditemukan atau salah.', position: 'top' });
+        Toast.show({ type: 'error', text1: t('common.failed'), text2: t('role.recoveryCodeNotFound'), position: 'top' });
         return;
       }
 
@@ -146,14 +146,14 @@ export default function RoleSelectionScreen() {
           useAACStore.getState().setSelectedVoice(recoveredGender === 'Girl' ? 'id-female-1' : 'id-male-1');
         }
         
-        Toast.show({ type: 'success', text1: 'Berhasil', text2: 'Profil Anak berhasil dipulihkan!', position: 'top' });
+        Toast.show({ type: 'success', text1: t('common.success'), text2: t('role.recoverySuccess'), position: 'top' });
         setShowRecovery(false);
         setRole('Child');
       } else {
-         Toast.show({ type: 'error', text1: 'Gagal', text2: 'Profil Anak tidak ditemukan.', position: 'top' });
+         Toast.show({ type: 'error', text1: t('common.failed'), text2: t('role.recoveryProfileMissing'), position: 'top' });
       }
     } catch (err) {
-      Toast.show({ type: 'error', text1: 'Error', text2: 'Gagal memulihkan data.', position: 'top' });
+      Toast.show({ type: 'error', text1: t('common.error'), text2: t('role.recoveryFailed'), position: 'top' });
     } finally {
       setIsRecovering(false);
     }

@@ -4,6 +4,7 @@ import { FontAwesome5 } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Toast from 'react-native-toast-message';
 
+import { useTranslation } from '../../i18n';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'react-native';
 
@@ -16,6 +17,7 @@ interface HeaderProps {
 }
 
 export default function DynamicParentHeader({ childProfile, isOnline, lastSeen }: HeaderProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
 
   return (
@@ -35,16 +37,16 @@ export default function DynamicParentHeader({ childProfile, isOnline, lastSeen }
           </View>
           <View style={styles.childInfo}>
             <Text style={styles.childName} numberOfLines={1} ellipsizeMode="tail">
-              {childProfile?.fullName || childProfile?.name || childProfile?.nickname || 'Belum ditautkan'}
+              {childProfile?.fullName || childProfile?.name || childProfile?.nickname || t('header.childFallback')}
             </Text>
             <View style={styles.statusRow}>
               <View style={[styles.dot, { backgroundColor: isOnline ? '#34C759' : '#94A3B8' }]} />
               <Text style={[styles.statusText, { color: isOnline ? '#34C759' : '#94A3B8' }]}>
-                {isOnline ? 'Online' : 'Offline'}
+                {isOnline ? t('common.online') : t('common.offline')}
               </Text>
             </View>
             <Text style={styles.lastSeenText}>
-              Terakhir aktif: {isOnline ? 'Sekarang' : (lastSeen || 'Belum diketahui')}
+              {t('header.lastActive', { time: isOnline ? t('header.now') : (lastSeen || t('common.unknown')) })}
             </Text>
           </View>
         </View>

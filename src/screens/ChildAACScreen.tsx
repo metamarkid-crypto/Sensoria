@@ -3,7 +3,7 @@ import { View, StyleSheet, ActivityIndicator, Text, TouchableOpacity, ScrollView
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
-import { useAACStore, AACWord } from '../store/useAACStore';
+import { useAACStore, AACWord, resolveWordText } from '../store/useAACStore';
 import { evaluateAccess } from '../services/db/entitlement';
 import { initDB, getAllWords, addCustomWord, updateWord, setWordFavorite } from '../services/db/sqlite';
 import { tagImageWithBilingualNames, translateWordBilingual, isNoConfidenceTag } from '../services/ai/gemini';
@@ -255,7 +255,7 @@ export default function ChildAACScreen() {
 
   const handleCardPress = useCallback((word: AACWord) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    const wordText = language === 'id' ? word.word_id : word.word_zh;
+    const wordText = resolveWordText(word, language);
     
     if (speakOnTap) {
       playTTS(wordText, language, 'Child');
@@ -267,7 +267,7 @@ export default function ChildAACScreen() {
   const handleSpeakAll = () => {
     if (currentSentence.length === 0) return;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    const fullText = currentSentence.map(w => language === 'id' ? w.word_id : w.word_zh).join(' ');
+    const fullText = currentSentence.map(w => resolveWordText(w, language)).join(' ');
     playTTS(fullText, language, 'Child');
   };
 
@@ -295,7 +295,7 @@ export default function ChildAACScreen() {
       // loc remains as the last known location, or null. We don't block.
     }
     
-    const fullText = sentenceToWrap.map(w => language === 'id' ? w.word_id : w.word_zh).join(' ');
+    const fullText = sentenceToWrap.map(w => resolveWordText(w, language)).join(' ');
     
     if (pairingCode) {
       await sendAACMessage(pairingCode, {
@@ -441,7 +441,7 @@ export default function ChildAACScreen() {
     if (!selectedWord) return;
     setShowWordOptions(false);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    const wordText = language === 'id' ? selectedWord.word_id : selectedWord.word_zh;
+    const wordText = resolveWordText(selectedWord, language);
     await clearAudioCache(wordText, language, 'Child');
     playTTS(wordText, language, 'Child');
     Toast.show({ type: 'info', text1: t('aac.toastVoiceUpdated'), text2: t('aac.toastVoiceUpdatedDesc'), position: 'top' });
@@ -531,7 +531,7 @@ export default function ChildAACScreen() {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color="#00B5B8" />
-        {isProcessingAI && <Text style={{marginTop: 10, color: '#11427B'}}>AI Sedang Menganalisis Gambar...</Text>}
+        {isProcessingAI && <Text style={{marginTop: 10, color: '#11427B'}}>{t('aac.aiAnalyzing')}</Text>}
       </View>
     );
   }
@@ -592,7 +592,7 @@ export default function ChildAACScreen() {
       {/* Compassionate grace: subtle, non-blocking subscription nudge */}
       {childInGrace ? (
         <View style={styles.graceBanner}>
-          <Text style={styles.graceBannerText}>Ayah/Bunda, yuk perbarui langganan 🙏</Text>
+          <Text style={styles.graceBannerText}>{t('aac.graceBanner')}</Text>
         </View>
       ) : null}
 

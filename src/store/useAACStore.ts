@@ -45,6 +45,23 @@ export interface AboutContent {
 }
 
 /**
+ * ONE source of truth for resolving a word's display/speech text for the
+ * active app language — used by BOTH card labels (visual) and every playTTS
+ * trigger, so the English TTS engine never receives Mandarin text:
+ *   id → word_id
+ *   en → word_en (fallback to word_id when null — legacy rows)
+ *   zh → word_zh (fallback to word_id when null)
+ */
+export const resolveWordText = (
+  word: Pick<AACWord, 'word_id' | 'word_en' | 'word_zh'>,
+  language: AppLanguage
+): string => {
+  if (language === 'en') return word.word_en || word.word_id;
+  if (language === 'zh') return word.word_zh || word.word_id;
+  return word.word_id;
+};
+
+/**
  * Global premium entitlement (Master Blueprint — Combo rule).
  *
  * Protocol — "Compassionate Child, Strict Parent". The raw expiry boundaries

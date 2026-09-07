@@ -126,10 +126,15 @@ export default function PaywallScreen() {
       setStage('qr');
     } catch (e) {
       setStage('idle');
+      // paywall.ts throws stable error CODES (PAYMENT_SERVER_TIMEOUT /
+      // CHECKOUT_NO_QRIS) — map them to localized toasts. Anything else is a
+      // raw transport error (e.g. network) shown as-is.
+      const code = e instanceof Error ? e.message : '';
+      const localizedCode = code === 'PAYMENT_SERVER_TIMEOUT' || code === 'CHECKOUT_NO_QRIS';
       Toast.show({
         type: 'error',
         text1: t('paywall.toastCheckoutFailed'),
-        text2: e instanceof Error ? e.message : t('paywall.toastTryAgain'),
+        text2: localizedCode || !code ? t('paywall.toastTryAgain') : code,
         position: 'top',
       });
     }

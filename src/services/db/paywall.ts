@@ -117,7 +117,9 @@ export const createQrisCheckout = async (
   const TIMEOUT_MS = 20000;
   const timeout = new Promise<never>((_, reject) => {
     setTimeout(
-      () => reject(new Error('Server pembayaran tidak merespons. Silakan coba lagi.')),
+      // Stable error CODE (not user-facing prose) — PaywallScreen maps it to a
+      // localized toast message so users always see text in their language.
+      () => reject(new Error('PAYMENT_SERVER_TIMEOUT')),
       TIMEOUT_MS,
     );
   });
@@ -165,7 +167,7 @@ export const createQrisCheckout = async (
   }
 
   if (!imageUri) {
-    throw new Error('Respons checkout tidak berisi gambar QRIS. Silakan coba lagi.');
+    throw new Error('CHECKOUT_NO_QRIS');
   }
 
   return {

@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { supabase } from '../services/db/supabase';
 import { useAACStore } from '../store/useAACStore';
+import { useTranslation } from '../i18n';
 import * as Haptics from 'expo-haptics';
 import { TextInput, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 
@@ -13,13 +14,24 @@ interface Props {
 }
 
 export default function PairingBottomSheet({ isVisible, onClose }: Props) {
+  const { t } = useTranslation();
   const [linkedParents, setLinkedParents] = useState<any[]>([]);
   const [inputCode, setInputCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const insets = useSafeAreaInsets();
   const { deviceId, pairingCode, role, childProfile, setPairingCode, setChildProfile, localParentName, setLocalParentName } = useAACStore();
+  // selectedRole keeps the CANONICAL stored label ('Ibu'/'Ayah'/... — persisted
+  // as parent_label and matched by the audio persona keywords); the pills only
+  // translate the DISPLAY.
   const [selectedRole, setSelectedRole] = useState(localParentName || 'Ibu');
-  const roleOptions = ['Ibu', 'Ayah', 'Kakek', 'Nenek', 'Terapis', 'Guru'];
+  const roleOptions = [
+    { id: 'Ibu', labelKey: 'pairing.roleMom' },
+    { id: 'Ayah', labelKey: 'pairing.roleDad' },
+    { id: 'Kakek', labelKey: 'pairing.roleGrandpa' },
+    { id: 'Nenek', labelKey: 'pairing.roleGrandma' },
+    { id: 'Terapis', labelKey: 'pairing.roleTherapist' },
+    { id: 'Guru', labelKey: 'pairing.roleTeacher' },
+  ] as const;
 
   useEffect(() => {
     if (!isVisible || !deviceId) return;
@@ -58,7 +70,7 @@ export default function PairingBottomSheet({ isVisible, onClose }: Props) {
 
   const handleLinkDevice = async () => {
     if (!inputCode || inputCode.length !== 6) {
-      Alert.alert('Gagal', 'Masukkan 6 digit kode yang valid.');
+      Alert.alert(t('common.failed'), t('pairing.toastInvalidCode'));
       return;
     }
 
@@ -72,7 +84,7 @@ export default function PairingBottomSheet({ isVisible, onClose }: Props) {
         .single();
         
       if (deviceError || !childDevice) {
-        Alert.alert('Gagal', 'Kode tidak valid atau perangkat anak tidak ditemukan.');
+        Alert.alert(t('common.failed'), t('pairing.toastCodeNotFound'));
         setIsLoading(false);
         return;
       }
@@ -103,12 +115,12 @@ export default function PairingBottomSheet({ isVisible, onClose }: Props) {
 
       setPairingCode(inputCode);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('Berhasil', 'Perangkat berhasil ditautkan!');
+      Alert.alert(t('common.success'), t('pairing.toastLinked'));
       setInputCode('');
       onClose();
 
     } catch (err) {
-      Alert.alert('Error', 'Gagal menautkan perangkat.');
+      Alert.alert(t('common.error'), t('pairing.toastLinkFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -116,12 +128,12 @@ export default function PairingBottomSheet({ isVisible, onClose }: Props) {
 
   const handleUnlink = () => {
     Alert.alert(
-      'Putuskan Tautan',
-      'Apakah Anda yakin ingin memutuskan tautan perangkat ini?',
+      t('pairing.unlinkTitle'),
+      t('pairing.unlinkConfirm'),
       [
-        { text: 'Batal', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         { 
-          text: 'Putuskan', 
+          text: t('pairing.unlink'), 
           style: 'destructive',
           onPress: async () => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -142,7 +154,7 @@ export default function PairingBottomSheet({ isVisible, onClose }: Props) {
     <>
       <Image source={require('../../assets/cover-pairing.png')} style={styles.sheetCoverImage} resizeMode="contain" />
       <View style={styles.sheetCodeBox}>
-        <Text style={styles.sheetCodeLabel}>Kode Pairing Anda</Text>
+        <Text style={styles.sheetCodeLabel}>{t('pairing.yourCode')}</Text>
         {linkedParents.length >= 1 ? (
           <View style={styles.sheetObfuscatedBox}>
             <FontAwesome5 name="lock" size={24} color="#94A3B8" style={{ marginRight: 12 }} />
@@ -157,13 +169,13 @@ export default function PairingBottomSheet({ isVisible, onClose }: Props) {
           </View>
         )}
         {linkedParents.length < 1 && (
-          <Text style={styles.sheetCodeDesc}>Masukkan kode ini pada perangkat keluarga untuk mulai terhubung.</Text>
+          <Text style={styles.sheetCodeDesc}>{t('pairing.codeDesc')}</Text>
         )}
       </View>
       <View style={styles.sheetDevicesSection}>
-        <Text style={styles.sheetDevicesTitle}>Perangkat Terhubung</Text>
+        <Text style={styles.sheetDevicesTitle}>{t('pairing.linkedDevices')}</Text>
         {linkedParents.length === 0 ? (
-          <Text style={styles.sheetDevicesEmpty}>Belum ada perangkat yang tertaut.</Text>
+          <Text style={styles.sheetDevicesEmpty}>{t('pairing.noDevices')}</Text>
         ) : (
           linkedParents.map(parent => (
             <View key={parent.id} style={styles.sheetDeviceRow}>
@@ -173,7 +185,7 @@ export default function PairingBottomSheet({ isVisible, onClose }: Props) {
               <Text style={styles.sheetDeviceName}>Sensoria {parent.parent_label}</Text>
               <View style={styles.sheetDeviceStatus}>
                 <View style={styles.sheetDeviceDot} />
-                <Text style={styles.sheetDeviceStatusText}>Terhubung</Text>
+                <Text style={styles.sheetDeviceStatusText}>{t('pairing.connected')}</Text>
               </View>
             </View>
           ))
@@ -189,7 +201,7 @@ export default function PairingBottomSheet({ isVisible, onClose }: Props) {
       {pairingCode && childProfile ? (
         // Already Linked
         <View style={styles.sheetCodeBox}>
-          <Text style={styles.sheetCodeLabel}>Perangkat Anak Terhubung</Text>
+          <Text style={styles.sheetCodeLabel}>{t('pairing.childLinked')}</Text>
           <View style={[styles.sheetDeviceRow, { width: '100%', backgroundColor: '#F8FAFC', marginBottom: 20 }]}>
             <View style={[styles.sheetDeviceIconBox, { backgroundColor: '#E0F2FE' }]}>
               <FontAwesome5 name="child" size={20} color="#0EA5E9" />
@@ -197,18 +209,18 @@ export default function PairingBottomSheet({ isVisible, onClose }: Props) {
             <Text style={styles.sheetDeviceName}>{childProfile.fullName || childProfile.nickname}</Text>
             <View style={styles.sheetDeviceStatus}>
               <View style={styles.sheetDeviceDot} />
-              <Text style={styles.sheetDeviceStatusText}>Terhubung</Text>
+              <Text style={styles.sheetDeviceStatusText}>{t('pairing.connected')}</Text>
             </View>
           </View>
           <TouchableOpacity style={[styles.sheetAddButton, { borderColor: '#EF4444', backgroundColor: '#FEF2F2' }]} onPress={handleUnlink}>
             <FontAwesome5 name="unlink" size={14} color="#EF4444" />
-            <Text style={[styles.sheetAddButtonText, { color: '#EF4444' }]}>Putuskan Tautan</Text>
+            <Text style={[styles.sheetAddButtonText, { color: '#EF4444' }]}>{t('pairing.unlinkTitle')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
         // Needs Linking
         <View style={styles.sheetCodeBox}>
-          <Text style={styles.sheetCodeLabel}>Masukkan Kode Pairing Anak</Text>
+          <Text style={styles.sheetCodeLabel}>{t('pairing.enterChildCode')}</Text>
           
           <View style={styles.inputContainer}>
             <TextInput
@@ -222,24 +234,24 @@ export default function PairingBottomSheet({ isVisible, onClose }: Props) {
             />
           </View>
           
-          <Text style={styles.sheetCodeDesc}>Dapatkan 6-digit kode ini dari perangkat anak.</Text>
+          <Text style={styles.sheetCodeDesc}>{t('pairing.getCodeDesc')}</Text>
           
-          <Text style={[styles.sheetCodeLabel, { marginTop: 16, marginBottom: 8 }]}>Pilih Peran Anda</Text>
+          <Text style={[styles.sheetCodeLabel, { marginTop: 16, marginBottom: 8 }]}>{t('pairing.chooseRole')}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16, width: '100%' }}>
             {roleOptions.map(r => (
               <TouchableOpacity 
-                key={r} 
+                key={r.id} 
                 style={[
                   styles.rolePill, 
-                  selectedRole === r ? styles.rolePillActive : styles.rolePillInactive
+                  selectedRole === r.id ? styles.rolePillActive : styles.rolePillInactive
                 ]}
-                onPress={() => setSelectedRole(r)}
+                onPress={() => setSelectedRole(r.id)}
               >
                 <Text style={[
                   styles.rolePillText, 
-                  selectedRole === r ? styles.rolePillTextActive : styles.rolePillTextInactive
+                  selectedRole === r.id ? styles.rolePillTextActive : styles.rolePillTextInactive
                 ]}>
-                  {r}
+                  {t(r.labelKey)}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -253,7 +265,7 @@ export default function PairingBottomSheet({ isVisible, onClose }: Props) {
             {isLoading ? <ActivityIndicator color="#FFF" /> : (
               <>
                 <FontAwesome5 name="link" size={14} color="#FFF" />
-                <Text style={styles.linkButtonText}>Tautkan Sekarang</Text>
+                <Text style={styles.linkButtonText}>{t('pairing.linkNow')}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -281,8 +293,8 @@ export default function PairingBottomSheet({ isVisible, onClose }: Props) {
           {/* Header */}
           <View style={styles.sheetHeader}>
             <View style={styles.sheetTitleContainer}>
-              <Text style={styles.sheetTitle}>Tautkan Perangkat</Text>
-              <Text style={styles.sheetSubtitle}>Hubungkan Sensoria dengan perangkat keluarga</Text>
+              <Text style={styles.sheetTitle}>{t('pairing.title')}</Text>
+              <Text style={styles.sheetSubtitle}>{t('pairing.subtitle')}</Text>
             </View>
             <TouchableOpacity style={styles.sheetCloseBtn} onPress={onClose}>
               <FontAwesome5 name="times" size={18} color="#FF2A7A" />

@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { View, Text, Image, StyleSheet, Animated, Pressable } from 'react-native';
-import { AACWord, useAACStore } from '../../store/useAACStore';
+import { AACWord, useAACStore, resolveWordText } from '../../store/useAACStore';
 import { getLocalImage } from '../../assets/imageMap';
 
 interface AACCardProps {
@@ -175,7 +175,7 @@ const AACCard = React.memo(({ item, onPress, onLongPress }: AACCardProps) => {
           resizeMode="contain"
         />
         <Text style={[styles.text, { fontSize: getFontSize() }]} numberOfLines={1}>
-          {language === 'id' ? item.word_id : item.word_zh}
+          {resolveWordText(item, language)}
         </Text>
       </Animated.View>
     </Pressable>

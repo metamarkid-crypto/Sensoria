@@ -2,29 +2,37 @@ import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, Dimensions, TouchableOpacity, Image, ActivityIndicator, Platform } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAACStore } from '../store/useAACStore';
+import { useTranslation, type TranslationKey } from '../i18n';
 import { logger } from '../utils/logger';
 
 const { width, height } = Dimensions.get('window');
 
-const SLIDES = [
+interface Slide {
+  id: string;
+  titleKey: TranslationKey;
+  image: any;
+}
+
+const SLIDES: Slide[] = [
   {
     id: '1',
-    title: 'Selamat Datang',
+    titleKey: 'welcome.title1',
     image: require('../../assets/onboarding1.png')
   },
   {
     id: '2',
-    title: 'Pilih Kartu',
+    titleKey: 'welcome.title2',
     image: require('../../assets/onboarding2.png')
   },
   {
     id: '3',
-    title: 'Kirim Pesan',
+    titleKey: 'welcome.title3',
     image: require('../../assets/onboarding3.png')
   }
 ];
 
 export default function WelcomeSliderScreen({ navigation }: any) {
+  const { t } = useTranslation();
   const { setHasSeenOnboarding } = useAACStore();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [assetsLoaded, setAssetsLoaded] = useState(false);
@@ -73,7 +81,7 @@ export default function WelcomeSliderScreen({ navigation }: any) {
 
   const renderSlide = ({ item }: { item: typeof SLIDES[0] }) => (
     <View style={styles.slideContainer}>
-      <Image source={item.image} style={styles.fullImage} resizeMode="cover" accessible={true} accessibilityLabel={`Ilustrasi: ${item.title}`} />
+      <Image source={item.image} style={styles.fullImage} resizeMode="cover" accessible={true} accessibilityLabel={t('welcome.illustration', { title: t(item.titleKey) })} />
     </View>
   );
 
@@ -108,9 +116,9 @@ export default function WelcomeSliderScreen({ navigation }: any) {
           onPress={handleSkip}
           accessible={true}
           accessibilityRole="button"
-          accessibilityLabel="Lewati tutorial"
+          accessibilityLabel={t('welcome.skipA11y')}
         >
-          <Text style={styles.skipText}>Lewati</Text>
+          <Text style={styles.skipText}>{t('welcome.skip')}</Text>
         </TouchableOpacity>
         
         <TouchableOpacity 
@@ -118,10 +126,10 @@ export default function WelcomeSliderScreen({ navigation }: any) {
           onPress={handleNext}
           accessible={true}
           accessibilityRole="button"
-          accessibilityLabel={currentIndex === SLIDES.length - 1 ? 'Mulai' : 'Berikutnya'}
+          accessibilityLabel={currentIndex === SLIDES.length - 1 ? t('welcome.start') : t('welcome.next')}
         >
           <Text style={styles.nextText}>
-            {currentIndex === SLIDES.length - 1 ? 'Mulai' : 'Berikutnya'}
+            {currentIndex === SLIDES.length - 1 ? t('welcome.start') : t('welcome.next')}
           </Text>
         </TouchableOpacity>
       </View>

@@ -83,19 +83,19 @@ export default function ParentMessagesScreen() {
       setModalVisible(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } else {
-      Alert.alert('Kosong', 'Masukkan teks balasan favorit Anda.');
+      Alert.alert(t('messages.emptyReplyAlert'), t('messages.emptyReplyDesc'));
     }
   };
 
   const handleLongPressReply = (reply: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     Alert.alert(
-      'Hapus Balasan Cepat',
-      `Apakah Anda yakin ingin menghapus "${reply}"?`,
+      t('messages.deleteReplyTitle'),
+      t('messages.deleteReplyConfirm', { reply }),
       [
-        { text: 'Batal', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         { 
-          text: 'Hapus', 
+          text: t('messages.delete'), 
           style: 'destructive', 
           onPress: () => {
             removeCustomQuickReply(reply);
@@ -140,7 +140,7 @@ export default function ParentMessagesScreen() {
           {/* Sender Name Tag for Parents */}
           {!isChild && (
             <Text style={[styles.senderNameTag, isCurrentUser ? styles.nameTagSelf : styles.nameTagOther]}>
-              {item.senderName || 'Keluarga'}
+              {item.senderName || t('messages.familyFallback')}
             </Text>
           )}
           
@@ -152,7 +152,7 @@ export default function ParentMessagesScreen() {
                 style={{ width: 20, height: 20, borderRadius: 10, marginRight: 6, backgroundColor: '#BAE6FD' }} 
               />
               <Text style={[styles.senderNameTag, { color: '#0369A1', marginBottom: 0 }]}>
-                {childProfile?.nickname || 'Anak'} {childProfile?.gender === 'Boy' ? '👦' : '👧'}
+                {childProfile?.nickname || t('aac.childFallback')} {childProfile?.gender === 'Boy' ? '👦' : '👧'}
               </Text>
             </View>
           )}
@@ -207,7 +207,7 @@ export default function ParentMessagesScreen() {
               onPress={() => setModalVisible(true)}
             >
               <FontAwesome5 name="plus" size={12} color="#00B5B8" style={{marginRight: 4}} />
-              <Text style={[styles.quickReplyText, { color: '#00B5B8', fontWeight: 'bold' }]}>Tambah</Text>
+              <Text style={[styles.quickReplyText, { color: '#00B5B8', fontWeight: 'bold' }]}>{t('messages.add')}</Text>
             </TouchableOpacity>
           </ScrollView>
 

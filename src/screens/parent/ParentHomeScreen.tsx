@@ -20,16 +20,20 @@ export default function ParentHomeScreen() {
   const [recentMessage, setRecentMessage] = useState<any>(null);
   
   const { childStatus } = useAACStore();
-  const currentAddress = childStatus.lastAddress || 'Lokasi belum tersedia';
+  const currentAddress = childStatus.lastAddress || t('home.locationUnavailable');
   const [todayMessageCount, setTodayMessageCount] = useState<number>(0);
   
   // NEW: Comprehensive Activity Widget State
-  const TABS = ['Hari Ini', '7 Hari', '30 Hari'] as const;
-  type TabType = typeof TABS[number];
+  const ACTIVITY_TABS = [
+    { id: 'today', labelKey: 'home.tabToday' },
+    { id: '7d', labelKey: 'home.tab7Days' },
+    { id: '30d', labelKey: 'home.tab30Days' },
+  ] as const;
+  type TabId = typeof ACTIVITY_TABS[number]['id'];
 
   const [todayUniqueWords, setTodayUniqueWords] = useState<number>(0);
   const [chartData, setChartData] = useState<number[]>(new Array(24).fill(0));
-  const [activeTab, setActiveTab] = useState<TabType>('Hari Ini');
+  const [activeTab, setActiveTab] = useState<TabId>('today');
 
   // ── Proactive Upgrade Banner (stealth kill-switch) ──────────────────────────
   // Reads the SHARED store flag, refreshed by the app lifecycle on boot and
@@ -189,11 +193,11 @@ export default function ParentHomeScreen() {
               </View>
               <View style={styles.upgradeTextWrap}>
                 <Text style={styles.upgradeTitle}>
-                  Suka dengan Sensoria? Upgrade ke Premium sekarang.
+                  {t('home.upgradeTitle')}
                 </Text>
                 {premium.trialEndsAt ? (
                   <Text style={styles.upgradeSub}>
-                    Masa coba aktif hingga {formatDate(premium.trialEndsAt)}.
+                    {t('home.trialUntil', { date: formatDate(premium.trialEndsAt) })}
                   </Text>
                 ) : null}
               </View>
@@ -207,7 +211,7 @@ export default function ParentHomeScreen() {
         <View style={styles.messageHeader}>
           <View style={styles.messageTitleRow}>
             <FontAwesome5 name="comment-dots" size={16} color="#00B5B8" />
-            <Text style={styles.widgetTitle}>Pesan Terbaru</Text>
+            <Text style={styles.widgetTitle}>{t('home.recentMessages')}</Text>
           </View>
           {recentMessage && (
             <Text style={styles.messageTime}>
@@ -254,11 +258,11 @@ export default function ParentHomeScreen() {
             </View>
 
             <TouchableOpacity style={styles.viewAllBtn} onPress={() => navigation.navigate('Pesan')}>
-              <Text style={styles.viewAllText}>Lihat semua pesan ➔</Text>
+              <Text style={styles.viewAllText}>{t('home.viewAllMessages')}</Text>
             </TouchableOpacity>
           </>
         ) : (
-          <Text style={styles.emptyText}>Belum ada pesan masuk hari ini.</Text>
+          <Text style={styles.emptyText}>{t('home.noMessagesToday')}</Text>
         )}
       </View>
 
@@ -272,44 +276,44 @@ export default function ParentHomeScreen() {
           <FontAwesome5 name="map-marker-alt" size={24} color="#059669" />
         </View>
         <View style={{ marginLeft: 16, flex: 1 }}>
-          <Text style={styles.widgetTitle}>Lokasi Sekarang</Text>
+          <Text style={styles.widgetTitle}>{t('home.currentLocation')}</Text>
           <Text style={[styles.summaryValue, { fontSize: 16, marginTop: 2 }]} numberOfLines={1}>{currentAddress}</Text>
-          <Text style={[styles.summarySub, { fontSize: 13, marginTop: 2 }]} numberOfLines={1}>Area aman</Text>
+          <Text style={[styles.summarySub, { fontSize: 13, marginTop: 2 }]} numberOfLines={1}>{t('home.safeZone')}</Text>
         </View>
         <FontAwesome5 name="chevron-right" size={16} color="#CBD5E1" />
       </TouchableOpacity>
 
       {/* WIDGET C: Aksi Cepat */}
       <View style={[styles.card, { marginTop: 8 }]}>
-        <Text style={[styles.widgetTitle, { marginBottom: 16 }]}>Aksi Cepat</Text>
+        <Text style={[styles.widgetTitle, { marginBottom: 16 }]}>{t('home.quickActions')}</Text>
         <View style={styles.grid}>
           
           <TouchableOpacity style={styles.gridItem}>
             <View style={[styles.gridIconBox, { backgroundColor: '#DCFCE7' }]}>
               <FontAwesome5 name="puzzle-piece" size={20} color="#16A34A" />
             </View>
-            <Text style={[styles.gridText, { color: '#16A34A' }]} numberOfLines={1}>Kosakata</Text>
+            <Text style={[styles.gridText, { color: '#16A34A' }]} numberOfLines={1}>{t('home.vocabulary')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.gridItem}>
             <View style={[styles.gridIconBox, { backgroundColor: '#FFEDD5' }]}>
               <FontAwesome5 name="sun" size={20} color="#EA580C" />
             </View>
-            <Text style={[styles.gridText, { color: '#EA580C' }]} numberOfLines={1}>Rutinitas</Text>
+            <Text style={[styles.gridText, { color: '#EA580C' }]} numberOfLines={1}>{t('home.routines')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.gridItem} onPress={() => navigation.navigate('VoiceSettings')}>
             <View style={[styles.gridIconBox, { backgroundColor: '#F3E8FF' }]}>
               <FontAwesome5 name="volume-up" size={20} color="#9333EA" />
             </View>
-            <Text style={[styles.gridText, { color: '#9333EA' }]} numberOfLines={1}>Suara</Text>
+            <Text style={[styles.gridText, { color: '#9333EA' }]} numberOfLines={1}>{t('home.voice')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.gridItem} onPress={() => navigation.navigate('AppearanceSettings')}>
             <View style={[styles.gridIconBox, { backgroundColor: '#EEF2FF' }]}>
               <FontAwesome5 name="palette" size={20} color="#4F46E5" />
             </View>
-            <Text style={[styles.gridText, { color: '#4F46E5' }]} numberOfLines={1}>Tampilan</Text>
+            <Text style={[styles.gridText, { color: '#4F46E5' }]} numberOfLines={1}>{t('home.appearance')}</Text>
           </TouchableOpacity>
 
         </View>
@@ -319,20 +323,20 @@ export default function ParentHomeScreen() {
       <View style={[styles.card, { padding: 0, overflow: 'hidden' }]}>
         <View style={{ padding: 16 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <Text style={styles.widgetTitle}>Aktivitas</Text>
+            <Text style={styles.widgetTitle}>{t('home.activity')}</Text>
             <FontAwesome5 name="ellipsis-h" size={16} color="#94A3B8" />
           </View>
 
           {/* Activity Tabs */}
           <View style={styles.activityTabsRow}>
-            {TABS.map((tab) => (
+            {ACTIVITY_TABS.map((tab) => (
               <TouchableOpacity 
-                key={tab}
-                style={[styles.activityTab, activeTab === tab && styles.activityTabActive]}
-                onPress={() => setActiveTab(tab)}
+                key={tab.id}
+                style={[styles.activityTab, activeTab === tab.id && styles.activityTabActive]}
+                onPress={() => setActiveTab(tab.id)}
               >
-                <Text style={[styles.activityTabText, activeTab === tab && styles.activityTabTextActive]}>
-                  {tab}
+                <Text style={[styles.activityTabText, activeTab === tab.id && styles.activityTabTextActive]}>
+                  {t(tab.labelKey)}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -346,7 +350,7 @@ export default function ParentHomeScreen() {
               </View>
               <View>
                 <Text style={styles.statValue}>{todayMessageCount}</Text>
-                <Text style={styles.statLabel}>Pesan disampaikan</Text>
+                <Text style={styles.statLabel}>{t('home.statMessages')}</Text>
               </View>
             </View>
 
@@ -356,7 +360,7 @@ export default function ParentHomeScreen() {
               </View>
               <View>
                 <Text style={styles.statValue}>{todayUniqueWords}</Text>
-                <Text style={styles.statLabel}>Kata berbeda</Text>
+                <Text style={styles.statLabel}>{t('home.statUniqueWords')}</Text>
               </View>
             </View>
 
@@ -366,7 +370,7 @@ export default function ParentHomeScreen() {
               </View>
               <View>
                 <Text style={styles.statValue}>0</Text>
-                <Text style={styles.statLabel}>Permintaan</Text>
+                <Text style={styles.statLabel}>{t('home.statRequests')}</Text>
               </View>
             </View>
 
@@ -376,13 +380,13 @@ export default function ParentHomeScreen() {
               </View>
               <View>
                 <Text style={styles.statValue}>0</Text>
-                <Text style={styles.statLabel}>Respons sosial</Text>
+                <Text style={styles.statLabel}>{t('home.statSocialResponses')}</Text>
               </View>
             </View>
           </View>
 
           <Text style={[styles.widgetTitle, { fontSize: 14, marginTop: 24, marginBottom: 16 }]}>
-            Aktivitas Komunikasi
+            {t('home.commActivity')}
           </Text>
 
           {/* Custom Flexbox Bar Chart */}
@@ -420,7 +424,7 @@ export default function ParentHomeScreen() {
           {/* Chart Legend */}
           <View style={styles.chartLegend}>
             <View style={[styles.legendDot, { backgroundColor: '#3B82F6' }]} />
-            <Text style={styles.legendText}>Rendah</Text>
+            <Text style={styles.legendText}>{t('home.legendLow')}</Text>
             
             <View style={styles.legendDotsRow}>
               <View style={[styles.legendDotSmall, { backgroundColor: '#34D399' }]} />
@@ -430,7 +434,7 @@ export default function ParentHomeScreen() {
             </View>
 
             <View style={[styles.legendDot, { backgroundColor: '#9333EA', marginLeft: 8 }]} />
-            <Text style={styles.legendText}>Tinggi</Text>
+            <Text style={styles.legendText}>{t('home.legendHigh')}</Text>
           </View>
         </View>
       </View>

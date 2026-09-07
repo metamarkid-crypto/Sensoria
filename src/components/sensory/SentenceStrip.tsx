@@ -1,11 +1,13 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, LayoutAnimation, UIManager, Platform, Image } from 'react-native';
-import { useAACStore } from '../../store/useAACStore';
+import { useAACStore, resolveWordText } from '../../store/useAACStore';
 import * as Haptics from 'expo-haptics';
 import { playTTS } from '../../services/ai/audioManager';
+import { useTranslation } from '../../i18n';
 import { getLocalImage } from '../../assets/imageMap';
 
 export default function SentenceStrip() {
+  const { t } = useTranslation();
   const { currentSentence, removeFromSentence, language, childProfile } = useAACStore();
 
   useEffect(() => {
@@ -25,11 +27,11 @@ export default function SentenceStrip() {
   return (
     <View style={styles.container}>
       {currentSentence.length === 0 ? (
-        <Text style={styles.placeholderText}>Ketuk kartu di bawah untuk menyusun kalimat...</Text>
+        <Text style={styles.placeholderText}>{t('aac.sentencePlaceholder')}</Text>
       ) : (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
           {currentSentence.map((item, index) => {
-            const wordText = language === 'id' ? item.word_id : item.word_zh;
+            const wordText = resolveWordText(item, language);
             
             let imageSource = null;
             if (item.isCustom) {

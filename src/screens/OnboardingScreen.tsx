@@ -6,8 +6,10 @@ import * as Haptics from 'expo-haptics';
 import Toast from 'react-native-toast-message';
 import { useAACStore } from '../store/useAACStore';
 import { supabase } from '../services/db/supabase';
+import { useTranslation } from '../i18n';
 
 export default function OnboardingScreen({ navigation }: any) {
+  const { t } = useTranslation();
   const [fullName, setFullName] = useState('');
   const [nickname, setNickname] = useState('');
   const [gender, setGender] = useState<'boy' | 'girl' | null>(null);
@@ -17,7 +19,7 @@ export default function OnboardingScreen({ navigation }: any) {
 
   const handleSave = async () => {
     if (!fullName.trim() || !nickname.trim() || !gender) {
-      Toast.show({ type: 'error', text1: 'Data Belum Lengkap', text2: 'Silakan isi nama, panggilan, dan pilih gender anak Anda.' });
+      Toast.show({ type: 'error', text1: t('onboarding.toastIncomplete'), text2: t('onboarding.toastIncompleteDesc') });
       return;
     }
 
@@ -45,7 +47,7 @@ export default function OnboardingScreen({ navigation }: any) {
       navigation.replace('ChildAAC');
     } catch (error) {
       console.error('Error saving profile:', error);
-      Toast.show({ type: 'error', text1: 'Gagal', text2: 'Terjadi kesalahan saat menyimpan profil.' });
+      Toast.show({ type: 'error', text1: t('common.failed'), text2: t('onboarding.toastFailedDesc') });
     } finally {
       setIsSubmitting(false);
     }
@@ -61,14 +63,14 @@ export default function OnboardingScreen({ navigation }: any) {
         style={styles.container}
       >
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          <Text style={styles.title}>Kenalan Dulu Yuk! 🎈</Text>
-          <Text style={styles.subtitle}>Masukkan nama buah hati Anda agar Sensoria bisa menyapanya setiap hari.</Text>
+          <Text style={styles.title}>{t('onboarding.title')}</Text>
+          <Text style={styles.subtitle}>{t('onboarding.subtitle')}</Text>
 
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Nama Lengkap</Text>
+            <Text style={styles.label}>{t('onboarding.fullName')}</Text>
             <TextInput
               style={styles.input}
-              placeholder="Contoh: Budi Santoso"
+              placeholder={t('onboarding.fullNamePlaceholder')}
               value={fullName}
               onChangeText={setFullName}
               placeholderTextColor="#999"
@@ -76,10 +78,10 @@ export default function OnboardingScreen({ navigation }: any) {
           </View>
 
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Nama Panggilan</Text>
+            <Text style={styles.label}>{t('onboarding.nickname')}</Text>
             <TextInput
               style={styles.input}
-              placeholder="Contoh: Budi"
+              placeholder={t('onboarding.nicknamePlaceholder')}
               value={nickname}
               onChangeText={setNickname}
               placeholderTextColor="#999"
@@ -87,14 +89,14 @@ export default function OnboardingScreen({ navigation }: any) {
           </View>
 
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Jenis Kelamin Anak</Text>
+            <Text style={styles.label}>{t('onboarding.gender')}</Text>
             <View style={styles.genderRow}>
               <TouchableOpacity 
                 style={[styles.genderBtn, gender === 'boy' && styles.genderBtnActive]} 
                 onPress={() => setGender('boy')}
               >
                 <Text style={styles.genderEmoji}>👦🏻</Text>
-                <Text style={[styles.genderText, gender === 'boy' && styles.genderTextActive]}>Laki-laki</Text>
+                <Text style={[styles.genderText, gender === 'boy' && styles.genderTextActive]}>{t('profile.boy')}</Text>
               </TouchableOpacity>
               
               <TouchableOpacity 
@@ -102,7 +104,7 @@ export default function OnboardingScreen({ navigation }: any) {
                 onPress={() => setGender('girl')}
               >
                 <Text style={styles.genderEmoji}>👧🏻</Text>
-                <Text style={[styles.genderText, gender === 'girl' && styles.genderTextActive]}>Perempuan</Text>
+                <Text style={[styles.genderText, gender === 'girl' && styles.genderTextActive]}>{t('profile.girl')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -112,7 +114,7 @@ export default function OnboardingScreen({ navigation }: any) {
             onPress={handleSave}
             disabled={isSubmitting || !fullName || !nickname || !gender}
           >
-            <Text style={styles.buttonText}>Mulai Petualangan! 🚀</Text>
+            <Text style={styles.buttonText}>{t('onboarding.startButton')}</Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
