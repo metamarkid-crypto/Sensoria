@@ -10,8 +10,10 @@ import { ensureTrialSubscription } from '../services/db/subscriptions';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import Toast from 'react-native-toast-message';
+import { LANGUAGES, useTranslation } from '../i18n';
 
 export default function RoleSelectionScreen() {
+  const { t, language: currentLanguage, setLanguage } = useTranslation();
   const setRole = useAACStore((state) => state.setRole);
   const deviceId = useAACStore((state) => state.deviceId);
   const setDeviceId = useAACStore((state) => state.setDeviceId);
@@ -157,8 +159,6 @@ export default function RoleSelectionScreen() {
     }
   };
 
-  const setLanguage = useAACStore((state) => state.setLanguage);
-  const currentLanguage = useAACStore((state) => state.language);
   const [showLanguageModal, setShowLanguageModal] = useState(false);
 
   const handleLanguageSelect = (lang: 'id' | 'en' | 'zh') => {
@@ -179,9 +179,8 @@ export default function RoleSelectionScreen() {
           <View style={styles.headerSection}>
             <Image source={require('../../assets/sensoria.png')} style={styles.logo} resizeMode="contain" />
             <Text style={styles.descText}>
-              Aplikasi komunikasi AAC yang dapat disesuaikan{'\n'}
-              untuk pengguna <Text style={{color: '#00B5B8', fontWeight: 'bold'}}>Autism</Text>, pengguna dengan{'\n'}
-              <Text style={{color: '#FF2A7A', fontWeight: 'bold'}}>gangguan bicara & pendengaran</Text> serta pengguna <Text style={{color: '#9C27B0', fontWeight: 'bold'}}>nonverbal</Text>.
+              {t('role.descStart')}<Text style={{color: '#00B5B8', fontWeight: 'bold'}}>{t('role.descAutism')}</Text>{t('role.descMid')}
+              <Text style={{color: '#FF2A7A', fontWeight: 'bold'}}>{t('role.descSpeech')}</Text>{t('role.descEnd')}<Text style={{color: '#9C27B0', fontWeight: 'bold'}}>{t('role.descNonverbal')}</Text>{t('role.descDot')}
             </Text>
 
             <View style={styles.featuresBadge}>
@@ -189,32 +188,32 @@ export default function RoleSelectionScreen() {
                 <View style={[styles.featureIconBox, { backgroundColor: '#EBF4FF' }]}>
                   <FontAwesome5 name="smile" size={14} color="#2488FF" solid />
                 </View>
-                <Text style={styles.featureText}>Komunikasi{'\n'}Mudah</Text>
+                <Text style={styles.featureText}>{t('role.f1')}</Text>
               </View>
               <View style={styles.featureItem}>
                 <View style={[styles.featureIconBox, { backgroundColor: '#FFF0F5' }]}>
                   <FontAwesome5 name="heart" size={14} color="#FF2A7A" solid />
                 </View>
-                <Text style={styles.featureText}><Text style={{color: '#FF2A7A'}}>Interaktif</Text>{'\n'}& Menyenangkan</Text>
+                <Text style={styles.featureText}><Text style={{color: '#FF2A7A'}}>{t('role.f2a')}</Text>{t('role.f2b')}</Text>
               </View>
               <View style={styles.featureItem}>
                 <View style={[styles.featureIconBox, { backgroundColor: '#F0FDF4' }]}>
                   <FontAwesome5 name="brain" size={14} color="#4CAF50" solid />
                 </View>
-                <Text style={styles.featureText}><Text style={{color: '#4CAF50'}}>Cerdas</Text> &{'\n'}Adaptif</Text>
+                <Text style={styles.featureText}><Text style={{color: '#4CAF50'}}>{t('role.f3a')}</Text>{t('role.f3b')}</Text>
               </View>
               <View style={styles.featureItem}>
                 <View style={[styles.featureIconBox, { backgroundColor: '#F5F3FF' }]}>
                   <FontAwesome5 name="users" size={14} color="#9C27B0" solid />
                 </View>
-                <Text style={styles.featureText}>Untuk Semua,{'\n'}Setiap Suara Berarti</Text>
+                <Text style={styles.featureText}>{t('role.f4')}</Text>
               </View>
             </View>
           </View>
 
           <View style={styles.titleSection}>
-            <Text style={styles.titleText}>Pilih peran Anda</Text>
-            <Text style={styles.subtitleText}>untuk melanjutkan</Text>
+            <Text style={styles.titleText}>{t('role.title')}</Text>
+            <Text style={styles.subtitleText}>{t('role.subtitle')}</Text>
           </View>
 
           <View style={styles.buttonSection}>
@@ -243,8 +242,8 @@ export default function RoleSelectionScreen() {
                 <FontAwesome5 name="sync-alt" size={20} color="#FFF" />
               </View>
               <View style={styles.recoveryTextBox}>
-                <Text style={styles.recoveryTitleText}>Pulihkan Profil Anak Lama</Text>
-                <Text style={styles.recoveryDescText}>Lanjutkan dengan memulihkan data yang{'\n'}sebelumnya sudah dibuat.</Text>
+                <Text style={styles.recoveryTitleText}>{t('role.recoverTitle')}</Text>
+                <Text style={styles.recoveryDescText}>{t('role.recoverDesc')}</Text>
               </View>
             </TouchableOpacity>
           </View>
@@ -254,31 +253,22 @@ export default function RoleSelectionScreen() {
       <Modal visible={showLanguageModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.languageContainer}>
-            <Text style={styles.languageTitle}>Pilih Bahasa Aplikasi</Text>
-            
-            <TouchableOpacity 
-              style={[styles.langBtn, currentLanguage === 'id' && styles.langBtnActive]} 
-              onPress={() => handleLanguageSelect('id')}
-            >
-              <Text style={[styles.langBtnText, currentLanguage === 'id' && styles.langBtnTextActive]}>🇮🇩 Indonesia</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.langBtn, currentLanguage === 'en' && styles.langBtnActive]} 
-              onPress={() => handleLanguageSelect('en')}
-            >
-              <Text style={[styles.langBtnText, currentLanguage === 'en' && styles.langBtnTextActive]}>🇬🇧 English</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.langBtn, currentLanguage === 'zh' && styles.langBtnActive]} 
-              onPress={() => handleLanguageSelect('zh')}
-            >
-              <Text style={[styles.langBtnText, currentLanguage === 'zh' && styles.langBtnTextActive]}>🇨🇳 Mandarin (中文)</Text>
-            </TouchableOpacity>
+            <Text style={styles.languageTitle}>{t('role.languageTitle')}</Text>
+
+            {LANGUAGES.map((lang) => (
+              <TouchableOpacity
+                key={lang.code}
+                style={[styles.langBtn, currentLanguage === lang.code && styles.langBtnActive]}
+                onPress={() => handleLanguageSelect(lang.code)}
+              >
+                <Text style={[styles.langBtnText, currentLanguage === lang.code && styles.langBtnTextActive]}>
+                  {lang.flag} {lang.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
 
             <TouchableOpacity style={styles.languageCancel} onPress={() => setShowLanguageModal(false)}>
-              <Text style={styles.languageCancelText}>Batal</Text>
+              <Text style={styles.languageCancelText}>{t('common.cancel')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -290,11 +280,11 @@ export default function RoleSelectionScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
         >
           <View style={styles.recoveryContainer}>
-            <Text style={styles.recoveryTitle}>Pulihkan Profil Anak</Text>
-            <Text style={styles.recoveryDesc}>Masukkan 6-digit Family Pairing Code dari perangkat sebelumnya untuk memulihkan profil.</Text>
+            <Text style={styles.recoveryTitle}>{t('role.recoveryTitle')}</Text>
+            <Text style={styles.recoveryDesc}>{t('role.recoveryDesc')}</Text>
             <TextInput 
               style={styles.pairingInput}
-              placeholder="Contoh: 123456"
+              placeholder={t('role.recoveryPlaceholder')}
               value={recoveryCode}
               onChangeText={setRecoveryCode}
               keyboardType="number-pad"
@@ -302,10 +292,10 @@ export default function RoleSelectionScreen() {
               autoFocus={true}
             />
             <TouchableOpacity style={styles.recoverySubmit} onPress={handleRecoverProfile} disabled={isRecovering}>
-              {isRecovering ? <ActivityIndicator color="#FFF" /> : <Text style={styles.recoverySubmitText}>Pulihkan</Text>}
+              {isRecovering ? <ActivityIndicator color="#FFF" /> : <Text style={styles.recoverySubmitText}>{t('role.recoverySubmit')}</Text>}
             </TouchableOpacity>
             <TouchableOpacity style={styles.recoveryCancel} onPress={() => setShowRecovery(false)} disabled={isRecovering}>
-              <Text style={styles.recoveryCancelText}>Batal</Text>
+              <Text style={styles.recoveryCancelText}>{t('common.cancel')}</Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>

@@ -10,6 +10,7 @@ import { supabase } from '../services/db/supabase';
 import { useAACStore } from '../store/useAACStore';
 import { playTTS } from '../services/ai/audioManager';
 import * as Haptics from 'expo-haptics';
+import { useTranslation } from '../i18n';
 
 import ParentHomeScreen from './parent/ParentHomeScreen';
 import ParentMessagesScreen from './parent/ParentMessagesScreen';
@@ -20,6 +21,7 @@ import DynamicGlobalHeader from '../components/parent/DynamicGlobalHeader';
 const Tab = createBottomTabNavigator();
 
 export default function ParentDashboardScreen() {
+  const { t } = useTranslation();
   const { pairingCode, language, deviceId, setChildStatus } = useAACStore();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
@@ -95,12 +97,12 @@ export default function ParentDashboardScreen() {
         const diffMins = Math.floor((new Date().getTime() - lastActive.getTime()) / 60000);
         
         let isOnline = false;
-        let lastSeenStr = 'Sekarang';
+        let lastSeenStr = t('header.now');
         
         if (diffMins < 5) {
           isOnline = true;
         } else {
-          lastSeenStr = `${diffMins} menit lalu`;
+          lastSeenStr = t('header.minutesAgo', { n: diffMins });
         }
         
         setChildStatus({ isOnline, lastSeen: lastSeenStr, lat, lng, lastAddress });
@@ -197,11 +199,11 @@ export default function ParentDashboardScreen() {
           }
         })}
       >
-        <Tab.Screen name="Beranda" component={ParentHomeScreen} />
-        <Tab.Screen name="Pesan" component={ParentMessagesScreen} />
+        <Tab.Screen name="Beranda" component={ParentHomeScreen} options={{ tabBarLabel: t('tabs.home') }} />
+        <Tab.Screen name="Pesan" component={ParentMessagesScreen} options={{ tabBarLabel: t('tabs.messages') }} />
         {/* Lokasi renders its own curved gradient header (Roadmap #3 UI) */}
-        <Tab.Screen name="Lokasi" component={ParentLocationScreen} options={{ headerShown: false }} />
-        <Tab.Screen name="Atur" component={ParentSettingsListScreen} />
+        <Tab.Screen name="Lokasi" component={ParentLocationScreen} options={{ headerShown: false, tabBarLabel: t('tabs.location') }} />
+        <Tab.Screen name="Atur" component={ParentSettingsListScreen} options={{ tabBarLabel: t('tabs.settings') }} />
       </Tab.Navigator>
     </View>
   );
@@ -226,6 +228,7 @@ function ParentStrictLock({
   onRetry: () => void;
   onExtend: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <View style={lockStyles.screen}>
       <View style={lockStyles.card}>
@@ -233,35 +236,34 @@ function ParentStrictLock({
           <FontAwesome5 name="lock" size={30} color="#FFF" solid />
         </View>
         <Text style={lockStyles.title}>
-          {offline ? 'Koneksi Terputus' : 'Langganan Berakhir'}
+          {offline ? t('lock.offlineTitle') : t('lock.expiredTitle')}
         </Text>
         {offline ? (
           <Text style={lockStyles.message}>
-            Sesi Anda telah berakhir, silakan hubungkan internet untuk perpanjangan.
+            {t('lock.offlineMsg')}
           </Text>
         ) : (
           <Text style={lockStyles.message}>
-            Akses Pantau Anak Anda telah berakhir. Perpanjang langganan untuk
-            melanjutkan memantau lokasi, pesan, dan zona aman anak.
+            {t('lock.expiredMsg')}
           </Text>
         )}
 
         {offline ? (
           <TouchableOpacity style={lockStyles.primaryBtn} onPress={onRetry}>
             <FontAwesome5 name="sync" size={15} color="#FFF" solid />
-            <Text style={lockStyles.primaryBtnText}>Coba Lagi</Text>
+            <Text style={lockStyles.primaryBtnText}>{t('lock.retry')}</Text>
           </TouchableOpacity>
         ) : (
           <>
             <TouchableOpacity style={lockStyles.primaryBtn} onPress={onExtend}>
               <FontAwesome5 name="crown" size={15} color="#FFF" solid />
-              <Text style={lockStyles.primaryBtnText}>Perpanjang Langganan</Text>
+              <Text style={lockStyles.primaryBtnText}>{t('lock.extend')}</Text>
             </TouchableOpacity>
             <Text style={lockStyles.hint}>
-              Masih dalam masa aktif? Ketuk “Coba Lagi” untuk memeriksa ulang.
+              {t('lock.hint')}
             </Text>
             <TouchableOpacity onPress={onRetry} style={lockStyles.retryLink}>
-              <Text style={lockStyles.retryLinkText}>Coba Lagi</Text>
+              <Text style={lockStyles.retryLinkText}>{t('lock.retry')}</Text>
             </TouchableOpacity>
           </>
         )}

@@ -3,26 +3,34 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { FontAwesome5 } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import PairingBottomSheet from '../../components/PairingBottomSheet';
+import LanguagePickerModal from '../../components/i18n/LanguagePickerModal';
 import { useAACStore } from '../../store/useAACStore';
 import { formatDate } from '../../utils/format';
+import { useTranslation } from '../../i18n';
+import type { TranslationKey } from '../../i18n';
 
 type FontAwesomeIconName = React.ComponentProps<typeof FontAwesome5>['name'];
 
 interface SettingsItem {
   id: string;
-  title: string;
+  /** Translation key — resolved through the global i18n store. */
+  titleKey: TranslationKey;
   subtitle?: string;
   icon: FontAwesomeIconName;
   iconColor: string;
   iconBg: string;
   route?: string;
+  /** Custom tap handler (e.g. opening a modal) before route navigation. */
+  onPress?: () => void;
   /** Review-mode placeholder row: rendered but never navigates. */
   disabled?: boolean;
 }
 
 export default function ParentSettingsListScreen() {
   const navigation = useNavigation<any>();
+  const { t, language } = useTranslation();
   const [showPairing, setShowPairing] = useState(false);
+  const [showLanguage, setShowLanguage] = useState(false);
 
   // ── Stealth kill-switch (App Review mandate) ───────────────────────────────
   // Reads the SHARED store flag, refreshed by the app lifecycle on boot and
@@ -37,13 +45,13 @@ export default function ParentSettingsListScreen() {
   // Optional status subtitle (live mode only — never surfaces in review).
   const subscriptionSubtitle = liveMode
     ? premium.status === 'trial' && premium.isPremium
-      ? `Masa Coba Gratis · aktif sampai ${formatDate(premium.trialEndsAt)}`
+      ? t('settings.trialUntil', { date: formatDate(premium.trialEndsAt) })
       : premium.status === 'active' && premium.isPremium
-        ? `Aktif sampai ${formatDate(premium.expiresAt)}`
+        ? t('settings.activeUntil', { date: formatDate(premium.expiresAt) })
         : premium.loaded
-          ? 'Langganan belum aktif'
-          : 'Lihat paket langganan'
-    : 'Segera Hadir';
+          ? t('settings.notActive')
+          : t('settings.seePlans')
+    : t('settings.soonComing');
 
   // Live mode → tappable row that opens the Paywall (which independently
   // re-verifies the kill-switch before ever showing pricing).
@@ -51,7 +59,7 @@ export default function ParentSettingsListScreen() {
   const subscriptionItem: SettingsItem = liveMode
     ? {
         id: 'premium',
-        title: 'Status Langganan',
+        titleKey: 'settings.subscription',
         subtitle: subscriptionSubtitle,
         icon: 'crown',
         iconColor: '#D97706',
@@ -60,7 +68,7 @@ export default function ParentSettingsListScreen() {
       }
     : {
         id: 'premium',
-        title: 'Premium',
+        titleKey: 'settings.premium',
         subtitle: subscriptionSubtitle,
         icon: 'lock',
         iconColor: '#94A3B8',
@@ -68,20 +76,26 @@ export default function ParentSettingsListScreen() {
         disabled: true,
       };
 
+  // Current language label for the row subtitle (e.g. "Indonesia").
+  const languageLabel =
+    language === 'id' ? t('aac.langNameId') : language === 'en' ? t('aac.langNameEn') : t('aac.langNameZh');
+
   // Hierarchy: billing sits LOW in the list — directly above "Tentang Sensoria
   // AAC" and slightly separated from the functional settings — so an
   // accessibility/medical app never opens on a sales pitch.
   const mainSettingsItems: SettingsItem[] = [
-    { id: '1', title: 'Profil Pengguna', icon: 'user', iconColor: '#11427B', iconBg: '#F0F9FF', route: 'UserProfile' },
-    { id: '2', title: 'Suara & Bicara', icon: 'volume-up', iconColor: '#11427B', iconBg: '#F0F9FF', route: 'VoiceSettings' },
-    { id: '3', title: 'Tampilan', icon: 'palette', iconColor: '#11427B', iconBg: '#F0F9FF', route: 'AppearanceSettings' },
-    { id: '4', title: 'Aksesibilitas', icon: 'universal-access', iconColor: '#11427B', iconBg: '#F0F9FF', route: 'AccessibilitySettings' },
-    { id: '5', title: 'Koneksi & Perangkat', icon: 'link', iconColor: '#11427B', iconBg: '#F0F9FF', route: 'ConnectionModal' },
+    { id: '1', titleKey: 'settings.profile', icon: 'user', iconColor: '#11427B', iconBg: '#F0F9FF', route: 'UserProfile' },
+    { id: '2', titleKey: 'settings.voice', icon: 'volume-up', iconColor: '#11427B', iconBg: '#F0F9FF', route: 'VoiceSettings' },
+    { id: '3', titleKey: 'settings.appearance', icon: 'palette', iconColor: '#11427B', iconBg: '#F0F9FF', route: 'AppearanceSettings' },
+    // Language sits right under Appearance — a global preference, not billing.
+    { id: 'lang', titleKey: 'settings.language', subtitle: languageLabel, icon: 'globe', iconColor: '#11427B', iconBg: '#F0F9FF', onPress: () => setShowLanguage(true) },
+    { id: '4', titleKey: 'settings.accessibility', icon: 'universal-access', iconColor: '#11427B', iconBg: '#F0F9FF', route: 'AccessibilitySettings' },
+    { id: '5', titleKey: 'settings.connection', icon: 'link', iconColor: '#11427B', iconBg: '#F0F9FF', route: 'ConnectionModal' },
   ];
 
   const aboutItem: SettingsItem = {
     id: '6',
-    title: 'Tentang Sensoria AAC',
+    titleKey: 'settings.about',
     icon: 'info-circle',
     iconColor: '#11427B',
     iconBg: '#F0F9FF',
@@ -89,7 +103,12 @@ export default function ParentSettingsListScreen() {
   };
 
   const handlePress = (item: SettingsItem) => {
-    if (item.disabled || !item.route) return;
+    if (item.disabled) return;
+    if (item.onPress) {
+      item.onPress();
+      return;
+    }
+    if (!item.route) return;
     if (item.route === 'ConnectionModal') {
       setShowPairing(true);
     } else {
@@ -110,7 +129,7 @@ export default function ParentSettingsListScreen() {
           <FontAwesome5 name={item.icon} size={16} color={item.iconColor} />
         </View>
         <View style={styles.itemText}>
-          <Text style={[styles.itemTitle, item.disabled && styles.itemTitleDisabled]}>{item.title}</Text>
+          <Text style={[styles.itemTitle, item.disabled && styles.itemTitleDisabled]}>{t(item.titleKey)}</Text>
           {item.subtitle ? (
             <Text style={styles.itemSubtitle} numberOfLines={1}>{item.subtitle}</Text>
           ) : null}
@@ -118,7 +137,7 @@ export default function ParentSettingsListScreen() {
       </View>
       {item.disabled ? (
         <View style={styles.soonBadge}>
-          <Text style={styles.soonBadgeText}>Segera</Text>
+          <Text style={styles.soonBadgeText}>{t('settings.soonBadge')}</Text>
         </View>
       ) : (
         <FontAwesome5 name="chevron-right" size={14} color="#CBD5E1" />
@@ -150,6 +169,9 @@ export default function ParentSettingsListScreen() {
         isVisible={showPairing} 
         onClose={() => setShowPairing(false)} 
       />
+
+      {/* Global trilingual language picker */}
+      <LanguagePickerModal visible={showLanguage} onClose={() => setShowLanguage(false)} />
     </View>
   );
 }

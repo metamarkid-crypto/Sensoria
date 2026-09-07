@@ -19,6 +19,7 @@ import {
 } from '../services/db/paywall';
 import { computeRenewalPreview } from '../services/db/entitlement';
 import { useAccessibleAction } from '../hooks/useAccessibleAction';
+import { useTranslation } from '../i18n';
 import type { SubscriptionPlanRow } from '../services/db/types';
 
 /**
@@ -44,17 +45,11 @@ const MONTHS_ID = [
 ];
 
 const PERKS = [
-  { icon: 'map-marked-alt', text: 'Pantau lokasi anak & zona aman (Geofencing)' },
-  { icon: 'comments', text: 'Pesan & riwayat komunikasi tanpa batas' },
-  { icon: 'microphone-alt', text: 'Semua pilihan suara premium untuk AAC' },
-  { icon: 'shield-alt', text: 'Satu langganan untuk 1 Anak + Orang Tua (Combo)' },
-];
-
-const DURATION_LABEL: Record<number, string> = {
-  1: '1 Bulan',
-  6: '6 Bulan',
-  12: '12 Bulan',
-};
+  { icon: 'map-marked-alt', textKey: 'paywall.perk1' },
+  { icon: 'comments', textKey: 'paywall.perk2' },
+  { icon: 'microphone-alt', textKey: 'paywall.perk3' },
+  { icon: 'shield-alt', textKey: 'paywall.perk4' },
+] as const;
 
 /** Rp 1.234.567 — Indonesian thousands separator, no Intl dependency. */
 const formatRupiah = (value: number) =>
@@ -69,6 +64,7 @@ const formatDate = (iso: string | null): string => {
 
 export default function PaywallScreen() {
   const navigation = useNavigation<any>();
+  const { t } = useTranslation();
   const deviceId = useAACStore((s) => s.deviceId);
   const premium = useAACStore((s) => s.premium);
   const refreshEntitlement = useAACStore((s) => s.refreshEntitlement);
@@ -116,7 +112,7 @@ export default function PaywallScreen() {
 
   const handleSelectPlan = async (plan: SubscriptionPlanRow) => {
     if (!deviceId) {
-      Toast.show({ type: 'error', text1: 'Gagal', text2: 'Akun belum selesai disiapkan.', position: 'top' });
+      Toast.show({ type: 'error', text1: t('common.failed'), text2: t('paywall.toastAccountNotReady'), position: 'top' });
       return;
     }
     setSelectedPlan(plan);
@@ -132,8 +128,8 @@ export default function PaywallScreen() {
       setStage('idle');
       Toast.show({
         type: 'error',
-        text1: 'Checkout Gagal',
-        text2: e instanceof Error ? e.message : 'Silakan coba lagi.',
+        text1: t('paywall.toastCheckoutFailed'),
+        text2: e instanceof Error ? e.message : t('paywall.toastTryAgain'),
         position: 'top',
       });
     }
@@ -147,7 +143,7 @@ export default function PaywallScreen() {
     const isPremiumNow = useAACStore.getState().premium.isPremium;
 
     if (isPremiumNow) {
-      Toast.show({ type: 'success', text1: 'Pembayaran Berhasil 🎉', text2: 'Premium Anda sekarang aktif.', position: 'top' });
+      Toast.show({ type: 'success', text1: t('paywall.toastPaid'), text2: t('paywall.toastPaidDesc'), position: 'top' });
       // Small pause so the toast renders before the modal dismisses.
       setTimeout(goBack, 900);
     } else {
@@ -155,8 +151,8 @@ export default function PaywallScreen() {
       setVerifyPending(true);
       Toast.show({
         type: 'info',
-        text1: 'Belum Terverifikasi',
-        text2: 'Jika pembayaran sudah selesai, tunggu sebentar lalu periksa lagi.',
+        text1: t('paywall.toastNotVerified'),
+        text2: t('paywall.toastNotVerifiedDesc'),
         position: 'top',
       });
     }
@@ -183,7 +179,7 @@ export default function PaywallScreen() {
     <View style={styles.header}>
       <View style={{ flex: 1 }}>
         <Text style={styles.headerTitle}>Sensoria Premium</Text>
-        <Text style={styles.headerSubtitle}>Akses penuh untuk keluarga Anda</Text>
+        <Text style={styles.headerSubtitle}>{t('paywall.headerSubtitle')}</Text>
       </View>
       <TouchableOpacity style={styles.closeBtn} onPress={goBack} disabled={busy}>
         <FontAwesome5 name="times" size={18} color="#64748B" />
@@ -194,11 +190,11 @@ export default function PaywallScreen() {
   const renderPerks = () => (
     <View style={styles.perksCard}>
       {PERKS.map((perk) => (
-        <View key={perk.text} style={styles.perkRow}>
+        <View key={perk.textKey} style={styles.perkRow}>
           <View style={styles.perkIconBox}>
             <FontAwesome5 name={perk.icon} size={13} color="#00B5B8" solid />
           </View>
-          <Text style={styles.perkText}>{perk.text}</Text>
+          <Text style={styles.perkText}>{t(perk.textKey)}</Text>
         </View>
       ))}
     </View>
@@ -209,14 +205,14 @@ export default function PaywallScreen() {
       <View style={styles.successIcon}>
         <FontAwesome5 name="crown" size={34} color="#FFF" solid />
       </View>
-      <Text style={styles.successTitle}>Premium Aktif</Text>
+      <Text style={styles.successTitle}>{t('paywall.successTitle')}</Text>
       {premium.status === 'trial' ? (
         <Text style={styles.successDesc}>
-          Masa percobaan Anda aktif hingga {formatDate(premium.trialEndsAt)}.
+          {t('paywall.successTrial', { date: formatDate(premium.trialEndsAt) })}
         </Text>
       ) : (
         <Text style={styles.successDesc}>
-          Langganan aktif hingga {formatDate(premium.expiresAt)}.
+          {t('paywall.successActive', { date: formatDate(premium.expiresAt) })}
         </Text>
       )}
 
@@ -226,11 +222,11 @@ export default function PaywallScreen() {
         <View style={styles.stackingCard}>
           <FontAwesome5 name="layer-group" size={16} color="#D97706" solid />
           <View style={{ flex: 1 }}>
-            <Text style={styles.stackingTitle}>Masa aktif ditambahkan, tidak hangus</Text>
+            <Text style={styles.stackingTitle}>{t('paywall.stackTitle')}</Text>
             <Text style={styles.stackingText}>
               {renewalPreview.stacks
-                ? `Beli paket kapan pun — durasinya DITAMBAHKAN ke akhir masa aktif Anda. Contoh: Paket 1 Bulan dibeli sekarang berlaku hingga ${formatDate(renewalPreview.newExpiresAt)}.`
-                : 'Masa langganan Anda telah berakhir. Paket baru akan aktif segera setelah pembayaran terverifikasi.'}
+                ? t('paywall.stackText', { date: formatDate(renewalPreview.newExpiresAt) })
+                : t('paywall.expiredStackText')}
             </Text>
           </View>
         </View>
@@ -241,13 +237,13 @@ export default function PaywallScreen() {
         <TouchableOpacity style={styles.renewCta} onPress={openRenewalPlans} activeOpacity={0.85}>
           <FontAwesome5 name="crown" size={15} color="#FFF" solid />
           <Text style={styles.renewCtaText}>
-            {premium.status === 'active' ? 'Perpanjang Langganan' : 'Upgrade ke Premium'}
+            {premium.status === 'active' ? t('paywall.extend') : t('paywall.upgrade')}
           </Text>
         </TouchableOpacity>
       ) : null}
 
       <TouchableOpacity style={styles.primaryBtn} onPress={goBack}>
-        <Text style={styles.primaryBtnText}>Kembali</Text>
+        <Text style={styles.primaryBtnText}>{t('common.back')}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -257,17 +253,16 @@ export default function PaywallScreen() {
       <View style={styles.lockIcon}>
         <FontAwesome5 name="lock" size={26} color="#FFF" solid />
       </View>
-      <Text style={styles.reviewTitle}>Fitur Premium Segera Hadir</Text>
+      <Text style={styles.reviewTitle}>{t('paywall.reviewTitle')}</Text>
       <Text style={styles.reviewDesc}>
-        Kami sedang menyiapkan paket langganan terbaik untuk keluarga Anda.
-        Nantikan pembaruan berikutnya!
+        {t('paywall.reviewDesc')}
       </Text>
       {renderPerks()}
       <View style={styles.soonBadge}>
-        <Text style={styles.soonBadgeText}>🚀 Segera Hadir</Text>
+        <Text style={styles.soonBadgeText}>{t('paywall.soonBadge')}</Text>
       </View>
       <TouchableOpacity style={styles.secondaryBtn} onPress={goBack}>
-        <Text style={styles.secondaryBtnText}>Kembali</Text>
+        <Text style={styles.secondaryBtnText}>{t('common.back')}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -277,15 +272,15 @@ export default function PaywallScreen() {
       <View style={styles.comboNote}>
         <FontAwesome5 name="users" size={14} color="#11427B" solid />
         <Text style={styles.comboNoteText}>
-          1 langganan Combo mencakup 1 perangkat Anak + semua Orang Tua yang terhubung.
+          {t('paywall.comboNote')}
         </Text>
       </View>
 
       {plans.length === 0 ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyStateText}>Paket belum tersedia saat ini.</Text>
+          <Text style={styles.emptyStateText}>{t('paywall.emptyPlans')}</Text>
           <TouchableOpacity onPress={() => void load()}>
-            <Text style={styles.retryText}>Muat Ulang</Text>
+            <Text style={styles.retryText}>{t('paywall.reload')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -299,7 +294,7 @@ export default function PaywallScreen() {
           >
             <View style={styles.planInfo}>
               <View style={styles.planBadge}>
-                <Text style={styles.planBadgeText}>{DURATION_LABEL[plan.duration_months] ?? `${plan.duration_months} Bulan`}</Text>
+                <Text style={styles.planBadgeText}>{t('paywall.month', { n: plan.duration_months })}</Text>
               </View>
               <Text style={styles.planName}>{plan.name}</Text>
               {plan.description ? (
@@ -309,7 +304,7 @@ export default function PaywallScreen() {
             <View style={styles.planPriceBox}>
               <Text style={styles.planPrice}>{formatRupiah(plan.price)}</Text>
               <Text style={styles.planPerMonth}>
-                ≈ {formatRupiah(Math.round(plan.price / plan.duration_months))}/bln
+                {t('paywall.perMonth', { price: formatRupiah(Math.round(plan.price / plan.duration_months)) })}
               </Text>
             </View>
             <View style={styles.planCta}>
@@ -326,7 +321,7 @@ export default function PaywallScreen() {
       <View style={styles.qrCard}>
         <View style={styles.qrHeaderRow}>
           <FontAwesome5 name="qrcode" size={18} color="#11427B" solid />
-          <Text style={styles.qrTitle}>Scan untuk Membayar</Text>
+          <Text style={styles.qrTitle}>{t('paywall.scanToPay')}</Text>
         </View>
 
         <View style={styles.qrFrame}>
@@ -338,18 +333,18 @@ export default function PaywallScreen() {
         </View>
 
         <Text style={styles.qrInstruction}>
-          Buka aplikasi bank / e-wallet Anda, pilih <Text style={{ fontWeight: '800' }}>QRIS</Text>, lalu scan kode di atas untuk menyelesaikan pembayaran.
+          {t('paywall.qrInstructionPre')}<Text style={{ fontWeight: '800' }}>QRIS</Text>{t('paywall.qrInstructionPost')}
         </Text>
 
         {qrExpiresAt ? (
-          <Text style={styles.qrExpiry}>Berlaku hingga {formatDate(qrExpiresAt)}</Text>
+          <Text style={styles.qrExpiry}>{t('paywall.qrExpiry', { date: formatDate(qrExpiresAt) })}</Text>
         ) : null}
-        {orderId ? <Text style={styles.qrOrderId}>Order: {orderId}</Text> : null}
+        {orderId ? <Text style={styles.qrOrderId}>{t('paywall.qrOrder', { id: orderId })}</Text> : null}
       </View>
 
       {verifyPending ? (
         <Text style={styles.verifyHint}>
-          Pembayaran belum terverifikasi. Jika sudah transfer, periksa kembali dalam beberapa saat.
+          {t('paywall.verifyHint')}
         </Text>
       ) : null}
 
@@ -359,13 +354,13 @@ export default function PaywallScreen() {
         ) : (
           <>
             <FontAwesome5 name="check-circle" size={16} color="#FFF" solid />
-            <Text style={styles.primaryBtnText}>Saya Sudah Membayar — Verifikasi</Text>
+            <Text style={styles.primaryBtnText}>{t('paywall.payVerify')}</Text>
           </>
         )}
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.secondaryBtn} onPress={() => setStage('idle')} disabled={busy}>
-        <Text style={styles.secondaryBtnText}>Pilih Paket Lain</Text>
+        <Text style={styles.secondaryBtnText}>{t('paywall.chooseOther')}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -377,16 +372,16 @@ export default function PaywallScreen() {
     body = (
       <View style={styles.centerBox}>
         <ActivityIndicator size="large" color="#00B5B8" />
-        <Text style={styles.bootingText}>Memeriksa status premium…</Text>
+        <Text style={styles.bootingText}>{t('paywall.checking')}</Text>
       </View>
     );
   } else if (!deviceId) {
     body = (
       <View style={styles.centerBox}>
-        <Text style={styles.reviewTitle}>Akun Belum Siap</Text>
-        <Text style={styles.reviewDesc}>Selesaikan pengaturan perangkat terlebih dahulu.</Text>
+        <Text style={styles.reviewTitle}>{t('paywall.accountNotReadyTitle')}</Text>
+        <Text style={styles.reviewDesc}>{t('paywall.accountNotReadyDesc')}</Text>
         <TouchableOpacity style={styles.secondaryBtn} onPress={goBack}>
-          <Text style={styles.secondaryBtnText}>Kembali</Text>
+          <Text style={styles.secondaryBtnText}>{t('common.back')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -418,7 +413,7 @@ export default function PaywallScreen() {
           <View style={styles.overlayCard}>
             <ActivityIndicator size="large" color="#00B5B8" />
             <Text style={styles.overlayText}>
-              {stage === 'requesting' ? 'Menyiapkan pembayaran QRIS…' : 'Memverifikasi pembayaran…'}
+              {stage === 'requesting' ? t('paywall.requesting') : t('paywall.verifying')}
             </Text>
           </View>
         </View>

@@ -5,6 +5,7 @@ import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAACStore } from '../../store/useAACStore';
 import { supabase } from '../../services/db/supabase';
+import { useTranslation } from '../../i18n';
 
 const { width } = Dimensions.get('window');
 
@@ -14,10 +15,11 @@ interface HeaderProps {
 
 export default function DynamicGlobalHeader({ routeName }: HeaderProps) {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const { childProfile, childStatus } = useAACStore();
   const { isOnline, lastSeen } = childStatus;
 
-  const fullName = childProfile?.fullName || childProfile?.full_name || childProfile?.nickname || 'Belum ditautkan';
+  const fullName = childProfile?.fullName || childProfile?.full_name || childProfile?.nickname || t('header.childFallback');
   const avatarSource = childProfile?.gender === 'Girl' ? require('../../../assets/icon.png') : require('../../../assets/icon.png');
 
   // Height Shapeshifting logic
@@ -37,11 +39,11 @@ export default function DynamicGlobalHeader({ routeName }: HeaderProps) {
           <View style={styles.statusRow}>
             <View style={[styles.dot, { backgroundColor: isOnline ? '#34C759' : '#94A3B8' }]} />
             <Text style={[styles.statusText, { color: isOnline ? '#34C759' : '#94A3B8' }]}>
-              {isOnline ? 'Online' : 'Offline'}
+              {isOnline ? t('common.online') : t('common.offline')}
             </Text>
           </View>
           <Text style={styles.lastSeenText}>
-            Terakhir aktif: {isOnline ? 'Sekarang' : (lastSeen || 'Belum diketahui')}
+            {t('header.lastActive', { time: isOnline ? t('header.now') : (lastSeen || t('common.unknown')) })}
           </Text>
         </View>
       </View>
@@ -63,7 +65,7 @@ export default function DynamicGlobalHeader({ routeName }: HeaderProps) {
         <View style={styles.statusRow}>
           <View style={[styles.dot, { width: 6, height: 6, borderRadius: 3, backgroundColor: isOnline ? '#34C759' : '#94A3B8' }]} />
           <Text style={[styles.statusText, { fontSize: 11, color: isOnline ? '#34C759' : '#94A3B8' }]}>
-            {isOnline ? 'Online' : lastSeen ? `Aktif ${lastSeen} lalu` : 'Offline'}
+            {isOnline ? t('common.online') : lastSeen ? t('header.activeAgo', { time: lastSeen }) : t('common.offline')}
           </Text>
         </View>
       </View>
@@ -72,7 +74,7 @@ export default function DynamicGlobalHeader({ routeName }: HeaderProps) {
 
   const renderLocationContent = () => (
     <View style={styles.rowHeaderBetween}>
-      <Text style={styles.centerTitle}>Lokasi</Text>
+      <Text style={styles.centerTitle}>{t('header.locationTitle')}</Text>
       <TouchableOpacity style={styles.iconButton}>
         <Ionicons name="reload" size={22} color="#FFFFFF" />
       </TouchableOpacity>
@@ -81,7 +83,7 @@ export default function DynamicGlobalHeader({ routeName }: HeaderProps) {
 
   const renderSettingsContent = () => (
     <View style={styles.rowHeader}>
-      <Text style={styles.centerTitle}>Pengaturan</Text>
+      <Text style={styles.centerTitle}>{t('header.settingsTitle')}</Text>
     </View>
   );
 

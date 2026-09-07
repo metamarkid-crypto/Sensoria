@@ -9,8 +9,10 @@ import { supabase, sendAACMessage } from '../../services/db/supabase';
 import { useAACStore } from '../../store/useAACStore';
 import * as Haptics from 'expo-haptics';
 import { useAccessibleAction } from '../../hooks/useAccessibleAction';
+import { useTranslation } from '../../i18n';
 
 export default function ParentMessagesScreen() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { pairingCode, customQuickReplies, addCustomQuickReply, removeCustomQuickReply, localParentName, childProfile } = useAACStore();
   
@@ -217,7 +219,7 @@ export default function ParentMessagesScreen() {
               activeOpacity={0.7}
             >
               <Text style={styles.toggleText}>
-                {isInputVisible ? 'Tutup Papan Ketik' : 'Tulis Pesan Manual'}
+                {isInputVisible ? t('messages.hideKeyboard') : t('messages.writeManual')}
               </Text>
               <FontAwesome5 name={isInputVisible ? "chevron-down" : "chevron-up"} size={12} color="#94A3B8" />
             </TouchableOpacity>
@@ -228,7 +230,7 @@ export default function ParentMessagesScreen() {
             <View style={styles.inputRow}>
               <TextInput
                 style={styles.textInput}
-                placeholder="Ketik (Maks 20 huruf)..."
+                placeholder={t('messages.inputPlaceholder')}
                 placeholderTextColor="#94A3B8"
                 value={inputText}
                 onChangeText={setInputText}
@@ -251,10 +253,10 @@ export default function ParentMessagesScreen() {
         <Modal visible={isModalVisible} transparent animationType="fade">
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
             <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Balasan Favorit Baru</Text>
+              <Text style={styles.modalTitle}>{t('messages.customTitle')}</Text>
               <TextInput
                 style={styles.modalInput}
-                placeholder="Misal: Kakak sedang di jalan..."
+                placeholder={t('messages.customPlaceholder')}
                 value={newReplyText}
                 onChangeText={setNewReplyText}
                 maxLength={60}
@@ -262,10 +264,10 @@ export default function ParentMessagesScreen() {
               />
               <View style={styles.modalActions}>
                 <TouchableOpacity style={styles.modalBtnCancel} onPress={() => setModalVisible(false)}>
-                  <Text style={styles.modalBtnCancelText}>Batal</Text>
+                  <Text style={styles.modalBtnCancelText}>{t('common.cancel')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.modalBtnSave} onPress={handleSaveQuickReply}>
-                  <Text style={styles.modalBtnSaveText}>Simpan</Text>
+                  <Text style={styles.modalBtnSaveText}>{t('common.save')}</Text>
                 </TouchableOpacity>
               </View>
             </View>

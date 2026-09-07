@@ -10,9 +10,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Toast from 'react-native-toast-message';
 import * as Haptics from 'expo-haptics';
 import { useAccessibleAction } from '../../hooks/useAccessibleAction';
+import { useTranslation } from '../../i18n';
 
 export default function ParentHomeScreen() {
   const navigation = useNavigation<any>();
+  const { t } = useTranslation();
   const { pairingCode, language, deviceId, childProfile, localParentName } = useAACStore();
   
   const [recentMessage, setRecentMessage] = useState<any>(null);
@@ -143,11 +145,11 @@ export default function ParentHomeScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     await sendAACMessage(pairingCode, {
       sender: 'Parent',
-      senderName: localParentName || 'Orang Tua',
+      senderName: localParentName || t('home.parentFallback'),
       text: text,
       timestamp: Date.now()
     });
-    Toast.show({ type: 'success', text1: 'Terkirim', text2: `Balasan "${text}" telah dikirim.`, position: 'top' });
+    Toast.show({ type: 'success', text1: t('aac.toastSent'), text2: t('home.toastReplied', { text }), position: 'top' });
   };
 
   const handleReplayTTS = () => {
@@ -227,26 +229,26 @@ export default function ParentHomeScreen() {
                     style={{ width: 24, height: 24, borderRadius: 12, marginRight: 8, backgroundColor: '#E0F2FE' }} 
                   />
                   <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#3B82F6' }}>
-                    {childProfile?.nickname || 'Anak'}
+                    {childProfile?.nickname || t('aac.childFallback')}
                   </Text>
                 </View>
               </View>
             </View>
 
             <View style={styles.quickReplyRow}>
-              <TouchableOpacity style={styles.flexBtn} onPress={() => quickReplyFiltered('Oke')} activeOpacity={0.8}>
+              <TouchableOpacity style={styles.flexBtn} onPress={() => quickReplyFiltered(t('home.quickOke'))} activeOpacity={0.8}>
                 <LinearGradient colors={['#FF9800', '#F57C00']} style={styles.btnGradient}>
-                  <Text style={styles.btnText}>Oke</Text>
+                  <Text style={styles.btnText}>{t('home.quickOke')}</Text>
                 </LinearGradient>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.flexBtn} onPress={() => quickReplyFiltered('Ya')} activeOpacity={0.8}>
+              <TouchableOpacity style={styles.flexBtn} onPress={() => quickReplyFiltered(t('home.quickYa'))} activeOpacity={0.8}>
                 <LinearGradient colors={['#34D399', '#10B981']} style={styles.btnGradient}>
-                  <Text style={styles.btnText}>Ya</Text>
+                  <Text style={styles.btnText}>{t('home.quickYa')}</Text>
                 </LinearGradient>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.flexBtn} onPress={() => quickReplyFiltered('Tidak')} activeOpacity={0.8}>
+              <TouchableOpacity style={styles.flexBtn} onPress={() => quickReplyFiltered(t('home.quickNo'))} activeOpacity={0.8}>
                 <LinearGradient colors={['#F87171', '#EF4444']} style={styles.btnGradient}>
-                  <Text style={styles.btnText}>Tidak</Text>
+                  <Text style={styles.btnText}>{t('home.quickNo')}</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>

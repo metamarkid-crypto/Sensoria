@@ -17,6 +17,7 @@ import * as Location from 'expo-location';
 import * as Haptics from 'expo-haptics';
 import { playTTS, clearAudioCache } from '../services/ai/audioManager';
 import { useAccessibleAction } from '../hooks/useAccessibleAction';
+import { useTranslation } from '../i18n';
 import SettingsScreen from './SettingsScreen';
 import { supabase, sendAACMessage, subscribeToAACMessages, syncCustomWordToCloud } from '../services/db/supabase';
 import {
@@ -44,11 +45,11 @@ const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> =>
 // Category choices for a new custom card — ids mirror the Child tab bar so
 // a saved card lands in the right tab immediately.
 const AUTO_TAG_CATEGORIES = [
-  { id: 'pronoun', label: 'Orang', icon: 'user', color: '#FFB6C1' },
-  { id: 'verb', label: 'Aksi', icon: 'running', color: '#22C55E' },
-  { id: 'noun', label: 'Benda', icon: 'apple-alt', color: '#3B82F6' },
-  { id: 'emotion', label: 'Sifat', icon: 'smile', color: '#F59E0B' },
-  { id: 'social', label: 'Sosial', icon: 'hands-helping', color: '#8B5CF6' },
+  { id: 'pronoun', labelKey: 'aac.catPronoun', icon: 'user', color: '#FFB6C1' },
+  { id: 'verb', labelKey: 'aac.catVerb', icon: 'running', color: '#22C55E' },
+  { id: 'noun', labelKey: 'aac.catNoun', icon: 'apple-alt', color: '#3B82F6' },
+  { id: 'emotion', labelKey: 'aac.catEmotion', icon: 'smile', color: '#F59E0B' },
+  { id: 'social', labelKey: 'aac.catSocial', icon: 'hands-helping', color: '#8B5CF6' },
 ] as const;
 
 export default function ChildAACScreen() {
@@ -60,6 +61,7 @@ export default function ChildAACScreen() {
     cardSize, cardSpacing, speakOnTap,
     premium
   } = useAACStore();
+  const { t } = useTranslation();
 
   // ── Compassionate Child access ("Compassionate Child, Strict Parent") ──
   // Evaluated at render time from PERSISTED raw boundaries + Date.now(), so an
@@ -120,7 +122,7 @@ export default function ChildAACScreen() {
     else if (activeLang === 'en') setPendingEn(text);
     else setPendingZh(text);
   };
-  const activeLanguageLabel = activeLang === 'id' ? 'Indonesia' : activeLang === 'en' ? 'English' : 'Mandarin';
+  const activeLanguageLabel = activeLang === 'id' ? t('aac.langNameId') : activeLang === 'en' ? t('aac.langNameEn') : t('aac.langNameZh');
   const activeLanguagePlaceholder = activeLang === 'id' ? 'Bola' : activeLang === 'en' ? 'Ball' : '球';
   // What the AI proposed for the ACTIVE language (null = manual fallback).
   // Used to detect "user corrected the AI word" → siblings need re-translation.
@@ -133,7 +135,7 @@ export default function ChildAACScreen() {
     // Greet the child on first load!
     if (childProfile?.nickname) {
       setTimeout(() => {
-        playTTS(`Halo ${childProfile.nickname}!`, language, 'Child');
+        playTTS(t('aac.greeting', { name: childProfile.nickname }), language, 'Child');
       }, 1000);
     }
 
@@ -165,7 +167,7 @@ export default function ChildAACScreen() {
       if (payload.sender === 'Parent') {
         const senderName = payload.senderName || 'Parent';
         playTTS(payload.text, language, senderName);
-        Toast.show({ type: 'info', text1: '👩‍👦 Pesan dari Orang Tua', text2: payload.text, position: 'top', visibilityTime: 4000 });
+        Toast.show({ type: 'info', text1: t('aac.toastParentMsg'), text2: payload.text, position: 'top', visibilityTime: 4000 });
       }
     });
 
@@ -202,8 +204,8 @@ export default function ChildAACScreen() {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           Toast.show({ 
             type: 'success', 
-            text1: 'Perangkat Tertaut! 🎉', 
-            text2: `Sensoria Orang Tua berhasil terhubung.`, 
+            text1: t('aac.toastLinked'), 
+            text2: t('aac.toastLinkedDesc'), 
             position: 'top',
             visibilityTime: 4000
           });
@@ -217,7 +219,7 @@ export default function ChildAACScreen() {
         requestImmediateLocation()
           .then(() => {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            Toast.show({ type: 'success', text1: 'Lokasi Diperbarui', text2: 'Kiriman lokasi terbaru telah dikirim.', position: 'top' });
+            Toast.show({ type: 'success', text1: t('aac.toastLocationSent'), text2: t('aac.toastLocationSentDesc'), position: 'top' });
           })
           .catch((e) => console.warn('[LocationPing] refresh failed:', e));
       })
@@ -298,14 +300,14 @@ export default function ChildAACScreen() {
     if (pairingCode) {
       await sendAACMessage(pairingCode, {
         sender: 'Child',
-        senderName: childProfile?.nickname || 'Anak',
+        senderName: childProfile?.nickname || t('aac.childFallback'),
         text: fullText,
         timestamp: Date.now(),
         location: loc ? { latitude: loc.coords.latitude, longitude: loc.coords.longitude } : null
       });
-      Toast.show({ type: 'success', text1: 'Terkirim', text2: 'Pesan terkirim ke Orang Tua', position: 'top' });
+      Toast.show({ type: 'success', text1: t('aac.toastSent'), text2: t('aac.toastSentDesc'), position: 'top' });
     } else {
-      Toast.show({ type: 'error', text1: 'Gagal', text2: 'Belum tersambung ke perangkat orang tua.', position: 'top' });
+      Toast.show({ type: 'error', text1: t('common.failed'), text2: t('aac.toastNotLinked'), position: 'top' });
     }
   };
 
@@ -354,8 +356,8 @@ export default function ChildAACScreen() {
         aiOriginalRef.current = null;
         Toast.show({
           type: 'info',
-          text1: 'Deteksi Otomatis',
-          text2: 'Gagal deteksi otomatis. Silakan isi manual',
+          text1: t('aac.toastAiTag'),
+          text2: t('aac.toastAiTagFail'),
           position: 'top',
         });
       }
@@ -368,7 +370,7 @@ export default function ChildAACScreen() {
   const handleConfirmAutoTag = async () => {
     if (!pendingImageUri) return;
     if (!pendingLabel.trim()) {
-      Toast.show({ type: 'error', text1: 'Error', text2: 'Nama tidak boleh kosong', position: 'top' });
+      Toast.show({ type: 'error', text1: t('common.error'), text2: t('aac.toastNameRequired'), position: 'top' });
       return;
     }
 
@@ -395,7 +397,7 @@ export default function ChildAACScreen() {
     setShowAutoTagConfirm(false);
     setPendingImageUri(null);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Toast.show({ type: 'success', text1: 'Berhasil', text2: `Kartu "${label}" ditambahkan`, position: 'top' });
+    Toast.show({ type: 'success', text1: t('common.success'), text2: t('aac.toastCardAdded', { name: label }), position: 'top' });
 
     // Non-blocking background tasks: cloud backup + translation of the
     // languages the user did not type. Failures are logged, never surfaced
@@ -442,7 +444,7 @@ export default function ChildAACScreen() {
     const wordText = language === 'id' ? selectedWord.word_id : selectedWord.word_zh;
     await clearAudioCache(wordText, language, 'Child');
     playTTS(wordText, language, 'Child');
-    Toast.show({ type: 'info', text1: 'Suara Diperbarui', text2: 'Sedang mengambil suara baru dari AI...', position: 'top' });
+    Toast.show({ type: 'info', text1: t('aac.toastVoiceUpdated'), text2: t('aac.toastVoiceUpdatedDesc'), position: 'top' });
   };
 
   const handleToggleFavorite = async () => {
@@ -457,8 +459,8 @@ export default function ChildAACScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     Toast.show({
       type: 'success',
-      text1: isFavorite ? 'Dihapus dari Favorit' : 'Ditambahkan ke Favorit',
-      text2: isFavorite ? 'Kartu tetap tampil di tab asalnya' : 'Cek tab ⭐ Favorit',
+      text1: isFavorite ? t('aac.toastUnfavorited') : t('aac.toastFavorited'),
+      text2: isFavorite ? t('aac.toastUnfavDesc') : t('aac.toastFavDesc'),
       position: 'top',
     });
   };
@@ -491,7 +493,7 @@ export default function ChildAACScreen() {
   const handleSaveEditName = async () => {
     if (!selectedWord) return;
     if (!editNameId.trim() || !editNameZh.trim()) {
-      Toast.show({ type: 'error', text1: 'Error', text2: 'Nama tidak boleh kosong', position: 'top' });
+      Toast.show({ type: 'error', text1: t('common.error'), text2: t('aac.toastNameRequired'), position: 'top' });
       return;
     }
     
@@ -541,14 +543,14 @@ export default function ChildAACScreen() {
   });
 
   const categoriesConfig = [
-    { id: 'all', label: 'Semua', icon: 'shapes', color: '#00B5B8', rgba: '0, 181, 184' },
-    { id: 'favorit', label: 'Favorit', icon: 'star', color: '#FFD700', rgba: '255, 215, 0' },
-    { id: 'pronoun', label: 'Orang', icon: 'user', color: '#FFB6C1', rgba: '255, 182, 193' },
-    { id: 'verb', label: 'Aksi', icon: 'running', color: '#BBF7D0', rgba: '187, 247, 208' },
-    { id: 'noun', label: 'Benda', icon: 'apple-alt', color: '#BFDBFE', rgba: '191, 219, 254' },
-    { id: 'emotion', label: 'Sifat', icon: 'smile', color: '#FDE68A', rgba: '253, 230, 138' },
-    { id: 'social', label: 'Sosial', icon: 'hands-helping', color: '#DDD6FE', rgba: '221, 214, 254' },
-  ];
+    { id: 'all', labelKey: 'aac.tabAll', icon: 'shapes', color: '#00B5B8', rgba: '0, 181, 184' },
+    { id: 'favorit', labelKey: 'aac.tabFavorites', icon: 'star', color: '#FFD700', rgba: '255, 215, 0' },
+    { id: 'pronoun', labelKey: 'aac.catPronoun', icon: 'user', color: '#FFB6C1', rgba: '255, 182, 193' },
+    { id: 'verb', labelKey: 'aac.catVerb', icon: 'running', color: '#BBF7D0', rgba: '187, 247, 208' },
+    { id: 'noun', labelKey: 'aac.catNoun', icon: 'apple-alt', color: '#BFDBFE', rgba: '191, 219, 254' },
+    { id: 'emotion', labelKey: 'aac.catEmotion', icon: 'smile', color: '#FDE68A', rgba: '253, 230, 138' },
+    { id: 'social', labelKey: 'aac.catSocial', icon: 'hands-helping', color: '#DDD6FE', rgba: '221, 214, 254' },
+  ] as const;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
@@ -561,7 +563,7 @@ export default function ChildAACScreen() {
               <Text style={{ fontSize: 16 }}>👦🏻</Text>
             )}
           </View>
-          <Text style={styles.title}>Hai, {childProfile?.nickname || 'Sensoria'}!</Text>
+          <Text style={styles.title}>{t('aac.headerGreeting', { name: childProfile?.nickname || 'Sensoria' })}</Text>
         </View>
         
         <View style={styles.headerRight}>
@@ -574,8 +576,8 @@ export default function ChildAACScreen() {
             onPress={() => {
               Toast.show({
                 type: 'info',
-                text1: 'Akses Terkunci',
-                text2: 'Tahan 3 detik untuk membuka Pengaturan',
+                text1: t('aac.lockedTitle'),
+                text2: t('aac.lockedDesc'),
                 position: 'top',
                 visibilityTime: 2000,
               });
@@ -599,13 +601,13 @@ export default function ChildAACScreen() {
         <SentenceStrip />
         <View style={styles.actionRow}>
           <TouchableOpacity style={styles.actionBtnRed} onPress={clearSentence}>
-            <Text style={styles.actionBtnText}>🗑️ Hapus</Text>
+            <Text style={styles.actionBtnText}>🗑️ {t('aac.clear')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionBtnBlue} onPress={speakAllFiltered}>
-            <Text style={styles.actionBtnText}>🔊 Bicara</Text>
+            <Text style={styles.actionBtnText}>🔊 {t('aac.speak')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionBtnOrange} onPress={sendToParentFiltered}>
-            <Text style={styles.actionBtnText}>🚀 Kirim</Text>
+            <Text style={styles.actionBtnText}>🚀 {t('aac.send')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -620,7 +622,7 @@ export default function ChildAACScreen() {
           <View style={styles.softLockOverlay} pointerEvents="auto">
             <Text style={styles.softLockEmoji}>🤗</Text>
             <Text style={styles.softLockText}>
-              Minta tolong Ayah/Bunda untuk mengaktifkan kembali dari HP mereka ya!
+              {t('aac.softLock')}
             </Text>
           </View>
         ) : null}
@@ -630,28 +632,28 @@ export default function ChildAACScreen() {
       <Modal visible={showWordOptions} transparent animationType="fade">
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowWordOptions(false)}>
           <View style={styles.optionsModal}>
-            <Text style={styles.optionsTitle}>Pengaturan Kata</Text>
+            <Text style={styles.optionsTitle}>{t('aac.wordOptionsTitle')}</Text>
             <TouchableOpacity style={styles.optionBtn} onPress={handleUpdateVoice}>
               <Text style={styles.optionEmoji}>🔊</Text>
-              <Text style={styles.optionText}>Ubah / Segarkan Suara</Text>
+              <Text style={styles.optionText}>{t('aac.optionVoice')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.optionBtn} onPress={handleOpenEditName}>
               <Text style={styles.optionEmoji}>✏️</Text>
-              <Text style={styles.optionText}>Ubah Nama</Text>
+              <Text style={styles.optionText}>{t('aac.optionEditName')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.optionBtn} onPress={handleChangeImage}>
               <Text style={styles.optionEmoji}>🖼️</Text>
-              <Text style={styles.optionText}>Ubah Gambar</Text>
+              <Text style={styles.optionText}>{t('aac.optionChangeImage')}</Text>
             </TouchableOpacity>
-            {selectedWord?.categoryId === 'favorit' ? (
+            {selectedWord?.isFavorite === true ? (
               <TouchableOpacity style={styles.optionBtn} onPress={handleToggleFavorite}>
                 <Text style={styles.optionEmoji}>💔</Text>
-                <Text style={[styles.optionText, styles.optionTextDanger]}>Hapus dari Favorit</Text>
+                <Text style={[styles.optionText, styles.optionTextDanger]}>{t('aac.optionUnfavorite')}</Text>
               </TouchableOpacity>
             ) : (
               <TouchableOpacity style={styles.optionBtn} onPress={handleToggleFavorite}>
                 <Text style={styles.optionEmoji}>⭐</Text>
-                <Text style={styles.optionText}>Tambah ke Favorit</Text>
+                <Text style={styles.optionText}>{t('aac.optionFavorite')}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -662,14 +664,14 @@ export default function ChildAACScreen() {
       <Modal visible={showEditName} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.editNameModal}>
-            <Text style={styles.optionsTitle}>Ubah Nama Kata</Text>
-            <Text style={styles.editLabel}>Bahasa Indonesia:</Text>
+            <Text style={styles.optionsTitle}>{t('aac.editNameTitle')}</Text>
+            <Text style={styles.editLabel}>{t('aac.editLabelId')}</Text>
             <TextInput 
               style={styles.editInput} 
               value={editNameId} 
               onChangeText={setEditNameId} 
             />
-            <Text style={styles.editLabel}>Mandarin:</Text>
+            <Text style={styles.editLabel}>{t('aac.editLabelZh')}</Text>
             <TextInput 
               style={styles.editInput} 
               value={editNameZh} 
@@ -677,10 +679,10 @@ export default function ChildAACScreen() {
             />
             <View style={styles.editActions}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowEditName(false)}>
-                <Text style={styles.cancelBtnText}>Batal</Text>
+                <Text style={styles.cancelBtnText}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.saveBtn} onPress={handleSaveEditName}>
-                <Text style={styles.saveBtnText}>Simpan</Text>
+                <Text style={styles.saveBtnText}>{t('common.save')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -695,25 +697,25 @@ export default function ChildAACScreen() {
         >
           <ScrollView contentContainerStyle={styles.autoTagScroll} bounces={false}>
             <View style={styles.autoTagModal}>
-              <Text style={styles.optionsTitle}>Konfirmasi Kartu Baru</Text>
+              <Text style={styles.optionsTitle}>{t('aac.autoTagTitle')}</Text>
               {pendingImageUri ? (
                 <Image source={{ uri: pendingImageUri }} style={styles.autoTagImage} />
               ) : null}
               <Text style={styles.autoTagHint}>
-                Periksa hasil deteksi AI — ubah sesukamu sebelum menyimpan.
+                {t('aac.autoTagHint')}
               </Text>
-              <Text style={styles.editLabel}>Nome ({activeLanguageLabel}):</Text>
+              <Text style={styles.editLabel}>{t('aac.autoTagNameLabel', { lang: activeLanguageLabel })}</Text>
               <TextInput
                 style={styles.editInput}
                 value={pendingLabel}
                 onChangeText={setPendingLabel}
-                placeholder={`Contoh: ${activeLanguagePlaceholder}`}
+                placeholder={t('aac.placeholder', { word: activeLanguagePlaceholder })}
                 placeholderTextColor="#94A3B8"
               />
               <Text style={styles.autoTagHint}>
-                Bahasa lain dilengkapi otomatis di belakang layar.
+                {t('aac.autoTagOthersHint')}
               </Text>
-              <Text style={styles.editLabel}>Kategori:</Text>
+              <Text style={styles.editLabel}>{t('aac.categoryLabel')}</Text>
               <View style={styles.chipRow}>
                 {AUTO_TAG_CATEGORIES.map((cat) => {
                   const isActive = pendingCategory === cat.id;
@@ -727,17 +729,17 @@ export default function ChildAACScreen() {
                       }}
                     >
                       <FontAwesome5 name={cat.icon} size={12} color={isActive ? '#FFF' : cat.color} solid />
-                      <Text style={[styles.chipText, isActive && styles.chipTextActive]}>{cat.label}</Text>
+                      <Text style={[styles.chipText, isActive && styles.chipTextActive]}>{t(cat.labelKey)}</Text>
                     </TouchableOpacity>
                   );
                 })}
               </View>
               <View style={styles.editActions}>
                 <TouchableOpacity style={styles.cancelBtn} onPress={handleCancelAutoTag}>
-                  <Text style={styles.cancelBtnText}>Batal</Text>
+                  <Text style={styles.cancelBtnText}>{t('common.cancel')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.saveBtn} onPress={handleConfirmAutoTag}>
-                  <Text style={styles.saveBtnText}>Gunakan Hasil</Text>
+                  <Text style={styles.saveBtnText}>{t('aac.useResult')}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -763,7 +765,7 @@ export default function ChildAACScreen() {
                   />
                 )}
                 <FontAwesome5 name={cat.icon} size={22} color="#FFF" solid style={{ marginBottom: 6 }} />
-                <Text style={[styles.catText, isActive && { fontWeight: '900' }]}>{cat.label}</Text>
+                <Text style={[styles.catText, isActive && { fontWeight: '900' }]}>{t(cat.labelKey)}</Text>
                 {isActive && <View style={[styles.activeIndicator, { backgroundColor: cat.color }]} />}
               </TouchableOpacity>
             );

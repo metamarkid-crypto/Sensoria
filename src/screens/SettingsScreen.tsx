@@ -5,12 +5,16 @@ import { FontAwesome5, Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
 import PairingBottomSheet from '../components/PairingBottomSheet';
+import LanguagePickerModal from '../components/i18n/LanguagePickerModal';
 import { useAACStore } from '../store/useAACStore';
 import { formatDate } from '../utils/format';
+import { useTranslation } from '../i18n';
 
 export default function SettingsScreen() {
   const navigation = useNavigation<any>();
+  const { t, language } = useTranslation();
   const [showPairing, setShowPairing] = useState(false);
+  const [showLanguage, setShowLanguage] = useState(false);
 
   // ── Stealth kill-switch — EXACT mirror of ParentSettingsListScreen ─────────
   // Reads the SHARED store flag, refreshed by the app lifecycle on boot and
@@ -29,27 +33,33 @@ export default function SettingsScreen() {
   // Optional status subtitle (live mode only — never surfaces in review).
   const subscriptionSubtitle = liveMode
     ? premium.status === 'trial' && premium.isPremium
-      ? `Masa Coba Gratis · aktif sampai ${formatDate(premium.trialEndsAt)}`
+      ? t('settings.trialUntil', { date: formatDate(premium.trialEndsAt) })
       : premium.status === 'active' && premium.isPremium
-        ? `Aktif sampai ${formatDate(premium.expiresAt)}`
+        ? t('settings.activeUntil', { date: formatDate(premium.expiresAt) })
         : premium.loaded
-          ? 'Langganan belum aktif'
-          : 'Lihat paket langganan'
-    : 'Segera Hadir';
+          ? t('settings.notActive')
+          : t('settings.seePlans')
+    : t('settings.soonComing');
+
+  // Current language label for the row subtitle.
+  const languageLabel =
+    language === 'id' ? t('aac.langNameId') : language === 'en' ? t('aac.langNameEn') : t('aac.langNameZh');
 
   const MENU_ITEMS = [
-    { id: 'profile', title: 'Profil Pengguna', icon: 'person', type: 'Ionicons', action: () => navigation.navigate('UserProfile') },
-    { id: 'audio', title: 'Suara & Bicara', icon: 'volume-high', type: 'Ionicons', action: () => navigation.navigate('VoiceSettings') },
-    { id: 'display', title: 'Tampilan', icon: 'color-palette', type: 'Ionicons', action: () => navigation.navigate('AppearanceSettings') },
-    { id: 'accessibility', title: 'Aksesibilitas', icon: 'accessibility', type: 'Ionicons', action: () => navigation.navigate('AccessibilitySettings') },
-    { id: 'pairing', title: 'Koneksi & Perangkat', icon: 'link', type: 'Ionicons', action: () => setShowPairing(true) },
+    { id: 'profile', titleKey: 'settings.profile' as const, icon: 'person', type: 'Ionicons', action: () => navigation.navigate('UserProfile') },
+    { id: 'audio', titleKey: 'settings.voice' as const, icon: 'volume-high', type: 'Ionicons', action: () => navigation.navigate('VoiceSettings') },
+    { id: 'display', titleKey: 'settings.appearance' as const, icon: 'color-palette', type: 'Ionicons', action: () => navigation.navigate('AppearanceSettings') },
+    // Language sits right under Appearance — a global preference, not billing.
+    { id: 'language', titleKey: 'settings.language' as const, icon: 'globe', type: 'Ionicons', subtitle: languageLabel, action: () => setShowLanguage(true) },
+    { id: 'accessibility', titleKey: 'settings.accessibility' as const, icon: 'accessibility', type: 'Ionicons', action: () => navigation.navigate('AccessibilitySettings') },
+    { id: 'pairing', titleKey: 'settings.connection' as const, icon: 'link', type: 'Ionicons', action: () => setShowPairing(true) },
   ];
 
   const showComingSoon = () => {
     Toast.show({
       type: 'info',
-      text1: 'Segera Hadir',
-      text2: 'Fitur ini sedang dalam tahap pengembangan.',
+      text1: t('settings.soonComing'),
+      text2: t('settings.soonToastDesc'),
       position: 'bottom',
     });
   };
@@ -67,7 +77,7 @@ export default function SettingsScreen() {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color="#1A2980" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Pengaturan</Text>
+        <Text style={styles.headerTitle}>{t('settings.headerTitle')}</Text>
         <View style={{ width: 40 }} /> {/* Spacer */}
       </View>
 
@@ -86,7 +96,10 @@ export default function SettingsScreen() {
                   {renderIcon(item.type, item.icon)}
                 </View>
                 <View style={styles.menuItemText}>
-                  <Text style={styles.menuItemTitle}>{item.title}</Text>
+                  <Text style={styles.menuItemTitle}>{t(item.titleKey)}</Text>
+                  {item.subtitle ? (
+                    <Text style={styles.menuItemSubtitle} numberOfLines={1}>{item.subtitle}</Text>
+                  ) : null}
                 </View>
               </View>
               <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />
@@ -122,7 +135,7 @@ export default function SettingsScreen() {
               </View>
               <View style={styles.menuItemText}>
                 <Text style={[styles.menuItemTitle, !liveMode && styles.menuItemTitleDisabled]}>
-                  {liveMode ? 'Status Langganan' : 'Premium'}
+                  {liveMode ? t('settings.subscription') : t('settings.premium')}
                 </Text>
                 <Text style={styles.menuItemSubtitle} numberOfLines={1}>
                   {subscriptionSubtitle}
@@ -133,7 +146,7 @@ export default function SettingsScreen() {
               <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />
             ) : (
               <View style={styles.soonBadge}>
-                <Text style={styles.soonBadgeText}>Segera</Text>
+                <Text style={styles.soonBadgeText}>{t('settings.soonBadge')}</Text>
               </View>
             )}
           </TouchableOpacity>
@@ -147,7 +160,7 @@ export default function SettingsScreen() {
                 <Ionicons name="information-circle" size={22} color="#2488FF" />
               </View>
               <View style={styles.menuItemText}>
-                <Text style={styles.menuItemTitle}>Tentang Sensoria AAC</Text>
+                <Text style={styles.menuItemTitle}>{t('settings.about')}</Text>
               </View>
             </View>
             <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />
@@ -160,6 +173,9 @@ export default function SettingsScreen() {
         isVisible={showPairing} 
         onClose={() => setShowPairing(false)} 
       />
+
+      {/* Global trilingual language picker */}
+      <LanguagePickerModal visible={showLanguage} onClose={() => setShowLanguage(false)} />
       
       <Toast />
     </SafeAreaView>
