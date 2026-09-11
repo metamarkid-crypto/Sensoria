@@ -6,6 +6,11 @@ on:
       - main
   workflow_dispatch: # Allows manual trigger from GitHub UI
 
+# GITHUB_TOKEN needs actions:write to DELETE old artifacts in the purge step.
+permissions:
+  contents: read
+  actions: write
+
 jobs:
   build:
     name: Build Android APK
@@ -66,12 +71,28 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease
 
+      - name: 🧽 Purge old APK artifacts (keep only the latest)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          REPO="${{ github.repository }}"
+          IDS=$(curl -s -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/$REPO/actions/artifacts?per_page=100" \
+            | jq -r '.artifacts[] | select(.name == "Sensoria-Android-APK") | .id')
+          for id in $IDS; do
+            echo "Deleting old artifact $id"
+            curl -s -X DELETE -H "Authorization: Bearer $GH_TOKEN" \
+              "https://api.github.com/repos/$REPO/actions/artifacts/$id" > /dev/null
+          done
+          echo "Purge done. Free plan Actions storage is 500 MB and every APK is
+          100-200 MB — keeping only the newest build prevents the quota from
+          filling up and blocking future builds."
+
       - name: 📤 Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Sensoria-Android-APK
           path: android/app/build/outputs/apk/release/app-release.apk
-          # Actions storage quota on the free plan is 500 MB — each APK is
-          # ~100-200 MB, so without a cap a handful of pushes fills it and
-          # BLOCKS future builds. 7 days is plenty for grabbing the latest APK.
+          # Backstop for the purge above (e.g. skipped runs); 7 days is plenty
+          # for grabbing the latest APK.
           retention-days: 7
