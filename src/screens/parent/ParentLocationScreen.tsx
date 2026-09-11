@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Modal, TextInput, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, LayoutChangeEvent } from 'react-native';
 import MapView, { Marker, Circle, PROVIDER_GOOGLE } from 'react-native-maps';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontAwesome5 } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -39,13 +38,9 @@ function formatLastSeen(iso: string | null): string {
 
 const DEFAULT_COORD = { latitude: -6.200000, longitude: 106.816666 };
 
-// Header geometry mirrors the shared gradient header used on the other tabs
-// (see DynamicGlobalHeader: '#181824/#11427B/#007C92', 24px bottom radii,
-// paddingHorizontal 24). Height reserves enough room below the title so the
-// 24px curvature renders smooth over the map, and the floating info card
-// clears it by CARD_TOP_OFFSET below the header's bottom edge.
-const HEADER_BASE_HEIGHT = 72;
-const CARD_TOP_OFFSET = 16;
+// The child info card lives in the bottom sheet's sticky grab area — the
+// collapsed snap auto-fits its measured content, so no hard header/card
+// geometry constants are needed on this screen anymore.
 
 export default function ParentLocationScreen() {
   const insets = useSafeAreaInsets();
@@ -346,24 +341,9 @@ export default function ParentLocationScreen() {
     <View style={styles.container}>
 
       {/* ================================================================
-          LAYER 0 — CURVED GRADIENT HEADER (absolute, floats over the map)
-          Replicates the app-wide header used on Beranda/Pesan/Atur
-          (DynamicGlobalHeader): same gradient, same 24px bottom curvature,
-          and a single left-aligned title. overflow:'hidden' clips the
-          gradient crisply to the curvature over the native map surface.
-          The refresh action lives on the floating child info card only.
-          ================================================================ */}
-      <LinearGradient
-        colors={['#181824', '#11427B', '#007C92']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[styles.header, { paddingTop: insets.top + 10, height: insets.top + HEADER_BASE_HEIGHT }]}
-      >
-        <Text style={styles.headerTitle}>{t('header.locationTitle')}</Text>
-      </LinearGradient>
-
-      {/* ================================================================
-          LAYER 1 — MAP (full-bleed, behind header + sheet)
+          LAYER 1 — MAP (full-bleed behind the sheet; header removed — the
+          dashboard's shared global header already names this tab, so the
+          map now owns the entire top of the screen)
           ================================================================ */}
       <View style={StyleSheet.absoluteFill} onLayout={onAreaLayout}>
         <MapView
@@ -398,64 +378,83 @@ export default function ParentLocationScreen() {
           ))}
         </MapView>
 
-        {/* Floating Child Info Card — sits below the curved header with a
-            clear top margin so it never collides with the curvature. */}
-        <View
-          style={[
-            styles.infoCard,
-            { top: insets.top + HEADER_BASE_HEIGHT + CARD_TOP_OFFSET },
-          ]}
-        >
-          <View style={styles.cardTopRow}>
-            <View style={styles.cardAvatarWrap}>
-              <Image source={avatarSource} style={styles.cardAvatar} />
-            </View>
-            <View style={styles.cardHeaderInfo}>
-              <Text style={styles.cardName} numberOfLines={1}>{fullName}</Text>
-              <View style={styles.statusBadgeRow}>
-                {activeZone ? (
-                  <>
-                    <FontAwesome5 name="check-circle" size={13} color="#059669" />
-                    <Text style={styles.statusBadgeTextSafe} numberOfLines={1}>{t('location.inSafeZone', { zone: activeZone.name })}</Text>
-                  </>
-                ) : (
-                  <>
-                    <FontAwesome5 name="exclamation-circle" size={13} color="#DC2626" />
-                    <Text style={styles.statusBadgeTextDanger} numberOfLines={1}>{t('location.outsideSafeZone')}</Text>
-                  </>
-                )}
-              </View>
-            </View>
-            <TouchableOpacity style={styles.refreshButton} onPress={handleRefreshLocation} disabled={isRefreshing} activeOpacity={0.8}>
-              {isRefreshing ? (
-                <ActivityIndicator size="small" color="#FFF" />
-              ) : (
-                <FontAwesome5 name="sync-alt" size={16} color="#FFF" />
-              )}
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.divider} />
-
-          <Text style={styles.locationLabel}>{t('location.lastLocation')}</Text>
-          <Text style={styles.locationAddress} numberOfLines={1}>
-            {liveAddress || t('location.noAddress')}
-          </Text>
-          <Text style={styles.timestamp} numberOfLines={1}>
-            {t('location.lastUpdate', { time: liveTimestamp || t('common.unknown') })}
-          </Text>
-        </View>
       </View>
 
       {/* ================================================================
-          LAYER 2 — DRAGGABLE BOTTOM SHEET (snap 25% / 50%, above tab bar)
+          LAYER 2 — DRAGGABLE BOTTOM SHEET (sticky child card, snap 50%)
+          The child info card moved INTO the sheet's sticky grab area:
+            • the collapsed snap auto-fits the card → never clipped,
+            • the card sits in natural one-thumb reach at the bottom,
+            • the map gains full-bleed vertical space (no header overlay).
           The ONLY ScrollView on this screen lives inside this sheet.
           ================================================================ */}
       <LocationBottomSheet
-        snapFractions={[0.25, 0.5]}
+        expandedFraction={0.5}
         viewportHeight={areaHeight}
         bottomOffset={tabBarHeight}
-        header={zonesHeader}
+        header={
+          <View style={styles.sheetGrabContent}>
+            {/* ── Child Info Card (sticky above the Safe Zone list) ── */}
+            <View style={styles.infoCard}>
+              <View style={styles.cardTopRow}>
+                <View style={styles.cardAvatarWrap}>
+                  <Image source={avatarSource} style={styles.cardAvatar} />
+                </View>
+                <View style={styles.cardHeaderInfo}>
+                  <Text style={styles.cardName} numberOfLines={1}>{fullName}</Text>
+                  {activeZone ? (
+                    <View style={[styles.statusPill, styles.statusPillSafe]}>
+                      <FontAwesome5 name="check-circle" size={11} color="#059669" />
+                      <Text style={styles.statusPillTextSafe} numberOfLines={1}>
+                        {t('location.inSafeZone', { zone: activeZone.name })}
+                      </Text>
+                    </View>
+                  ) : (
+                    <View style={[styles.statusPill, styles.statusPillDanger]}>
+                      <FontAwesome5 name="exclamation-circle" size={11} color="#DC2626" />
+                      <Text style={styles.statusPillTextDanger} numberOfLines={1}>
+                        {t('location.outsideSafeZone')}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                <TouchableOpacity
+                  style={styles.refreshButton}
+                  onPress={handleRefreshLocation}
+                  disabled={isRefreshing}
+                  activeOpacity={0.8}
+                >
+                  {isRefreshing ? (
+                    <ActivityIndicator size="small" color="#FFF" />
+                  ) : (
+                    <FontAwesome5 name="sync-alt" size={15} color="#FFF" />
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.divider} />
+
+              <View style={styles.cardMetaRow}>
+                <FontAwesome5
+                  name="map-marker-alt"
+                  size={14}
+                  color="#2563EB"
+                  style={styles.cardMetaIcon}
+                />
+                <View style={styles.cardMetaTextWrap}>
+                  <Text style={styles.locationAddress} numberOfLines={2}>
+                    {liveAddress || t('location.noAddress')}
+                  </Text>
+                  <Text style={styles.timestamp} numberOfLines={1}>
+                    {t('location.lastUpdate', { time: liveTimestamp || t('common.unknown') })}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {zonesHeader}
+          </View>
+        }
       >
         <ScrollView
           contentContainerStyle={styles.sheetScrollContent}
@@ -553,44 +552,20 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
-  /* --- LAYER 0: CURVED GRADIENT HEADER --- */
-  // Same curvature recipe as the shared DynamicGlobalHeader (Pengaturan):
-  // 24px bottom radii + overflow hidden so the gradient clips smoothly to
-  // the curve instead of bleeding square corners over the map surface.
-  header: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    paddingHorizontal: 24,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    overflow: 'hidden',
-    zIndex: 5,
-    // No elevation: the header floats over the map; shadows near the surface
-    // are unnecessary and the gradient + curvature carry the design.
+  /* --- SHEET GRAB CONTENT: sticky child info card + zone header --- */
+  sheetGrabContent: {
+    paddingHorizontal: 16,
   },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-  /* --- LAYER 1: MAP + FLOATING INFO CARD --- */
   infoCard: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
     backgroundColor: '#FFFFFF',
-    borderRadius: 18,
+    borderRadius: 16,
     padding: 14,
-    elevation: 4,
+    marginBottom: 6,
+    elevation: 3,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
   },
   cardTopRow: {
     flexDirection: 'row',
@@ -615,32 +590,42 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   cardName: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#0F172A',
-    marginBottom: 2,
+    marginBottom: 4,
   },
-  statusBadgeRow: {
+  statusPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    alignSelf: 'flex-start',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
   },
-  statusBadgeTextSafe: {
-    fontSize: 13,
+  statusPillSafe: {
+    backgroundColor: '#D1FAE5',
+  },
+  statusPillDanger: {
+    backgroundColor: '#FEE2E2',
+  },
+  statusPillTextSafe: {
+    fontSize: 11,
     fontWeight: 'bold',
     color: '#059669',
     flexShrink: 1,
   },
-  statusBadgeTextDanger: {
-    fontSize: 13,
+  statusPillTextDanger: {
+    fontSize: 11,
     fontWeight: 'bold',
     color: '#DC2626',
     flexShrink: 1,
   },
   refreshButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: '#2563EB',
     alignItems: 'center',
     justifyContent: 'center',
@@ -650,17 +635,23 @@ const styles = StyleSheet.create({
     backgroundColor: '#F1F5F9',
     marginVertical: 10,
   },
-  locationLabel: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: '#94A3B8',
-    textTransform: 'uppercase',
-    marginBottom: 2,
+  cardMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  cardMetaIcon: {
+    marginTop: 2,
+    marginRight: 8,
+    width: 16,
+  },
+  cardMetaTextWrap: {
+    flex: 1,
   },
   locationAddress: {
     fontSize: 14,
     fontWeight: '600',
     color: '#1E293B',
+    lineHeight: 19,
     marginBottom: 2,
   },
   timestamp: {
@@ -675,7 +666,6 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     marginTop: 2,
     marginBottom: 4,
-    paddingHorizontal: 16,
     paddingVertical: 6,
   },
   zonesTitle: {

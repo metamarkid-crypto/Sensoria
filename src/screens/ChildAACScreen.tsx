@@ -17,7 +17,7 @@ import * as Location from 'expo-location';
 import * as Haptics from 'expo-haptics';
 import { playTTS, clearAudioCache } from '../services/ai/audioManager';
 import { useAccessibleAction } from '../hooks/useAccessibleAction';
-import { useTranslation } from '../i18n';
+import { useTranslation, translate } from '../i18n';
 import SettingsScreen from './SettingsScreen';
 import { supabase, sendAACMessage, subscribeToAACMessages, syncCustomWordToCloud } from '../services/db/supabase';
 import {
@@ -166,9 +166,13 @@ export default function ChildAACScreen() {
 
     const channel = subscribeToAACMessages(pairingCode, (payload: any) => {
       if (payload.sender === 'Parent') {
+        // Read the language fresh at callback time — this effect mounts once,
+        // so the closure `language` would otherwise go stale after a language
+        // switch and speak parent messages in the previous language.
+        const currentLang = useAACStore.getState().language;
         const senderName = payload.senderName || 'Parent';
-        playTTS(payload.text, language, senderName);
-        Toast.show({ type: 'info', text1: t('aac.toastParentMsg'), text2: payload.text, position: 'top', visibilityTime: 4000 });
+        playTTS(payload.text, currentLang, senderName);
+        Toast.show({ type: 'info', text1: translate(currentLang, 'aac.toastParentMsg'), text2: payload.text, position: 'top', visibilityTime: 4000 });
       }
     });
 
@@ -203,10 +207,14 @@ export default function ChildAACScreen() {
         { event: 'INSERT', schema: 'public', table: 'family_links', filter: `child_device_id=eq.${deviceId}` },
         (payload) => {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          // Read the language fresh at callback time — this effect mounts
+          // once, so the closure `t` would otherwise go stale after a
+          // language switch and show the link toast in the old language.
+          const currentLang = useAACStore.getState().language;
           Toast.show({ 
             type: 'success', 
-            text1: t('aac.toastLinked'), 
-            text2: t('aac.toastLinkedDesc'), 
+            text1: translate(currentLang, 'aac.toastLinked'), 
+            text2: translate(currentLang, 'aac.toastLinkedDesc'), 
             position: 'top',
             visibilityTime: 4000
           });
@@ -220,7 +228,11 @@ export default function ChildAACScreen() {
         requestImmediateLocation()
           .then(() => {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            Toast.show({ type: 'success', text1: t('aac.toastLocationSent'), text2: t('aac.toastLocationSentDesc'), position: 'top' });
+            // Language read fresh at callback time (see family-links note):
+            // the mount-closed `t` would freeze the ping toast in the
+            // language that was active when this screen first mounted.
+            const currentLang = useAACStore.getState().language;
+            Toast.show({ type: 'success', text1: translate(currentLang, 'aac.toastLocationSent'), text2: translate(currentLang, 'aac.toastLocationSentDesc'), position: 'top' });
           })
           .catch((e) => console.warn('[LocationPing] refresh failed:', e));
       })
