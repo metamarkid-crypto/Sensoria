@@ -6,6 +6,7 @@ import * as Sentry from '@sentry/react-native';
 import Toast, { BaseToast, ErrorToast } from 'react-native-toast-message';
 import AppNavigator from './src/navigation/AppNavigator';
 import { useAACStore } from './src/store/useAACStore';
+import { subscribeEntitlementRealtime } from './src/services/db/entitlementRealtime';
 
 Sentry.init({
   dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
@@ -69,6 +70,25 @@ const toastConfig = {
  *  3. Foreground resume — catches trial expiry and payments settled off-app
  *     (user scans the QRIS in a bank app, returns, entitlement re-reads).
  *
+ * REAL-TIME EXPIRY WATCHDOG (`tickPremiumGate`):
+ *  4. A 15s interval re-derives the gate phase from the persisted raw
+ *     boundaries against the local clock, so a device kept continuously open
+ *     locks the moment its boundary passes instead of waiting for a refresh,
+ *     navigation, or any other render trigger. It also fires on foreground
+ *     resume (before the network refresh) to cover time spent suspended.
+ *     Idle ticks are pure no-ops in the store — no state write, no re-render.
+ *     Enforcement stays client-judged (offline-first mandate); the hourly
+ *     DB cron only mirrors expiry into the subscriptions table.
+ *
+ * REALTIME ENTITLEMENT WATCHER (`subscribeEntitlementRealtime`):
+ *  5. A Supabase Realtime channel on `subscriptions` + `family_links`
+ *     funnels REMOTE row changes (renewal purchased on another device,
+ *     cancellation, cron expiry flip, pairing/unpairing) into
+ *     `refreshEntitlement()` on a LIVE session — no foreground resume needed.
+ *     Every event goes through the same authoritative derivation path as
+ *     every other trigger; relevance is filtered against the resolved
+ *     `linkedChildIds` so foreign-child noise never causes a refresh.
+ *
  * The stealth kill-switch (`webPaymentActive`) follows the same lifecycle:
  * fetched on boot and re-fetched on every foreground resume so flipping
  * `app_settings.web_payment_active` in Supabase applies live without a
@@ -79,10 +99,13 @@ const toastConfig = {
  * launch of a premium Child/Parent reads local state, so `resetPremium()` is
  * only called on a REAL in-session role/device switch, never on boot.
  */
+const EXPIRY_WATCHDOG_INTERVAL_MS = 15_000;
+
 function EntitlementLifecycle() {
   const role = useAACStore((s) => s.role);
   const deviceId = useAACStore((s) => s.deviceId);
   const refreshEntitlement = useAACStore((s) => s.refreshEntitlement);
+  const tickPremiumGate = useAACStore((s) => s.tickPremiumGate);
   const resetPremium = useAACStore((s) => s.resetPremium);
   const refreshWebPaymentActive = useAACStore((s) => s.refreshWebPaymentActive);
 
@@ -116,12 +139,44 @@ function EntitlementLifecycle() {
     void refreshWebPaymentActive();
   }, [refreshWebPaymentActive]);
 
+  // Expiry watchdog tick — local clock only, no network. Runs every 15s and
+  // once on foreground resume (covering suspension), so a boundary that
+  // passes while the app is open/suspended locks on that very tick.
+  useEffect(() => {
+    if (role === 'None' || !deviceId) return;
+    tickPremiumGate(); // re-sync immediately after any role/device transition
+    const id = setInterval(tickPremiumGate, EXPIRY_WATCHDOG_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [role, deviceId, tickPremiumGate]);
+
+  // Realtime entitlement watcher — remote renewals/cancellations land on a
+  // live session in under a second instead of waiting for the next
+  // foreground resume. Events funnel into refreshEntitlement() (single
+  // derivation path); relevance is filtered against the resolved
+  // linkedChildIds. A socket drop self-heals in supabase-js, and the AppState
+  // refresh below remains the authoritative fallback after long suspensions.
+  useEffect(() => {
+    if (role === 'None' || !deviceId) return;
+    return subscribeEntitlementRealtime({
+      getRelevantChildIds: () => useAACStore.getState().premium.linkedChildIds,
+      refresh: () => useAACStore.getState().refreshEntitlement(),
+    });
+  }, [role, deviceId]);
+
   useEffect(() => {
     const sub = AppState.addEventListener('change', (next) => {
       if (next !== 'active') return;
-      const { role: r, deviceId: d, refreshEntitlement: refresh, refreshWebPaymentActive: refreshSwitch } =
-        useAACStore.getState();
-      if (d && r !== 'None') void refresh();
+      const {
+        role: r,
+        deviceId: d,
+        refreshEntitlement: refresh,
+        refreshWebPaymentActive: refreshSwitch,
+        tickPremiumGate: tick,
+      } = useAACStore.getState();
+      if (d && r !== 'None') {
+        tick(); // instant local-clock phase update (e.g. expired while suspended)
+        void refresh(); // authoritative re-read (payments settled off-app)
+      }
       void refreshSwitch();
     });
     return () => sub.remove();

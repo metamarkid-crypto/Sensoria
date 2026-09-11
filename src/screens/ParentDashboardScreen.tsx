@@ -218,8 +218,11 @@ export default function ParentDashboardScreen() {
  *    keep locking once expired).
  *  • Online  → the Paywall modal is auto-presented (it honors
  *    `web_payment_active` itself); if dismissed, the CTA reopens it.
+ *
+ * Also reused by the Navigator-level ParentAccessGate (fresh install /
+ * role re-selection entry guard).
  */
-function ParentStrictLock({
+export function ParentStrictLock({
   offline,
   onRetry,
   onExtend,

@@ -13,6 +13,7 @@ import VoiceSettingsScreen from '../screens/VoiceSettingsScreen';
 import AccessibilitySettingsScreen from '../screens/AccessibilitySettingsScreen';
 import AboutScreen from '../screens/AboutScreen';
 import PaywallScreen from '../screens/PaywallScreen';
+import ParentAccessGate from '../components/parent/ParentAccessGate';
 import { useAACStore } from '../store/useAACStore';
 
 const Stack = createNativeStackNavigator();
@@ -46,7 +47,12 @@ export default function AppNavigator() {
           )
         ) : (
           <>
-            <Stack.Screen name="ParentDashboard" component={ParentDashboardScreen} />
+            {/* Strict-Parent entry guard: the dashboard only mounts through
+                this gate, so an expired entitlement (or a role re-selection
+                on an expired device) can never reach the tabs — including
+                the fresh-install 'unknown' phase (verifying → one refresh,
+                then lock/grant). */}
+            <Stack.Screen name="ParentDashboard" component={ParentAccessGate} />
             {/* The Settings sub-screens MUST be registered at the Root Stack level 
                 so they render Full Screen, hiding the Bottom Tabs when pushed */}
             <Stack.Screen name="UserProfile" component={UserProfileScreen} options={{ animation: 'slide_from_right' }} />

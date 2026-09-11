@@ -65,7 +65,9 @@ export interface AccessEvaluation {
  *   premium: status active/trial AND end boundary in the future.
  *   grace:   (CHILD only) boundary passed, now < boundary + grace days.
  *   locked:  boundary passed with no grace left (parents always; children once
- *            the compassionate window is exhausted).
+ *            the compassionate window is exhausted) — or status 'cancelled',
+ *            an explicit remote revocation that locks a PARENT immediately,
+ *            even mid-period (children finish out the boundary + grace).
  *   unknown: nothing known — never locks either role (a fresh child with no
  *            data is never disrupted; a never-premium parent is handled by the
  *            feature paywalls, not by an expiry lock).
@@ -78,11 +80,27 @@ export const evaluateAccess = (
   const endAt = input.status === 'trial' ? input.trialEndsAt : input.expiresAt;
 
   if (!input.loaded || !endAt) {
-    return { phase: 'unknown', isPremium: false, endAt: endAt ?? null, graceEndsAt: null };
+    // A 'cancelled' row with NO boundary at all is an explicit revocation —
+    // fail closed ('locked'), never 'unknown' (which unlocks).
+    return {
+      phase: input.status === 'cancelled' ? 'locked' : 'unknown',
+      isPremium: false,
+      endAt: endAt ?? null,
+      graceEndsAt: null,
+    };
   }
 
   const endMs = new Date(endAt).getTime();
   if (Number.isNaN(endMs)) {
+    return { phase: 'locked', isPremium: false, endAt, graceEndsAt: null };
+  }
+
+  // A remote CANCELLATION is an explicit revocation for the PARENT: the
+  // strict node locks the moment the status flips — even mid-period, while
+  // its dates are still in the future. The CHILD node keeps its compassionate
+  // path (access runs to the boundary, then grace), so a mid-session
+  // cancellation disrupts the child no more than a normal lapse would.
+  if (input.status === 'cancelled' && role === 'Parent' && now < endMs) {
     return { phase: 'locked', isPremium: false, endAt, graceEndsAt: null };
   }
 
@@ -121,6 +139,62 @@ export const isSubscriptionEntitled = (row: SubscriptionRow | null): boolean => 
   if (!endAt) return false;
 
   return new Date(endAt).getTime() > Date.now();
+};
+
+/** Navigator-level Parent gate outcome. */
+export type ParentGatePhase = 'grant' | 'verifying' | 'lock';
+
+/**
+ * Navigator-level Parent gate — "Strict Parent" extended past the dashboard.
+ *
+ * Evaluates the PERSISTED raw boundaries (no network — so it also decides on
+ * a cold start, before any fetch) and returns:
+ *  • 'grant'     — live entitlement now.
+ *  • 'verifying' — nothing stored yet (fresh install / role re-selection):
+ *                  the entitlement refresh is given one network round-trip
+ *                  to decide. NEVER auto-locks: a brand-new parent must be
+ *                  able to reach the dashboard to pair in the first place.
+ *  • 'lock'      — the stored boundary is in the past (trial, active,
+ *                  expired, cancelled — any past end date).
+ *
+ * Once the post-install refresh resolves, a fresh parent pairing to an
+ * expired child reads the child's expired row (boundaryRow) and locks on the
+ * next pass — the "re-select role to escape" bypass is closed because the
+ * dashboard never mounts while the entitlement is still unknown. A parent
+ * whose child has NO subscription row at all is granted (combo-consistent:
+ * the child device itself is in phase 'unknown' = unlocked there).
+ *
+ * The locked dashboard (ParentDashboardScreen) keeps rendering its own
+ * ParentStrictLock afterwards — this gate only guards entry.
+ */
+export const evaluateParentGate = (
+  premium: {
+    loaded: boolean;
+    status: SubscriptionRow['status'] | null;
+    trialEndsAt: string | null;
+    expiresAt: string | null;
+  },
+  now = Date.now(),
+): ParentGatePhase => {
+  const hasBoundaries =
+    premium.status !== null ||
+    premium.trialEndsAt !== null ||
+    premium.expiresAt !== null;
+
+  // Stored boundary present → decide strictly (zero parent grace).
+  if (hasBoundaries) {
+    const { phase } = evaluateAccess(
+      { ...premium, loaded: true, childGracePeriodDays: 0 },
+      'Parent',
+      now,
+    );
+    return phase === 'locked' ? 'lock' : 'grant';
+  }
+
+  // No boundaries known: fresh install / role re-selection → wait for the
+  // refresh; a completed refresh with no row anywhere → grant (combo rule:
+  // mirror the child device's 'unknown' = unlocked state).
+  return premium.loaded ? 'grant' : 'verifying';
 };
 
 // ── Stacking math (Subscription Upgrade CTA) ───────────────────────────────
@@ -197,6 +271,14 @@ export interface EntitlementSnapshot {
   isPremium: boolean;
   /** The live subscription row backing the decision (null when not premium). */
   subscription: SubscriptionRow | null;
+  /**
+   * The row whose raw boundaries the client should PERSIST for offline gate
+   * evaluation. Live row with the farthest end date when any child is
+   * entitled; otherwise the NEWEST row (expired) — its past boundary is what
+   * evaluateAccess() needs to judge grace/locked. Nulling it away would drop
+   * an expired device into phase 'unknown', which never locks.
+   */
+  boundaryRow: SubscriptionRow | null;
   /** Linked child device ids that were evaluated (Parent context only). */
   linkedChildIds: string[];
   /**
@@ -209,6 +291,7 @@ export interface EntitlementSnapshot {
 const NO_ENTITLEMENT: EntitlementSnapshot = {
   isPremium: false,
   subscription: null,
+  boundaryRow: null,
   linkedChildIds: [],
   childGracePeriodDays: DEFAULT_CHILD_GRACE_DAYS,
 };
@@ -268,13 +351,31 @@ export const fetchPremiumEntitlement = async (
     }
   }
 
-  let live: SubscriptionRow | null = null;
+  let live: SubscriptionRow | null = null;      // any entitled row → isPremium
+  let boundary: SubscriptionRow | null = null;  // live row with the FARTHEST end
+  let newest: SubscriptionRow | null = null;    // newest row overall (fallback)
   for (const row of newestPerChild.values()) {
+    if (!newest || new Date(row.created_at).getTime() > new Date(newest.created_at).getTime()) {
+      newest = row;
+    }
     if (isSubscriptionEntitled(row)) {
-      live = row;
-      break; // one live combo is enough for this device
+      if (!live) live = row; // one live combo is enough for this device
+      const endAt = row.status === 'trial' ? row.trial_ends_at : row.expires_at;
+      const boundaryEnd =
+        boundary ? (boundary.status === 'trial' ? boundary.trial_ends_at : boundary.expires_at) : null;
+      if (
+        !boundary ||
+        (endAt && new Date(endAt).getTime() > new Date(boundaryEnd ?? 0).getTime())
+      ) {
+        boundary = row;
+      }
     }
   }
+  // No live row anywhere → keep the newest (expired) row's PAST boundaries so
+  // the gate can judge grace/locked offline. Nulling them away would drop the
+  // device into phase 'unknown', which never locks. Empty map → null (fresh
+  // child, phase 'unknown' — unchanged behavior).
+  const boundaryRow = boundary ?? newest;
 
   // Dynamic grace length — tolerated failure (defaults), never blocks premium.
   let childGracePeriodDays = DEFAULT_CHILD_GRACE_DAYS;
@@ -291,6 +392,7 @@ export const fetchPremiumEntitlement = async (
   return {
     isPremium: live !== null,
     subscription: live,
+    boundaryRow,
     linkedChildIds: childIds,
     childGracePeriodDays,
   };
