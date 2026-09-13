@@ -7,10 +7,25 @@ import type {
   SubscriptionStatus,
 } from "@/lib/types";
 
+/** For a PARENT row: one linked child's minimal story. */
+export interface DeviceChildSummary {
+  deviceId: string;
+  nickname: string | null;
+  fullName: string | null;
+  subscriptionStatus: SubscriptionStatus | null;
+}
+
 export interface DeviceListItem {
   device: DeviceRow;
   profile: ChildProfileRow | null;
   parentLabels: string[];
+  /** Slot capacity per the Combo rule (devices.max_parent_slots). */
+  slotsUsed: number;
+  maxParentSlots: number;
+  /** First linked parent's contact row (child_devices) — one number per family. */
+  parentContact: { name: string | null; phone: string | null } | null;
+  /** PARENT rows only: the children this device monitors. */
+  children: DeviceChildSummary[];
   subscription: {
     status: SubscriptionStatus;
     planId: string | null;
@@ -37,12 +52,17 @@ export async function getFleet(): Promise<{
 }> {
   const db = createServiceClient();
 
-  const [devices, profiles, links, subs, words] = await Promise.all([
+  const [devices, profiles, links, subs, words, contacts] = await Promise.all([
     db.from("devices").select("*").order("created_at", { ascending: false }).limit(1000),
     db.from("child_profiles").select("*"),
     db.from("family_links").select("*"),
     db.from("subscriptions").select("*").order("created_at", { ascending: false }),
     db.from("custom_words").select("id, child_device_id"),
+    // Contact registry (20260913_parent_contacts.sql) — tolerant of a
+    // pending migration: a null result just leaves contacts empty.
+    db
+      .from("child_devices")
+      .select("parent_device_id, parent_name, parent_phone"),
   ]);
 
   for (const res of [devices, profiles, links, subs, words]) {
@@ -68,16 +88,62 @@ export async function getFleet(): Promise<{
     wordCount.set(w.child_device_id, (wordCount.get(w.child_device_id) ?? 0) + 1);
   }
 
+  // Family topology: distinct linked children per parent device (a parent can
+  // be linked to several children; each consumes one slot on that child).
+  const childIdsByParent = new Map<string, string[]>();
+  for (const l of (links.data ?? []) as FamilyLinkRow[]) {
+    const list = childIdsByParent.get(l.parent_device_id) ?? [];
+    if (!list.includes(l.child_device_id)) list.push(l.child_device_id);
+    childIdsByParent.set(l.parent_device_id, list);
+  }
+
+  // Contact map (parent_device_id → its registry row), degraded safely.
+  const contactByParent = new Map<string, { name: string | null; phone: string | null }>();
+  if (!contacts.error) {
+    for (const c of (contacts.data ?? []) as Array<{
+      parent_device_id: string;
+      parent_name: string | null;
+      parent_phone: string | null;
+    }>) {
+      contactByParent.set(c.parent_device_id, {
+        name: c.parent_name,
+        phone: c.parent_phone,
+      });
+    }
+  }
+
   const since24h = Date.now() - 24 * 60 * 60 * 1000;
+  const profileList = (profiles.data ?? []) as ChildProfileRow[];
   const items: DeviceListItem[] = ((devices.data ?? []) as DeviceRow[]).map(
     (device) => {
       const sub = subByChild.get(device.id);
+      const myLinks = linksByChild.get(device.id) ?? [];
+      const childIds = childIdsByParent.get(device.id) ?? [];
+      // "One number per family": the first linked parent that has a contact
+      // row on file (rows sync automatically from family_links).
+      const contact =
+        myLinks
+          .map((l) => contactByParent.get(l.parent_device_id))
+          .find((c) => c && (c.phone || c.name)) ?? null;
       return {
         device,
         profile: profileByDevice.get(device.id) ?? null,
-        parentLabels: (linksByChild.get(device.id) ?? []).map(
-          (l) => l.parent_label ?? "Parent",
-        ),
+        parentLabels: myLinks.map((l) => l.parent_label ?? "Parent"),
+        slotsUsed: myLinks.length,
+        maxParentSlots: device.max_parent_slots,
+        parentContact: contact,
+        children: device.role === "Parent"
+          ? childIds.map((id) => {
+              const p = profileByDevice.get(id) ?? null;
+              const cs = subByChild.get(id) ?? null;
+              return {
+                deviceId: id,
+                nickname: p?.nickname ?? null,
+                fullName: p?.full_name ?? null,
+                subscriptionStatus: cs?.status ?? null,
+              };
+            })
+          : [],
         subscription: sub
           ? {
               status: sub.status,

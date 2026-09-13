@@ -46,10 +46,18 @@ export async function middleware(request: NextRequest) {
   }
 
   if (user && isLogin) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/admin";
-    url.search = "";
-    return NextResponse.redirect(url);
+    // An explicit error/denied/mfa flag means lib/auth.ts just bounced the
+    // user HERE on purpose (not allowlisted, MFA required, …). Render the
+    // message — bouncing back to /admin would bounce here again and loop
+    // forever (ERR_TOO_MANY_REDIRECTS).
+    const sp = request.nextUrl.searchParams;
+    const bouncedOnPurpose = sp.has("denied") || sp.has("error") || sp.has("mfa");
+    if (!bouncedOnPurpose) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/admin";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
   }
 
   return response;

@@ -9,15 +9,21 @@ import {
   Tablets,
   CreditCard,
   Settings2,
+  ScrollText,
+  Users,
+  SearchCheck,
 } from "lucide-react";
 import { signOutAction } from "@/app/admin/login/actions";
 
 const NAV = [
   { href: "/admin", label: "Executive", icon: LayoutDashboard },
+  { href: "/admin/lookup", label: "Lookup", icon: SearchCheck },
   { href: "/admin/transactions", label: "Transactions", icon: ReceiptText },
   { href: "/admin/devices", label: "Devices", icon: Tablets },
   { href: "/admin/subscriptions", label: "Subscriptions", icon: CreditCard },
   { href: "/admin/settings", label: "Settings", icon: Settings2 },
+  { href: "/admin/team", label: "Team", icon: Users },
+  { href: "/admin/audit", label: "Audit Log", icon: ScrollText },
 ] as const;
 
 export default function Sidebar({ email }: { email: string }) {

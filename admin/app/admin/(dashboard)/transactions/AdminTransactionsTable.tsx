@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
-import { Download, RefreshCw, X, Search } from "lucide-react";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { Download, RefreshCw, X, Search, Undo2 } from "lucide-react";
 import clsx from "clsx";
 import type { TxListRow, TxStats } from "@/lib/transactions";
 import {
@@ -12,26 +12,55 @@ import {
   fmtDate,
   fmtIDR,
 } from "@/components/ui";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import {
   overrideStatusAction,
   retrySettlementAction,
+  getRefundsForTransaction,
+  type RefundRow,
 } from "./actions";
+import RefundDialog from "./RefundDialog";
 
-type StatusFilter = "all" | "pending" | "paid" | "failed";
+type StatusFilter = "all" | "pending" | "paid" | "failed" | "refunded";
 
 export default function AdminTransactionsTable({
   rows,
   stats,
+  dashboardOwner,
+  canRefund,
 }: {
   rows: TxListRow[];
   stats: TxStats;
+  /** Viewer is the Owner — refunds are Owner-only money operations. */
+  dashboardOwner: boolean;
+  /** refund_transaction RPC exists on the DB (20260913_manual_refunds.sql applied). */
+  canRefund: boolean;
 }) {
   const [status, setStatus] = useState<StatusFilter>("all");
   const [dateFrom, setDateFrom] = useState("");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<TxListRow | null>(null);
+  const [drawerRefunds, setDrawerRefunds] = useState<RefundRow[]>([]);
+  const [refundTarget, setRefundTarget] = useState<TxListRow | null>(null);
+  const [confirmTarget, setConfirmTarget] = useState<{
+    row: TxListRow;
+    toStatus: "paid" | "failed";
+  } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  // Refund history for the detail drawer (fetched when the drawer opens).
+  useEffect(() => {
+    setDrawerRefunds([]);
+    if (!selected) return;
+    let cancelled = false;
+    getRefundsForTransaction(selected.transaction_ref).then((rs) => {
+      if (!cancelled) setDrawerRefunds(rs);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [selected]);
 
   const filtered = useMemo(
     () =>
@@ -86,11 +115,21 @@ export default function AdminTransactionsTable({
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 xl:grid-cols-5">
         <StatCard label="Pending" value={stats.pending} />
         <StatCard label="Paid" value={stats.paid} />
+        <StatCard
+          label="Refunded"
+          value={fmtIDR(stats.refunded)}
+          sub="money returned to customers"
+        />
+        <StatCard
+          accent
+          label="Net settled"
+          value={fmtIDR(stats.netSettledVolume)}
+          sub={`${fmtIDR(stats.volumePaid)} gross`}
+        />
         <StatCard label="Failed" value={stats.failed} />
-        <StatCard accent label="Settled volume" value={fmtIDR(stats.volumePaid)} />
       </div>
 
       <Card
@@ -103,7 +142,7 @@ export default function AdminTransactionsTable({
       >
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <div className="flex gap-1 rounded-xl border border-ink-line p-1">
-            {(["all", "pending", "paid", "failed"] as StatusFilter[]).map((s) => (
+            {(["all", "pending", "paid", "refunded", "failed"] as StatusFilter[]).map((s) => (
               <button
                 key={s}
                 type="button"
@@ -174,6 +213,11 @@ export default function AdminTransactionsTable({
                     <td className="table-cell">{fmtIDR(r.amount)}</td>
                     <td className="table-cell">
                       <TransactionBadge status={r.status} />
+                      {r.refundedTotal > 0 && r.status !== "refunded" ? (
+                        <span className="mt-0.5 block text-[10px] text-violet-300">
+                          {fmtIDR(r.refundedTotal)} refunded
+                        </span>
+                      ) : null}
                     </td>
                     <td className="table-cell text-xs text-slate-400">
                       {fmtDate(r.created_at)}
@@ -192,23 +236,57 @@ export default function AdminTransactionsTable({
                           >
                             <RefreshCw size={13} /> Retry
                           </button>
-                        ) : (
+                        ) : r.status === "paid" ? (
+                          <>
+                            {canRefund && dashboardOwner ? (
+                              <button
+                                type="button"
+                                disabled={pending}
+                                onClick={() => setRefundTarget(r)}
+                                className="btn-ghost text-violet-300 hover:border-violet-400/50"
+                                title="Record a manual gateway refund"
+                              >
+                                <Undo2 size={13} /> Refund
+                              </button>
+                            ) : null}
+                            {canRefund ? (
+                              <button
+                                type="button"
+                                disabled={pending}
+                                onClick={() =>
+                                  setConfirmTarget({ row: r, toStatus: "failed" })
+                                }
+                                className="btn-ghost"
+                              >
+                                Mark failed
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={pending}
+                                onClick={() =>
+                                  runAction(() =>
+                                    overrideStatusAction(r.transaction_ref, "failed"),
+                                  )
+                                }
+                                className="btn-ghost"
+                              >
+                                Mark failed
+                              </button>
+                            )}
+                          </>
+                        ) : r.status === "failed" ? (
                           <button
                             type="button"
                             disabled={pending}
                             onClick={() =>
-                              runAction(() =>
-                                overrideStatusAction(
-                                  r.transaction_ref,
-                                  r.status === "paid" ? "failed" : "paid",
-                                ),
-                              )
+                              setConfirmTarget({ row: r, toStatus: "paid" })
                             }
                             className="btn-ghost"
                           >
-                            {r.status === "paid" ? "Mark failed" : "Mark paid"}
+                            Mark paid
                           </button>
-                        )}
+                        ) : null}
                       </div>
                     </td>
                   </tr>
@@ -256,6 +334,7 @@ export default function AdminTransactionsTable({
                 ["Gateway", selected.payment_gateway],
                 ["Created", fmtDate(selected.created_at)],
                 ["Paid at", fmtDate(selected.paid_at)],
+                ["Refunded", selected.refundedTotal > 0 ? fmtIDR(selected.refundedTotal) : "—"],
               ].map(([k, v]) => (
                 <div key={k} className="flex justify-between gap-4">
                   <dt className="text-slate-500">{k}</dt>
@@ -263,6 +342,36 @@ export default function AdminTransactionsTable({
                 </div>
               ))}
             </dl>
+
+            {drawerRefunds.length > 0 ? (
+              <div className="mt-6">
+                <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  Refund history ({drawerRefunds.length})
+                </h4>
+                <ul className="space-y-2">
+                  {drawerRefunds.map((rf) => (
+                    <li
+                      key={rf.id}
+                      className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-3 text-xs"
+                    >
+                      <div className="flex justify-between">
+                        <span className="font-semibold text-violet-300">
+                          {fmtIDR(rf.amount)}
+                        </span>
+                        <span className="text-slate-500">{fmtDate(rf.created_at)}</span>
+                      </div>
+                      <p className="mt-1 text-slate-300">{rf.reason}</p>
+                      <p className="mt-1 text-slate-500">
+                        by {rf.created_by_email}
+                        {rf.gateway_reference
+                          ? ` · gateway ref ${rf.gateway_reference}`
+                          : ""}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
 
             <h4 className="mb-2 mt-8 text-xs font-semibold uppercase tracking-wider text-slate-400">
               Raw webhook payload
@@ -274,6 +383,52 @@ export default function AdminTransactionsTable({
             </pre>
           </aside>
         </div>
+      ) : null}
+
+      {/* Owner-only refund dialog — records a manual gateway refund. */}
+      {refundTarget ? (
+        <RefundDialog
+          tx={refundTarget}
+          onClose={() => setRefundTarget(null)}
+          onCompleted={(msg) => {
+            setRefundTarget(null);
+            setToast(msg);
+            setTimeout(() => setToast(null), 6000);
+          }}
+        />
+      ) : null}
+
+      {/* Destructive status overrides now confirm explicitly (P2 #1). */}
+      {confirmTarget ? (
+        <ConfirmDialog
+          open
+          tone="danger"
+          busy={pending}
+          title={`Mark as ${confirmTarget.toStatus}?`}
+          body={
+            confirmTarget.toStatus === "failed" ? (
+              <span>
+                Transaction <code className="font-mono">{confirmTarget.row.transaction_ref}</code>{" "}
+                will be marked <strong>failed</strong>. Its amount leaves the
+                settled revenue. Use Refund instead if the money is being
+                returned.
+              </span>
+            ) : (
+              <span>
+                Transaction <code className="font-mono">{confirmTarget.row.transaction_ref}</code>{" "}
+                will be marked <strong>paid</strong> and its plan applied to the
+                subscription immediately.
+              </span>
+            )
+          }
+          confirmLabel={confirmTarget.toStatus === "failed" ? "Mark failed" : "Mark paid & apply plan"}
+          onCancel={() => setConfirmTarget(null)}
+          onConfirm={() => {
+            const { row, toStatus } = confirmTarget;
+            setConfirmTarget(null);
+            runAction(() => overrideStatusAction(row.transaction_ref, toStatus));
+          }}
+        />
       ) : null}
     </div>
   );

@@ -2,11 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
-import { getAdminOrNull } from "@/lib/auth";
+import { getAdminOrNull, OwnerRequiredError } from "@/lib/auth";
+import { writeAudit } from "@/lib/audit";
 
 async function guard() {
   const admin = await getAdminOrNull();
   if (!admin) throw new Error("Unauthorized");
+  // Global app behavior (trial length, paywall switch) — Owner only.
+  if (admin.role !== "owner") throw new OwnerRequiredError();
   return admin;
 }
 
@@ -44,6 +47,14 @@ export async function updateSettingsAction(
     .eq("id", true); // single-row guard
 
   revalidatePath("/admin/settings");
+  if (!error) {
+    await writeAudit({
+      action: "settings_update",
+      scope: "settings",
+      description: `App settings updated: ${Object.keys(patch).join(", ")}`,
+      metadata: { changed_keys: Object.keys(patch), patch },
+    });
+  }
   return error
     ? { ok: false, message: error.message }
     : { ok: true, message: "Settings applied — live apps pick this up on next refresh." };

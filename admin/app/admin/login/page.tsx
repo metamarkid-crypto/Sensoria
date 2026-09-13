@@ -6,6 +6,11 @@ const ERRORS: Record<string, string> = {
   missing: "Email and password are required.",
   invalid: "Invalid credentials, or this email is not an admin yet.",
   denied: "Access denied — this account is not on the admin allowlist.",
+  rate_limited:
+    "Too many failed attempts. Try again in a few minutes — further attempts are temporarily blocked.",
+  weak_password:
+    "This password is weak or appears in known data leaks — reset it to a long, unique passphrase before signing in.",
+  mfa: "Second factor required — verify your authenticator app to continue.",
 };
 
 export default async function LoginPage({

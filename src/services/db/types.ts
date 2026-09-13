@@ -63,6 +63,14 @@ export interface SubscriptionPlanRow {
   currency: string;
   is_active: boolean;
   created_at: string;
+  /**
+   * Plan taxonomy (20260913_parent_slot_packs.sql): 'combo' = subscription
+   * plan (default; pre-migration rows), 'slots' = one-time permanent
+   * parent-slot pack. Optional so pre-migration deployments typecheck.
+   */
+  kind?: 'combo' | 'slots';
+  /** For kind='slots': how many EXTRA parent slots the pack grants. */
+  slot_count?: number | null;
 }
 
 /** Row shape of `public.locations` — append-only GPS history (Child node). */

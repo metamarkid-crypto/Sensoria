@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getAdminOrNull } from "@/lib/auth";
+import { writeAudit } from "@/lib/audit";
 
 async function guard() {
   const admin = await getAdminOrNull();
@@ -63,6 +64,20 @@ export async function extendTrialAction(
     .eq("id", row.id);
 
   revalidatePath("/admin/devices");
+  if (!error) {
+    await writeAudit({
+      action: "subscription_extend",
+      scope: "devices",
+      description: `Subscription extended by ${days} days → ${extended.slice(0, 10)} (${isTrialOrigin ? "trial" : "paid"} boundary)`,
+      metadata: {
+        child_device_id: childDeviceId,
+        subscription_id: row.id,
+        days,
+        boundary: isTrialOrigin ? "trial_ends_at" : "expires_at",
+        new_end: extended,
+      },
+    });
+  }
   return error
     ? { ok: false, message: error.message }
     : { ok: true, message: `Extended by ${days} days → ${extended.slice(0, 10)}.` };
@@ -97,6 +112,14 @@ export async function revokePlanAction(
     .eq("id", row.id);
 
   revalidatePath("/admin/devices");
+  if (!error) {
+    await writeAudit({
+      action: "subscription_revoke",
+      scope: "devices",
+      description: `Plan revoked (cancelled) for child ${childDeviceId} — devices lock on next sync`,
+      metadata: { child_device_id: childDeviceId, subscription_id: row.id },
+    });
+  }
   return error
     ? { ok: false, message: error.message }
     : { ok: true, message: "Plan revoked (cancelled) — devices lock on next sync." };

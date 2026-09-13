@@ -1,5 +1,5 @@
 export type SubscriptionStatus = "trial" | "active" | "expired" | "cancelled";
-export type TransactionStatus = "pending" | "paid" | "failed";
+export type TransactionStatus = "pending" | "paid" | "failed" | "refunded";
 export type DeviceRole = "Child" | "Parent";
 
 export interface DeviceRow {
@@ -35,6 +35,10 @@ export interface PlanRow {
   id: string;
   name: string;
   description: string | null;
+  /** "combo" = subscription time · "slots" = one-time parent-slot pack. */
+  kind: "combo" | "slots";
+  /** For kind="slots": how many EXTRA parent slots the pack grants. */
+  slot_count: number | null;
   duration_months: number;
   price: number;
   currency: string;
@@ -65,6 +69,7 @@ export interface TransactionRow {
   payment_gateway: string;
   raw_payload: Record<string, unknown> | null;
   paid_at: string | null;
+  refunded_at?: string | null;
   created_at: string;
   updated_at: string;
 }

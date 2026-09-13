@@ -73,6 +73,12 @@ export const fetchPaywallSettings = async (): Promise<PaywallSettings> => {
 
 /**
  * Active Combo plans (1 / 6 / 12 months), cheapest first.
+ *
+ * Scoped to kind = 'combo' so the one-time parent-slot packs (kind = 'slots',
+ * seeded by 20260913_parent_slot_packs.sql) NEVER surface in the subscription
+ * paywall — they are bought from the pairing sheet instead. When the kind
+ * column does not exist yet (pre-migration), the filter degrades gracefully:
+ * the scoped query fails and we retry unscoped, exactly the old behavior.
  * Errors degrade to an empty list so the screen can show a retry state.
  */
 export const fetchActivePlans = async (): Promise<SubscriptionPlanRow[]> => {
@@ -81,13 +87,26 @@ export const fetchActivePlans = async (): Promise<SubscriptionPlanRow[]> => {
       .from('plans')
       .select('*')
       .eq('is_active', true)
+      .eq('kind', 'combo')
       .order('duration_months', { ascending: true });
 
     if (error) throw error;
     return (data ?? []) as SubscriptionPlanRow[];
-  } catch (e) {
-    console.warn('fetchActivePlans failed:', e);
-    return [];
+  } catch (kindErr) {
+    // Legacy fallback: plans.kind missing (unapplied migration) → retry
+    // unscoped so Combo plans still render on old databases.
+    try {
+      const { data, error } = await supabase
+        .from('plans')
+        .select('*')
+        .eq('is_active', true)
+        .order('duration_months', { ascending: true });
+      if (error) throw error;
+      return (data ?? []).filter((p) => (p as SubscriptionPlanRow).kind !== 'slots') as SubscriptionPlanRow[];
+    } catch (e) {
+      console.warn('fetchActivePlans failed:', kindErr, e);
+      return [];
+    }
   }
 };
 
