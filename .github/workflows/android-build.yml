@@ -71,28 +71,46 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease
 
-      - name: 🧽 Purge old APK artifacts (keep only the latest)
+      # ── STORAGE GUARD ─────────────────────────────────────────────────────
+      # The free plan gives only 500 MB of Actions storage. A failed run never
+      # reached the purge step before, so its APK (100-200 MB) stayed forever
+      # and the quota filled up ("storage full" on the next build). This step
+      # now:
+      #   • deletes EVERY artifact — this repo produces only the APK, so a
+      #     blanket purge is safe and clears strays from failed/partial runs;
+      #   • always runs — even when the build itself fails, old junk is still
+      #     removed so the quota never wedges;
+      #   • is failure-tolerant — one bad delete cannot abort the workflow.
+      - name: 🧽 Purge ALL old artifacts (keep only the one uploaded below)
+        if: always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           REPO="${{ github.repository }}"
-          IDS=$(curl -s -H "Authorization: Bearer $GH_TOKEN" \
-            "https://api.github.com/repos/$REPO/actions/artifacts?per_page=100" \
-            | jq -r '.artifacts[] | select(.name == "Sensoria-Android-APK") | .id')
-          for id in $IDS; do
-            echo "Deleting old artifact $id"
-            curl -s -X DELETE -H "Authorization: Bearer $GH_TOKEN" \
-              "https://api.github.com/repos/$REPO/actions/artifacts/$id" > /dev/null
+          page=1
+          while : ; do
+            RESP=$(curl -sf -H "Authorization: Bearer $GH_TOKEN" \
+              "https://api.github.com/repos/$REPO/actions/artifacts?per_page=100&page=$page") || break
+            IDS=$(echo "$RESP" | jq -r '.artifacts[]?.id // empty')
+            [ -z "$IDS" ] && break
+            for id in $IDS; do
+              echo "Deleting old artifact $id"
+              # Delete with retry; never let a single failure abort the purge.
+              curl -s -X DELETE -H "Authorization: Bearer $GH_TOKEN" \
+                "https://api.github.com/repos/$REPO/actions/artifacts/$id" > /dev/null || true
+            done
+            page=$((page + 1))
           done
           echo "Purge done. Free plan Actions storage is 500 MB and every APK is
-          100-200 MB — keeping only the newest build prevents the quota from
-          filling up and blocking future builds."
+          100-200 MB — wiping all old artifacts on EVERY run (success or not)
+          keeps the quota free for the newest build."
 
       - name: 📤 Upload APK Artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: Sensoria-Android-APK
           path: android/app/build/outputs/apk/release/app-release.apk
-          # Backstop for the purge above (e.g. skipped runs); 7 days is plenty
-          # for grabbing the latest APK.
-          retention-days: 7
+          # Backstop: even if every future purge were skipped, artifacts now
+          # expire on their own instead of filling the quota forever.
+          retention-days: 3

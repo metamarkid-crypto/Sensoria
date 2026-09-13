@@ -47,3 +47,7 @@ yarn-error.*
 
 # archives
 *.zip
+
+# Freebuff local tooling & runtime logs (machine-specific, never commit)
+.freebuff/
+dev-server.log
