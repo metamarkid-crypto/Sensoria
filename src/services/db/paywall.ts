@@ -15,9 +15,21 @@ import {
  * the `subscriptions` table (the backend flips the row after payment settles).
  */
 
-/** Web backend endpoints (owned by aacsensoria.id — qris-api, blueprint §4.3). */
-export const QRIS_CHECKOUT_URL = 'https://app.aacsensoria.id/api/qris-checkout';
-export const QRIS_STATUS_URL = 'https://app.aacsensoria.id/api/qris-status';
+/**
+ * Web backend base (qris-api, blueprint §4.3).
+ *
+ * DEFAULT = https://api.aacsensoria.id — the LIVE deployment (verified via
+ * /api/health). The old planned host `app.aacsensoria.id` does not resolve in
+ * DNS; the roadmap docs still mention it, but the deployed service lives on
+ * `api.`. Override with EXPO_PUBLIC_QRIS_API_BASE_URL when the host moves —
+ * trailing slashes are stripped so concatenation is always safe.
+ */
+export const QRIS_API_BASE_URL = (
+  process.env.EXPO_PUBLIC_QRIS_API_BASE_URL || 'https://api.aacsensoria.id'
+).replace(/\/+$/, '');
+
+export const QRIS_CHECKOUT_URL = `${QRIS_API_BASE_URL}/api/qris-checkout`;
+export const QRIS_STATUS_URL = `${QRIS_API_BASE_URL}/api/qris-status`;
 
 /** Subset of app_settings the paywall needs (stealth kill-switch). */
 export interface PaywallSettings {
