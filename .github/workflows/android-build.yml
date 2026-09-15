@@ -6,10 +6,16 @@ on:
       - main
   workflow_dispatch: # Allows manual trigger from GitHub UI
 
-# GITHUB_TOKEN needs actions:write to DELETE old artifacts in the purge step.
+# contents:write → publish the APK as a GitHub RELEASE (gh release create).
+# Releases do NOT count against the 500 MB Actions storage quota — unlike
+# artifacts, which kept wedging the pipeline ("Artifact storage quota has
+# been hit") even after old runs were deleted, because ACTIONS CACHES also
+# fill the same quota and survive artifact/run deletion. Strategy:
+#   • no artifacts at all → the APK ships as a Release asset (free storage);
+#   • no actions/setup-node cache → caches were the invisible quota eater;
+#   • rotate old releases → only the 5 newest apk-v* builds remain.
 permissions:
-  contents: read
-  actions: write
+  contents: write
 
 jobs:
   build:
@@ -36,8 +42,15 @@ jobs:
       - name: ⚙️ Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: 'npm'
+          # Node 22 LTS — Node 20 reached EOL (April 2026), which is why the
+          # runner printed the "Node 20 is being deprecated" banner. Node 22
+          # is fully supported by the Expo 57 / RN 0.86 toolchain.
+          node-version: 22
+          # Deliberately NO `cache: 'npm'`: caches share the 500 MB Actions
+          # storage quota with artifacts and are NOT deleted when runs or
+          # artifacts are — they silently filled the quota. A cold npm ci
+          # costs a couple of minutes; a pipeline that never wedges on
+          # storage is worth it.
 
       - name: ☕ Setup Java (JDK 17)
         uses: actions/setup-java@v4
@@ -76,46 +89,55 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease
 
-      # ── STORAGE GUARD ─────────────────────────────────────────────────────
-      # The free plan gives only 500 MB of Actions storage. A failed run never
-      # reached the purge step before, so its APK (100-200 MB) stayed forever
-      # and the quota filled up ("storage full" on the next build). This step
-      # now:
-      #   • deletes EVERY artifact — this repo produces only the APK, so a
-      #     blanket purge is safe and clears strays from failed/partial runs;
-      #   • always runs — even when the build itself fails, old junk is still
-      #     removed so the quota never wedges;
-      #   • is failure-tolerant — one bad delete cannot abort the workflow.
-      - name: 🧽 Purge ALL old artifacts (keep only the one uploaded below)
+      # ── PUBLISH (replaces artifact upload) ────────────────────────────────
+      # Releases storage is unlimited for this purpose and does not touch the
+      # Actions quota. Tag format apk-v<version>-r<run_number> keeps builds
+      # sortable; --latest marks it as the release testers should download.
+      - name: 🏷️ Publish APK to GitHub Releases
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="apk-v${VERSION}-r${{ github.run_number }}"
+          gh release create "$TAG" \
+            android/app/build/outputs/apk/release/app-release.apk \
+            --title "Sensoria APK v${VERSION} (build #${{ github.run_number }})" \
+            --latest \
+            --notes "Automated release build from commit ${{ github.sha }}.
+
+          Cara install: unduh app-release.apk → izinkan 'Install unknown apps' → install.
+
+          Dibangun dengan nilai EXPO_PUBLIC_* dari Actions secrets repo ini."
+
+      # ── QUOTA RECLAIM ──────────────────────────────────────────────────────
+      # Caches from the OLD workflow runs (actions/setup-node `cache: 'npm'`)
+      # still occupy quota and would only age out after 7 unused days. Delete
+      # them on every run — the workflow no longer CREATES caches, so this is
+      # a one-way reclaim that immediately frees the 500 MB budget.
+      - name: 🧹 Purge legacy Actions caches (reclaim storage quota)
         if: always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          REPO="${{ github.repository }}"
-          page=1
-          while : ; do
-            RESP=$(curl -sf -H "Authorization: Bearer $GH_TOKEN" \
-              "https://api.github.com/repos/$REPO/actions/artifacts?per_page=100&page=$page") || break
-            IDS=$(echo "$RESP" | jq -r '.artifacts[]?.id // empty')
-            [ -z "$IDS" ] && break
-            for id in $IDS; do
-              echo "Deleting old artifact $id"
-              # Delete with retry; never let a single failure abort the purge.
-              curl -s -X DELETE -H "Authorization: Bearer $GH_TOKEN" \
-                "https://api.github.com/repos/$REPO/actions/artifacts/$id" > /dev/null || true
-            done
-            page=$((page + 1))
-          done
-          echo "Purge done. Free plan Actions storage is 500 MB and every APK is
-          100-200 MB — wiping all old artifacts on EVERY run (success or not)
-          keeps the quota free for the newest build."
+          gh cache list --limit 100 2>/dev/null | awk '{print $1}' | while read -r id; do
+            echo "Deleting cache $id"
+            gh cache delete "$id" || true
+          done || true
+          echo "Cache purge done."
 
-      - name: 📤 Upload APK Artifact
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: Sensoria-Android-APK
-          path: android/app/build/outputs/apk/release/app-release.apk
-          # Backstop: even if every future purge were skipped, artifacts now
-          # expire on their own instead of filling the quota forever.
-          retention-days: 3
+      # ── ROTATION ───────────────────────────────────────────────────────────
+      # Keep the 5 newest apk-v* releases so testers always see the current
+      # build at the top and old builds never accumulate. Non-apk releases
+      # (if any) are never touched. Failure-tolerant: one bad delete cannot
+      # fail the workflow.
+      - name: 🧽 Rotate old APK releases (keep 5 newest)
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release list --limit 200 | awk '$1 ~ /^apk-v/ {print $1}' | tail -n +6 | while read -r tag; do
+            echo "Deleting old APK release: $tag"
+            gh release delete "$tag" --yes --cleanup-tag || true
+          done
+          echo "Rotation done — the 5 newest APK builds are kept."
