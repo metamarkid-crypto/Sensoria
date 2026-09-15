@@ -33,6 +33,10 @@ export const AUDIT_ACTIONS = [
   "parent_slot_grant",
   "privacy_purge_locations",
   "emergency_locate",
+  "qris_merchant_link",
+  "qris_static_qr_set",
+  "qris_token_refresh",
+  "qris_worker_run",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

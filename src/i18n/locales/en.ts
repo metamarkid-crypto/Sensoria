@@ -17,6 +17,9 @@ export const en: Record<TranslationKey, string> = {
   'common.unknown': 'Unknown',
   'common.back': 'Back',
 
+  // ── Splash (brand gate) ───────────────────────────────────────────────────
+  'splash.tagline': 'Connecting hearts, giving voice',
+
   // ── Bottom Tabs (Parent) ──────────────────────────────────────────────────
   'tabs.home': 'Home',
   'tabs.messages': 'Messages',

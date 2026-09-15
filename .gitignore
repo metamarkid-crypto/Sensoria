@@ -51,3 +51,9 @@ yarn-error.*
 # Freebuff local tooling & runtime logs (machine-specific, never commit)
 .freebuff/
 dev-server.log
+
+# go-merchant: local reverse-engineering sandbox for the GoPay/QRIS gateway.
+# NOT part of the shipped product — it vendors 17 MB of Windows platform-tools
+# binaries (adb.exe & co), runtime logs, and raw request dumps. The production
+# payment service lives in qris-api/ instead.
+go-merchant/

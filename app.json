@@ -2,7 +2,7 @@
   "expo": {
     "name": "Sensoria",
     "slug": "Sensoria",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -11,13 +11,14 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#FFFFFF",
+        "backgroundColor": "#E1F2FD",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
       "package": "id.sensoria.aac",
+      "versionCode": 2,
       "permissions": [
         "android.permission.POST_NOTIFICATIONS"
       ]
@@ -25,12 +26,24 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#FFFFFF"
-    },
     "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F2FAFE",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "dark": {
+            "backgroundColor": "#0B2545",
+            "image": "./assets/splash-icon.png"
+          },
+          "android": {
+            "backgroundColor": "#F2FAFE",
+            "image": "./assets/splash-icon.png",
+            "imageWidth": 200
+          }
+        }
+      ],
       "expo-sqlite",
       "expo-audio",
       "expo-secure-store",

@@ -7,6 +7,7 @@ import Toast, { BaseToast, ErrorToast } from 'react-native-toast-message';
 import AppNavigator from './src/navigation/AppNavigator';
 import { useAACStore } from './src/store/useAACStore';
 import { subscribeEntitlementRealtime } from './src/services/db/entitlementRealtime';
+import SplashGate from './src/components/SplashGate';
 
 Sentry.init({
   dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
@@ -189,6 +190,12 @@ function App() {
   return (
     <SafeAreaProvider>
       <StatusBar style="auto" />
+      {/* Brand gate: holds the native splash until the persisted store has
+          rehydrated (killing the RoleSelection flash) and plays the seamless
+          hero + wordmark + tagline reveal. Renders above the navigator AND
+          above the Sentry boundary (an error boundary can't intercept a
+          sibling), but below Toast (toast must top everything). */}
+      <SplashGate />
       <EntitlementLifecycle />
       <Sentry.ErrorBoundary fallback={ErrorFallbackScreen}>
         <AppNavigator />

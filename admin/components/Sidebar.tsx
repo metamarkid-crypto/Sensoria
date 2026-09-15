@@ -12,6 +12,7 @@ import {
   ScrollText,
   Users,
   SearchCheck,
+  QrCode,
 } from "lucide-react";
 import { signOutAction } from "@/app/admin/login/actions";
 
@@ -21,6 +22,7 @@ const NAV = [
   { href: "/admin/transactions", label: "Transactions", icon: ReceiptText },
   { href: "/admin/devices", label: "Devices", icon: Tablets },
   { href: "/admin/subscriptions", label: "Subscriptions", icon: CreditCard },
+  { href: "/admin/payment", label: "Payment Gateway", icon: QrCode },
   { href: "/admin/settings", label: "Settings", icon: Settings2 },
   { href: "/admin/team", label: "Team", icon: Users },
   { href: "/admin/audit", label: "Audit Log", icon: ScrollText },

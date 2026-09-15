@@ -17,6 +17,9 @@ export const zh: Record<TranslationKey, string> = {
   'common.unknown': '未知',
   'common.back': '返回',
 
+  // ── Splash (brand gate) ───────────────────────────────────────────────────
+  'splash.tagline': '连接心灵，赋予声音',
+
   // ── Bottom Tabs (Parent) ──────────────────────────────────────────────────
   'tabs.home': '首页',
   'tabs.messages': '消息',

@@ -21,6 +21,9 @@ export const id = {
   'common.unknown': 'Belum diketahui',
   'common.back': 'Kembali',
 
+  // ── Splash (brand gate) ───────────────────────────────────────────────────
+  'splash.tagline': 'Menghubungkan hati, memberi suara',
+
   // ── Bottom Tabs (Parent) ──────────────────────────────────────────────────
   'tabs.home': 'Beranda',
   'tabs.messages': 'Pesan',
