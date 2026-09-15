@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, Text, TouchableOpacity, Modal, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontAwesome5 } from '@expo/vector-icons';
@@ -9,7 +9,7 @@ import * as Haptics from 'expo-haptics';
 import { TextInput, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { fetchChildSlotState, fetchActiveSlotPlans, type SlotPackRow } from '../services/db/slots';
-import { createQrisCheckout } from '../services/db/paywall';
+import { createQrisCheckout, checkQrisStatus } from '../services/db/paywall';
 
 interface Props {
   isVisible: boolean;
@@ -73,6 +73,8 @@ export default function PairingBottomSheet({ isVisible, onClose }: Props) {
   // Capacity snapshot taken when the paywall opened — the baseline for the
   // "did the purchase land?" check after verification.
   const [slotCapacityBefore, setSlotCapacityBefore] = useState<number | null>(null);
+  // Order id of the in-flight slot purchase (instant-verify on "Sudah Membayar").
+  const qrOrderRef = useRef<string | null>(null);
 
   // STEALTH SAFETY: if the kill-switch flips OFF while a purchase flow is
   // open (foreground refresh can land mid-QR), tear the whole flow down
@@ -191,6 +193,7 @@ export default function PairingBottomSheet({ isVisible, onClose }: Props) {
       const result = await createQrisCheckout(deviceId, pack.id);
       setQrImageUri(result.imageUri);
       setQrExpiresAt(result.qrisExpiresAt);
+      qrOrderRef.current = result.orderId;
       setSlotFlow('qr');
     } catch (e) {
       setSlotFlow('plans');
@@ -215,6 +218,12 @@ export default function PairingBottomSheet({ isVisible, onClose }: Props) {
   const handleVerifySlot = async () => {
     if (slotFlow === 'verifying' || !deviceId) return;
     setSlotFlow('verifying');
+    // Instant-verify first: ask the backend to poll GoBiz journals NOW so a
+    // just-paid order settles within seconds instead of on the next cron
+    // sweep; then re-read capacity (the ledger re-read stays source of truth).
+    if (selectedPack && qrOrderRef.current) {
+      await checkQrisStatus(qrOrderRef.current);
+    }
     const state = await fetchChildSlotState(deviceId);
     const before = slotCapacityBefore;
     const grew =

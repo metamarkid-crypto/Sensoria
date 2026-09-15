@@ -61,6 +61,11 @@ jobs:
           echo "EXPO_PUBLIC_VOICE_BOY_2=${{ secrets.EXPO_PUBLIC_VOICE_BOY_2 }}" >> .env
           echo "EXPO_PUBLIC_VOICE_DAD=${{ secrets.EXPO_PUBLIC_VOICE_DAD }}" >> .env
           echo "EXPO_PUBLIC_VOICE_MOM=${{ secrets.EXPO_PUBLIC_VOICE_MOM }}" >> .env
+          # QRIS scanner-filter secret (hmac.ts) — SAME value as QRIS_API_SECRET
+          # in qris-api/.env.production. Missing it does NOT crash the app
+          # (hmac.ts throws lazily at payment time with QRIS_API_SECRET_MISSING),
+          # but without it the paywall can never open a checkout.
+          echo "EXPO_PUBLIC_QRIS_API_SECRET=${{ secrets.EXPO_PUBLIC_QRIS_API_SECRET }}" >> .env
 
       - name: 🏗️ Run Expo Prebuild (Generate Native Code)
         run: npx expo prebuild --platform android --clean

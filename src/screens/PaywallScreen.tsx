@@ -15,6 +15,7 @@ import Toast from 'react-native-toast-message';
 import { useAACStore } from '../store/useAACStore';
 import {
   createQrisCheckout,
+  checkQrisStatus,
   fetchActivePlans,
 } from '../services/db/paywall';
 import { computeRenewalPreview } from '../services/db/entitlement';
@@ -140,10 +141,21 @@ export default function PaywallScreen() {
     }
   };
 
-  /** Manual verification — re-reads subscriptions after the user pays via QRIS. */
+  /**
+   * Manual verification — instant-verify FIRST (ask the backend to poll the
+   * merchant's GoBiz journals now and settle on a match), then re-read
+   * subscriptions. The ledger re-read stays the source of truth; the status
+   * call only nudges the backend so "Saya Sudah Membayar" settles within
+   * seconds instead of waiting for the worker's next cron sweep.
+   */
   const handleVerifyPayment = async () => {
     if (stage === 'verifying') return;
     setStage('verifying');
+    if (orderId) {
+      // Verification failures are swallowed server-side — a hiccup just
+      // returns status null and we fall through to the entitlement re-read.
+      await checkQrisStatus(orderId);
+    }
     await refreshEntitlement();
     const isPremiumNow = useAACStore.getState().premium.isPremium;
 

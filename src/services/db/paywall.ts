@@ -1,5 +1,10 @@
 import { supabase } from './supabase';
 import type { SubscriptionPlanRow } from './types';
+import {
+  sensoriaSignatureHeaders,
+  QRIS_API_SECRET,
+  QRIS_API_SECRET_MISSING,
+} from './hmac';
 
 /**
  * Paywall / QRIS service — Stealth External Subscription (Master Blueprint).
@@ -10,8 +15,9 @@ import type { SubscriptionPlanRow } from './types';
  * the `subscriptions` table (the backend flips the row after payment settles).
  */
 
-/** Web backend endpoint (owned by aacsensoria.id — built server-side later). */
+/** Web backend endpoints (owned by aacsensoria.id — qris-api, blueprint §4.3). */
 export const QRIS_CHECKOUT_URL = 'https://app.aacsensoria.id/api/qris-checkout';
+export const QRIS_STATUS_URL = 'https://app.aacsensoria.id/api/qris-status';
 
 /** Subset of app_settings the paywall needs (stealth kill-switch). */
 export interface PaywallSettings {
@@ -110,50 +116,40 @@ export const fetchActivePlans = async (): Promise<SubscriptionPlanRow[]> => {
   }
 };
 
-/** Normalized QRIS checkout result returned by the web backend. */
-export interface QrisCheckoutResult {
-  orderId: string | null;
-  /** https URL or a `data:image/png;base64,…` URI — directly renderable. */
-  imageUri: string;
-  qrisExpiresAt: string | null;
-}
-
 /**
- * POST { device_id, plan_id } to the web backend and normalize the response.
+ * POST the signed JSON body to a qris-api endpoint.
  *
- * Accepted response shapes (backend contract, both optional):
- *   { qris_image_url: "https://…/qr.png" }
- *   { qris_image_base64: "<base64>" }            (also accepts a full data URI)
- * plus optional { order_id, qris_expires_at }.
- *
- * @throws a human-readable Error on network failure, non-2xx, or missing image.
+ * Signing: X-Sensoria-Sign = HMAC-SHA256("<unix-ts>.<rawBody>", secret) —
+ * the raw bytes the server verifies are the exact bytes we signed, so the
+ * body is serialized ONCE here and never re-stringified. Timeout via
+ * Promise.race (no AbortController dependency in this RN target).
  */
-export const createQrisCheckout = async (
-  deviceId: string,
-  planId: string,
-): Promise<QrisCheckoutResult> => {
-  // Timeout via Promise.race (no AbortController dependency in this RN target).
-  const TIMEOUT_MS = 20000;
+const signedPost = async (
+  url: string,
+  payload: Record<string, unknown>,
+  { timeoutMs = 20000 }: { timeoutMs?: number } = {},
+): Promise<{ ok: boolean; status: number; body: Record<string, unknown> }> => {
+  const rawBody = JSON.stringify(payload);
+  let headers: Record<string, string>;
+  try {
+    headers = {
+      'Content-Type': 'application/json',
+      ...sensoriaSignatureHeaders(rawBody, QRIS_API_SECRET),
+    };
+  } catch {
+    // Blank/missing EXPO_PUBLIC_QRIS_API_SECRET (e.g. dev build without env).
+    throw new Error(QRIS_API_SECRET_MISSING);
+  }
+
   const timeout = new Promise<never>((_, reject) => {
-    setTimeout(
-      // Stable error CODE (not user-facing prose) — PaywallScreen maps it to a
-      // localized toast message so users always see text in their language.
-      () => reject(new Error('PAYMENT_SERVER_TIMEOUT')),
-      TIMEOUT_MS,
-    );
+    setTimeout(() => reject(new Error('PAYMENT_SERVER_TIMEOUT')), timeoutMs);
   });
 
   let response: Response;
   try {
-    response = await Promise.race([
-      fetch(QRIS_CHECKOUT_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ device_id: deviceId, plan_id: planId }),
-      }),
-      timeout,
-    ]);
+    response = await Promise.race([fetch(url, { method: 'POST', headers, body: rawBody }), timeout]);
   } catch (e) {
+    if (e instanceof Error && e.message === 'PAYMENT_SERVER_TIMEOUT') throw e;
     throw new Error(
       e instanceof Error && e.message
         ? e.message
@@ -167,10 +163,56 @@ export const createQrisCheckout = async (
   } catch {
     throw new Error('Respons server tidak valid.');
   }
+  return { ok: response.ok, status: response.status, body };
+};
 
-  if (!response.ok) {
+/** Normalized QRIS checkout result returned by the web backend. */
+export interface QrisCheckoutResult {
+  orderId: string | null;
+  /** https URL or a `data:image/png;base64,…` URI — directly renderable. */
+  imageUri: string;
+  qrisExpiresAt: string | null;
+}
+
+/** Instant-verify result — mirrors qris-api's /api/qris-status response. */
+export interface QrisStatusResult {
+  status: 'pending' | 'paid' | 'expired' | 'failed' | null;
+  paidAt: string | null;
+  transactionRef: string | null;
+  amount: number | null;
+  expiresAt: string | null;
+}
+
+/**
+ * POST { device_id, plan_id } to the web backend and normalize the response.
+ *
+ * Accepted response shapes (backend contract, both optional):
+ *   { qris_image_url: "https://…/qr.png" }
+ *   { qris_image_base64: "<base64>" }            (also accepts a full data URI)
+ * plus optional { order_id, qris_expires_at }.
+ *
+ * @throws a human-readable Error on network failure, non-2xx, or missing image.
+ * Stable error CODES callers map to localized toasts: PAYMENT_SERVER_TIMEOUT,
+ * CHECKOUT_NO_QRIS, QRIS_API_SECRET_MISSING.
+ */
+export const createQrisCheckout = async (
+  deviceId: string,
+  planId: string,
+): Promise<QrisCheckoutResult> => {
+  const { ok, status, body } = await signedPost(QRIS_CHECKOUT_URL, {
+    device_id: deviceId,
+    plan_id: planId,
+  });
+
+  if (!ok) {
+    // 401 with BAD_SIGNATURE/TIMESTAMP_SKEW → the shipped secret doesn't match
+    // the server's — a config bug, not a user error; surface the stable code.
+    const errCode = typeof body.error === 'string' ? body.error : null;
+    if (status === 401 && (errCode === 'BAD_SIGNATURE' || errCode === 'TIMESTAMP_SKEW')) {
+      throw new Error('QRIS_SIGNATURE_REJECTED');
+    }
     const serverMessage =
-      typeof body.message === 'string' ? body.message : `Kode error ${response.status}`;
+      typeof body.message === 'string' ? body.message : `Kode error ${status}`;
     throw new Error(`Checkout gagal: ${serverMessage}`);
   }
 
@@ -194,4 +236,37 @@ export const createQrisCheckout = async (
     imageUri,
     qrisExpiresAt: typeof body.qris_expires_at === 'string' ? body.qris_expires_at : null,
   };
+};
+
+/**
+ * Instant verify for the "Saya Sudah Membayar" button: asks the backend to
+ * poll the merchant's GoBiz journals NOW and settle on a match, then returns
+ * the fresh order state. The caller still re-reads entitlements afterwards —
+ * the ledger/entitlement flow stays the source of truth.
+ *
+ * NEVER throws: a verification hiccup (network, 404 for a GC'd order, GoBiz
+ * outage) resolves to a null-status result so the UI can keep the QR up and
+ * let the user retry. Verification must not punish the paying user.
+ */
+export const checkQrisStatus = async (orderId: string): Promise<QrisStatusResult> => {
+  const empty: QrisStatusResult = {
+    status: null,
+    paidAt: null,
+    transactionRef: null,
+    amount: null,
+    expiresAt: null,
+  };
+  try {
+    const { ok, body } = await signedPost(QRIS_STATUS_URL, { order_id: orderId }, { timeoutMs: 15000 });
+    if (!ok) return empty;
+    return {
+      status: typeof body.status === 'string' ? (body.status as QrisStatusResult['status']) : null,
+      paidAt: typeof body.paid_at === 'string' ? body.paid_at : null,
+      transactionRef: typeof body.transaction_ref === 'string' ? body.transaction_ref : null,
+      amount: typeof body.amount === 'number' ? body.amount : null,
+      expiresAt: typeof body.expires_at === 'string' ? body.expires_at : null,
+    };
+  } catch {
+    return empty;
+  }
 };
