@@ -264,6 +264,7 @@ export const en: Record<TranslationKey, string> = {
   'profile.toastIncompleteDesc': 'Full name and nickname are required.',
   'profile.toastSaved': 'Saved Successfully',
   'profile.toastSavedDesc': 'User profile has been updated.',
+  'profile.toastSavedOfflineDesc': 'Saved on device, will sync when online.',
   'profile.toastFailed': 'Failed to Save',
   'profile.toastSystemError': 'A system error occurred.',
 
@@ -341,6 +342,7 @@ export const en: Record<TranslationKey, string> = {
   'messages.add': 'Add',
   'messages.delete': 'Delete',
   'messages.familyFallback': 'Family',
+  'messages.pendingSync': 'Waiting to sync',
 
   // ── Onboarding ───────────────────────────────────────────────────────
   'onboarding.title': 'Let\'s Get Acquainted! 🎈',

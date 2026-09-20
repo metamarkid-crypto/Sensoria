@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, Image, TextInput, KeyboardAvoidingView, Platform, ImageBackground, ScrollView, ActivityIndicator } from 'react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { useAACStore, UserRole } from '../store/useAACStore';
+import { queueCloudOp } from '../services/db/sqlite';
 import * as Haptics from 'expo-haptics';
 import SettingsScreen from './SettingsScreen';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -66,12 +67,18 @@ export default function RoleSelectionScreen() {
         setPairingCode(pairingCode);
       }
 
-      // Register to Supabase
-      await supabase.from('devices').upsert({
+      // Register to Supabase — offline-first: queue for replay on failure.
+      // Without the row the child never gets its trial injection, parent-slot
+      // capacity or pairing-code lookup, so this is REAL setup data.
+      const devicePayload = {
         id: currentDeviceId,
         role: role,
         pairing_code: pairingCode
-      });
+      };
+      const { error: regError } = await supabase.from('devices').upsert(devicePayload);
+      if (regError) {
+        await queueCloudOp('devices.upsert', devicePayload);
+      }
 
       // Blueprint: inject the premium free trial right after a successful setup.
       // Child only — subscriptions are keyed by child_device_id and cover linked
@@ -131,6 +138,7 @@ export default function RoleSelectionScreen() {
         setDeviceId(recoveredId);
         setPairingCode(recoveryCode);
         setChildProfile({
+          device_id: recoveredId,
           fullName: profile.full_name,
           nickname: profile.nickname,
           gender: profile.settings?.childProfileGender || 'Boy'

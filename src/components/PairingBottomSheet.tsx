@@ -140,6 +140,13 @@ export default function PairingBottomSheet({ isVisible, onClose }: Props) {
               settings: profile.settings,
             });
           }
+          // Sync the canonical role label (Ibu/Ayah/...) from family_links —
+          // a reinstalled or long-open session kept the stale 'Orang Tua'
+          // default, so chat bubbles labeled THIS parent wrong until they
+          // re-linked manually. DB is the source of truth.
+          if (link.parent_label) {
+            setLocalParentName(link.parent_label);
+          }
         }
       })();
       return () => {

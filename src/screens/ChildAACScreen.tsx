@@ -169,11 +169,18 @@ export default function ChildAACScreen() {
     };
     catchUpSync();
 
-    if (!pairingCode) return;
-    
-    logger.setUserContext('Child', pairingCode);
+    // The message bus needs the pairing code, so IT is optional — but the
+    // device-keyed channels below (settings mirror, family-link toasts,
+    // location pings) must exist on EVERY child install. The old
+    // `if (!pairingCode) return` silently skipped all four whenever the
+    // pairing code had not been restored at mount, leaving the child deaf to
+    // remote profile edits, new family links and parent location pings.
+    if (pairingCode) {
+      logger.setUserContext('Child', pairingCode);
+    }
 
-    const channel = subscribeToAACMessages(pairingCode, (payload: any) => {
+    const channel = pairingCode
+      ? subscribeToAACMessages(pairingCode, (payload: any) => {
       if (payload.sender === 'Parent') {
         // Read the language fresh at callback time — this effect mounts once,
         // so the closure `language` would otherwise go stale after a language
@@ -183,9 +190,11 @@ export default function ChildAACScreen() {
         playTTS(payload.text, currentLang, senderName);
         Toast.show({ type: 'info', text1: translate(currentLang, 'aac.toastParentMsg'), text2: payload.text, position: 'top', visibilityTime: 4000 });
       }
-    });
+        })
+      : null;
 
-    const settingsChannel = supabase.channel('child-settings-update')
+    const settingsChannel = deviceId
+      ? supabase.channel('child-settings-update')
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'child_profiles', filter: `device_id=eq.${deviceId}` },
@@ -208,9 +217,11 @@ export default function ChildAACScreen() {
           }
         }
       )
-      .subscribe();
+      .subscribe()
+      : null;
 
-    const familyLinksChannel = supabase.channel('child_family_links')
+    const familyLinksChannel = deviceId
+      ? supabase.channel('child_family_links')
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'family_links', filter: `child_device_id=eq.${deviceId}` },
@@ -229,10 +240,12 @@ export default function ChildAACScreen() {
           });
         }
       )
-      .subscribe();
+      .subscribe()
+      : null;
 
     // Parent "refresh location" ping → force one immediate GPS write.
-    const pingChannel = supabase.channel(`location-ping-${deviceId}`)
+    const pingChannel = deviceId
+      ? supabase.channel(`location-ping-${deviceId}`)
       .on('broadcast', { event: 'refresh-location' }, () => {
         requestImmediateLocation()
           .then(() => {
@@ -245,13 +258,14 @@ export default function ChildAACScreen() {
           })
           .catch((e) => console.warn('[LocationPing] refresh failed:', e));
       })
-      .subscribe();
+      .subscribe()
+      : null;
 
     return () => {
-      supabase.removeChannel(channel);
-      supabase.removeChannel(settingsChannel);
-      supabase.removeChannel(familyLinksChannel);
-      supabase.removeChannel(pingChannel);
+      if (channel) supabase.removeChannel(channel);
+      if (settingsChannel) supabase.removeChannel(settingsChannel);
+      if (familyLinksChannel) supabase.removeChannel(familyLinksChannel);
+      if (pingChannel) supabase.removeChannel(pingChannel);
     };
   }, []);
 

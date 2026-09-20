@@ -6,13 +6,16 @@ import { useNavigation } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
 import { supabase } from '../services/db/supabase';
 import { logger } from '../utils/logger';
-import { useAACStore } from '../store/useAACStore';
+import { useAACStore, resolveChildDeviceId } from '../store/useAACStore';
+import { queueCloudOp } from '../services/db/sqlite';
 import { useTranslation } from '../i18n';
 
 export default function UserProfileScreen() {
   const navigation = useNavigation<any>();
   const { t } = useTranslation();
   const { childProfile, setChildProfile } = useAACStore();
+  const role = useAACStore((state) => state.role);
+  const deviceId = useAACStore((state) => state.deviceId);
 
   const [fullName, setFullName] = useState('');
   const [nickname, setNickname] = useState('');
@@ -36,26 +39,37 @@ export default function UserProfileScreen() {
 
     setIsSaving(true);
     try {
-      if (!childProfile?.device_id) throw new Error(t('profile.deviceIdMissing'));
+      // childProfile.device_id is the canonical target, but profiles written
+      // by Onboarding / recovery historically carried NO device id — the old
+      // strict check turned that into a hard 'Device ID tidak ditemukan'
+      // failure on every save. Resolve flexibly instead: on the CHILD device
+      // the store's own deviceId is always a valid fallback, and a plain
+      // upsert (not update) heals a missing remote row in the same write.
+      const targetDeviceId = resolveChildDeviceId(childProfile, deviceId, role);
+      if (!targetDeviceId) throw new Error(t('profile.deviceIdMissing'));
 
       // SAFEGUARD 3: Strict Gender Payload
-      const updatedSettings = { ...childProfile.settings, childProfileGender: gender };
+      const updatedSettings = { ...(childProfile?.settings || {}), childProfileGender: gender };
       // childVoiceGender is no longer needed
 
+      // Upsert = UPDATE on conflict: heals a wiped/missing child_profiles row
+      // (this is also the first write that backfills childProfile.device_id).
+      const profilePayload = {
+        device_id: targetDeviceId,
+        full_name: fullName,
+        nickname: nickname,
+        settings: updatedSettings
+      };
       const { error } = await supabase
         .from('child_profiles')
-        .update({
-          full_name: fullName,
-          nickname: nickname,
-          settings: updatedSettings
-        })
-        .eq('device_id', childProfile.device_id);
+        .upsert(profilePayload);
 
-      if (error) throw error;
-
-      // Update Zustand
+      // Update Zustand FIRST and unconditionally — the local store is the
+      // source of truth for this device (offline-first). The failed-cloud
+      // path below queues a replay; UI must reflect the user's edit either way.
       setChildProfile({
         ...childProfile,
+        device_id: targetDeviceId,
         full_name: fullName,
         fullName: fullName,
         nickname: nickname,
@@ -63,12 +77,24 @@ export default function UserProfileScreen() {
         settings: updatedSettings
       });
 
-      Toast.show({
-        type: 'success',
-        text1: t('profile.toastSaved'),
-        text2: t('profile.toastSavedDesc'),
-        position: 'top'
-      });
+      if (error) {
+        // Offline-first: the profile edit is REAL user data — queue for replay
+        // and tell the user it landed locally, syncing later (NOT an error).
+        await queueCloudOp('child_profiles.upsert', profilePayload);
+        Toast.show({
+          type: 'success',
+          text1: t('profile.toastSaved'),
+          text2: t('profile.toastSavedOfflineDesc'),
+          position: 'top'
+        });
+      } else {
+        Toast.show({
+          type: 'success',
+          text1: t('profile.toastSaved'),
+          text2: t('profile.toastSavedDesc'),
+          position: 'top'
+        });
+      }
       
       setTimeout(() => navigation.goBack(), 1000);
       

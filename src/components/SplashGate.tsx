@@ -79,7 +79,21 @@ export default function SplashGate() {
 
   useEffect(() => {
     if (phase !== 'brand') return;
-    // Wordmark + tagline slide/fade in, THEN the whole overlay starts fading.
+    // PHASE 'brand' means the overlay has ALREADY painted fully opaque over
+    // the app (≥ MIN_BRAND_MS after hydration, or the failsafe fired) — so
+    // hiding the native splash HERE is the invisible handoff: the overlay's
+    // hero glyph occupies the exact same spot as the native one, pixel-identical.
+    //   • Hiding AFTER the overlay fade-out (bug #1) resurrected the native
+    //     glyph mid-transition — the "two dimmer logos" screenshot.
+    //   • Hiding only after THIS animation (bug #2) would cover the wordmark
+    //     fade-in entirely — the native splash never saw this overlay's
+    //     brand block, so the animation would play behind it, invisible.
+    SplashScreen.hideAsync().catch(() => {
+      /* already hidden */
+    });
+
+    // Then animate the wordmark + tagline in, and fade the whole overlay out
+    // once the brand block has fully landed.
     Animated.parallel([
       Animated.timing(brandOpacity, {
         toValue: 1,
@@ -101,9 +115,6 @@ export default function SplashGate() {
 
   const finishReveal = useCallback(() => {
     setPhase('done');
-    SplashScreen.hideAsync().catch(() => {
-      /* already hidden */
-    });
   }, []);
 
   useEffect(() => {

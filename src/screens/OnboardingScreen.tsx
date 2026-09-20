@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import Toast from 'react-native-toast-message';
 import { useAACStore } from '../store/useAACStore';
+import { queueCloudOp } from '../services/db/sqlite';
 import { supabase } from '../services/db/supabase';
 import { useTranslation } from '../i18n';
 
@@ -27,20 +28,43 @@ export default function OnboardingScreen({ navigation }: any) {
     setIsSubmitting(true);
 
     try {
-      // 1. Simpan ke local store
-      setChildProfile({ fullName: fullName.trim(), nickname: nickname.trim(), gender: gender === 'boy' ? 'Boy' : 'Girl' });
+      // 1. Simpan ke local store — device_id disertakan supaya seluruh
+      //    penulis cloud (UserProfile / Voice / Appearance / Accessibility)
+      //    punya target canonical sejak awal, bukan bergantung fallback.
+      setChildProfile({
+        device_id: deviceId ?? undefined,
+        fullName: fullName.trim(),
+        nickname: nickname.trim(),
+        gender: gender === 'boy' ? 'Boy' : 'Girl'
+      });
       
-      // 2. Simpan ke Supabase (jika sudah ada koneksi)
+      // 2. Simpan ke Supabase (jika sudah ada koneksi) — NON-FATAL saat
+      //    offline: profil & role sudah tersimpan lokal di atas, jadi sebuah
+      //    install offline tetap harus masuk ke papan AAC. Tulisan cloud
+      //    disusulkan otomatis oleh UserProfile upsert (self-healing) dan
+      //    catch-up sync saat perangkat online.
       if (deviceId) {
-        await supabase.from('child_profiles').upsert({
-          device_id: deviceId,
-          full_name: fullName.trim(),
-          nickname: nickname.trim(),
-          settings: {
-            speechRate: 1.0,
-            childProfileGender: gender === 'boy' ? 'Boy' : 'Girl'
+        try {
+          const profilePayload = {
+            device_id: deviceId,
+            full_name: fullName.trim(),
+            nickname: nickname.trim(),
+            settings: {
+              speechRate: 1.0,
+              childProfileGender: gender === 'boy' ? 'Boy' : 'Girl'
+            }
+          };
+          const { error: cloudError } = await supabase
+            .from('child_profiles')
+            .upsert(profilePayload);
+          if (cloudError) {
+            // Offline-first: queue for replay — the profile is REAL setup data
+            // (pairing lookups, parent dashboard, TTS settings all read it).
+            await queueCloudOp('child_profiles.upsert', profilePayload);
           }
-        });
+        } catch (cloudError) {
+          console.warn('Cloud profile write skipped (offline-safe):', cloudError);
+        }
       }
       
       // 3. Navigasi ke ChildAAC

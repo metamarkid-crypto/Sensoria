@@ -1,6 +1,17 @@
 import 'react-native-url-polyfill/auto';
 import { createClient } from '@supabase/supabase-js';
 import { AACWord } from '../../store/useAACStore';
+// Static import is Metro-safe (dynamic import() can break in RN bundles).
+// No circularity: sqlite.ts never imports this module.
+import {
+  getPendingMessages,
+  deletePendingMessage,
+  getCloudOps,
+  deleteCloudOp,
+  bumpCloudOpAttempts,
+  MAX_OUTBOX_ATTEMPTS,
+  queueCloudOp,
+} from './sqlite';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -41,12 +52,13 @@ if (!isSupabaseConfigured) {
 }
 
 /**
- * Mengirim pesan AAC ke Supabase (Sekaligus Insert ke tabel messages dan Broadcast Realtime)
+ * Mengirim pesan AAC ke Supabase (Sekaligus Insert ke tabel messages dan Broadcast Realtime).
+ * Returns true when the row is stored (callers may queue it locally otherwise).
  */
-export const sendAACMessage = async (channelId: string, payload: any) => {
+export const sendAACMessage = async (channelId: string, payload: any): Promise<boolean> => {
   if (!supabaseUrl || !supabaseAnonKey) {
     console.warn('Supabase not configured. Message sending skipped.');
-    return;
+    return false;
   }
   
   // Eksekusi Insert ke tabel messages agar tersimpan permanen
@@ -62,7 +74,147 @@ export const sendAACMessage = async (channelId: string, payload: any) => {
 
   if (error) {
     console.error('Gagal menyimpan pesan ke database:', error);
+    return false;
   }
+  return true;
+};
+
+// ── OUTBOX FLUSHER (offline-first messaging) ────────────────────────────────
+// Messages whose cloud insert failed (airplane mode, dead socket) live in the
+// SQLite outbox; this routine drains it FIFO. Every attempt is idempotent on
+// the transport level: `timestamp` mirrors PostgREST's unique constraint, so
+// a 409 (row already there — insert landed but the response was lost) counts
+// as SUCCESS, never as a permanent failure that would duplicate or wedge.
+let isFlushingOutbox = false;
+
+export const flushPendingMessages = async (): Promise<number> => {
+  if (!supabaseUrl || !supabaseAnonKey || isFlushingOutbox) return 0;
+  isFlushingOutbox = true;
+  let sent = 0;
+  try {
+    const pending = await getPendingMessages();
+    for (const row of pending) {
+      const { error } = await supabase.from('messages').insert({
+        channel_id: row.channel_id,
+        sender_role: row.sender_role,
+        sender_name: row.sender_name ?? row.sender_role,
+        text_content: row.text_content,
+        timestamp: row.timestamp,
+        location_lat: row.location_lat,
+        location_lng: row.location_lng,
+      });
+      if (error) {
+        if (error.code === '23505') {
+          // Already stored (insert reached the DB earlier, ack lost) — done.
+          await deletePendingMessage(row.id);
+          sent++;
+          continue;
+        }
+        console.warn('[Outbox] flush stopped (still offline?):', error.message);
+        break; // FIFO — stop at the first failure, retry later
+      }
+      await deletePendingMessage(row.id);
+      sent++;
+    }
+  } catch (e) {
+    console.warn('[Outbox] flush error:', e);
+  } finally {
+    isFlushingOutbox = false;
+  }
+  return sent;
+};
+
+// ── GENERIC CLOUD OUTBOX FLUSHER (all non-message write-paths) ──────────────
+// Replay strategies per op key:
+//   plain   → re-run the identical insert/upsert (idempotent by PK)
+//   merge   → re-fetch remote settings and merge the queued PARTIAL over it,
+//             so a replayed offline edit can never clobber newer cloud fields
+//   drop    → never replayed (stale-by-nature data, e.g. presence last_seen)
+const replayCloudOp = async (op: string, payload: any): Promise<'done' | 'retry' | 'drop'> => {
+  switch (op) {
+    case 'locations.insert': {
+      const { error } = await supabase.from('locations').insert(payload);
+      return error ? 'retry' : 'done';
+    }
+    case 'custom_words.upsert': {
+      const { error } = await supabase.from('custom_words').upsert(payload, { onConflict: 'id' });
+      return error ? 'retry' : 'done';
+    }
+    case 'devices.upsert': {
+      const { error } = await supabase.from('devices').upsert(payload);
+      return error ? 'retry' : 'done';
+    }
+    case 'child_profiles.upsert': {
+      const { error } = await supabase.from('child_profiles').upsert(payload);
+      return error ? 'retry' : 'done';
+    }
+    case 'child_profiles.settings': {
+      // Remote-merge: the queued payload holds ONLY the fields this device
+      // edited. Re-fetching first means a settings change made from another
+      // device while we were offline survives the replay.
+      const { data: current, error: fetchErr } = await supabase
+        .from('child_profiles')
+        .select('settings')
+        .eq('device_id', payload.device_id)
+        .maybeSingle();
+      if (fetchErr) return 'retry';
+      if (!current) return 'retry'; // profile row not created yet — wait for the self-healing profile upsert
+      const merged = { ...((current.settings as any) ?? {}), ...(payload.settings ?? {}) };
+      const { error } = await supabase
+        .from('child_profiles')
+        .update({ settings: merged })
+        .eq('device_id', payload.device_id);
+      return error ? 'retry' : 'done';
+    }
+    case 'devices.presence':
+      // last_seen/coords are stale the moment they were queued — replaying
+      // would LIE about the child's presence. Presence self-corrects on the
+      // next tracker write instead.
+      return 'drop';
+    default:
+      // Unknown op (older build's queue) — poison guard.
+      return 'drop';
+  }
+};
+
+let isFlushingCloudOps = false;
+
+export const flushCloudOps = async (): Promise<number> => {
+  if (!supabaseUrl || !supabaseAnonKey || isFlushingCloudOps) return 0;
+  isFlushingCloudOps = true;
+  let done = 0;
+  try {
+    const ops = await getCloudOps();
+    for (const row of ops) {
+      let payload: any;
+      try {
+        payload = JSON.parse(row.payload);
+      } catch {
+        await deleteCloudOp(row.id); // unparseable — poison guard
+        continue;
+      }
+      const verdict = await replayCloudOp(row.op, payload);
+      if (verdict === 'done' || verdict === 'drop') {
+        await deleteCloudOp(row.id);
+        if (verdict === 'done') done++;
+      } else {
+        const attempts = await bumpCloudOpAttempts(row.id);
+        if (attempts >= MAX_OUTBOX_ATTEMPTS) {
+          // Poison pill: a persistent failure (RLS misconfig, schema drift) is
+          // dropped so it can never wedge the FIFO and starve the ops behind it.
+          console.warn(`[CloudOutbox] op '${row.op}' dropped after ${attempts} attempts`);
+          await deleteCloudOp(row.id);
+        } else {
+          break; // FIFO: stop at the first still-offline op, resume next trigger
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[CloudOutbox] flush error:', e);
+  } finally {
+    isFlushingCloudOps = false;
+  }
+  return done;
 };
 
 /**
@@ -80,22 +232,26 @@ export const syncCustomWordToCloud = async (
   }
   if (!deviceId) return; // unlinked device — SQLite alone is the source of truth
 
+  const payload = {
+    id: word.id,
+    child_device_id: deviceId,
+    word_id: word.word_id,
+    word_en: word.word_en ?? null,
+    word_zh: word.word_zh,
+    image_url: word.imageUrl ?? null,
+    category_id: word.categoryId,
+    is_favorite: word.isFavorite ? 1 : 0,
+  };
   const { error } = await supabase.from('custom_words').upsert(
-    {
-      id: word.id,
-      child_device_id: deviceId,
-      word_id: word.word_id,
-      word_en: word.word_en ?? null,
-      word_zh: word.word_zh,
-      image_url: word.imageUrl ?? null,
-      category_id: word.categoryId,
-      is_favorite: word.isFavorite ? 1 : 0,
-    },
+    payload,
     { onConflict: 'id' }
   );
 
   if (error) {
-    console.error('[CustomWords] cloud sync failed (offline-safe):', error);
+    console.error('[CustomWords] cloud sync failed (queued for replay):', error);
+    // Custom cards + their favorite flag are REAL user data — same offline
+    // queue treatment as messages/location history.
+    await queueCloudOp('custom_words.upsert', payload);
   }
 };
 

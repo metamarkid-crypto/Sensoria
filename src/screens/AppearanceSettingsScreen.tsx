@@ -6,7 +6,8 @@ import { useNavigation } from '@react-navigation/native';
 import Slider from '@react-native-community/slider';
 import Toast from 'react-native-toast-message';
 import { supabase } from '../services/db/supabase';
-import { useAACStore } from '../store/useAACStore';
+import { useAACStore, resolveChildDeviceId } from '../store/useAACStore';
+import { queueCloudOp } from '../services/db/sqlite';
 import { useTranslation } from '../i18n';
 
 export default function AppearanceSettingsScreen() {
@@ -20,6 +21,8 @@ export default function AppearanceSettingsScreen() {
     enableCategoryColors, setEnableCategoryColors,
     highContrast, setHighContrast
   } = useAACStore();
+  const role = useAACStore((state) => state.role);
+  const deviceId = useAACStore((state) => state.deviceId);
 
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
 
@@ -27,7 +30,10 @@ export default function AppearanceSettingsScreen() {
   // We still ensure the DB is synced when values change.
   
   const syncToDatabase = useCallback(async (newSettings: any) => {
-    if (!childProfile?.device_id) return;
+    // Flexible device-id resolution (see store helper) — silent skips here
+    // meant appearance changes never reached the cloud on legacy profiles.
+    const targetDeviceId = resolveChildDeviceId(childProfile, deviceId, role);
+    if (!targetDeviceId || !childProfile) return;
     
     try {
       const mergedSettings = { ...(childProfile.settings || {}), ...newSettings };
@@ -35,9 +41,18 @@ export default function AppearanceSettingsScreen() {
       const { error } = await supabase
         .from('child_profiles')
         .update({ settings: mergedSettings })
-        .eq('device_id', childProfile.device_id);
+        .eq('device_id', targetDeviceId);
         
-      if (error) throw error;
+      if (error) {
+        // Queue ONLY the fields this edit changed — the flusher re-merges them
+        // over the remote settings, so a replay never clobbers edits made from
+        // another device while we were offline.
+        await queueCloudOp('child_profiles.settings', {
+          device_id: targetDeviceId,
+          settings: newSettings,
+        });
+        throw error;
+      }
       
       // Update local childProfile context quietly
       useAACStore.setState({
@@ -47,7 +62,7 @@ export default function AppearanceSettingsScreen() {
     } catch (error) {
       console.error('Failed to sync settings', error);
     }
-  }, [childProfile]);
+  }, [childProfile, deviceId, role]);
 
   const debouncedSync = useCallback((newSettings: any) => {
     if (debounceTimer.current) clearTimeout(debounceTimer.current);

@@ -81,6 +81,44 @@ export default function ParentLocationScreen() {
   const tabBarHeight = 70 + insets.bottom;
 
   // ── Resolve linked child + subscribe to its `locations` INSERTs ─────────
+  // Re-target on family_links changes: unlink/relink (even to a different
+  // child) bumps the epoch so the pipeline below re-resolves the link and
+  // re-subscribes — the old subscription never followed a mid-session relink
+  // and kept streaming the PREVIOUS child's location forever.
+  const [linkEpoch, setLinkEpoch] = useState(0);
+  const lastLinkedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (role !== 'Parent' || !deviceId) return;
+    // UNFILTERED on purpose: Postgres DELETE payloads carry only the PK under
+    // the default replica identity, so a parent_device_id filter can silently
+    // MISS the unlink event. Relevance is judged client-side by comparing the
+    // freshly-resolved child id against the last known one.
+    const linkWatch = supabase
+      .channel('loc_family_links_watch')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'family_links'
+      }, () => {
+        void (async () => {
+          const { data: links } = await supabase
+            .from('family_links')
+            .select('child_device_id')
+            .eq('parent_device_id', deviceId)
+            .limit(1);
+          const childId = links?.[0]?.child_device_id ?? null;
+          if (childId !== lastLinkedRef.current) {
+            lastLinkedRef.current = childId;
+            setLinkEpoch((e) => e + 1);
+          }
+        })();
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(linkWatch);
+    };
+  }, [role, deviceId]);
+
   useEffect(() => {
     if (role !== 'Parent' || !deviceId) return;
 
@@ -178,7 +216,7 @@ export default function ParentLocationScreen() {
       if (channelRef.current) supabase.removeChannel(channelRef.current);
       channelRef.current = null;
     };
-  }, [role, deviceId, setChildStatus]);
+  }, [role, deviceId, setChildStatus, linkEpoch]);
 
   // ── Refresh button: real Supabase Broadcast ping to the Child node ──────
   const handleRefreshLocation = () => {

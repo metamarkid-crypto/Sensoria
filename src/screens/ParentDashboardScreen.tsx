@@ -1,4 +1,5 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -77,6 +78,43 @@ export default function ParentDashboardScreen() {
     };
   }, [pairingCode, language, parentLocked]);
 
+  // Re-target trigger: any family_links change bumps the epoch so the presence
+  // effect below re-resolves the link and re-subscribes against the CURRENT
+  // child. UNFILTERED on purpose: Postgres DELETE payloads carry only the PK
+  // under the default replica identity, so a `parent_device_id=eq.X` filter
+  // can silently MISS the unlink event. Relevance is judged client-side —
+  // the epoch only bumps when THIS parent's linked child actually changed,
+  // so unrelated families' link events cause no channel churn.
+  const [linkEpoch, setLinkEpoch] = useState(0);
+  const lastLinkedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (parentLocked || !deviceId) return;
+    const linkWatch = supabase
+      .channel('dash_family_links_watch')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'family_links'
+      }, () => {
+        void (async () => {
+          const { data: links } = await supabase
+            .from('family_links')
+            .select('child_device_id')
+            .eq('parent_device_id', deviceId)
+            .limit(1);
+          const childId = links?.[0]?.child_device_id ?? null;
+          if (childId !== lastLinkedRef.current) {
+            lastLinkedRef.current = childId;
+            setLinkEpoch((e) => e + 1);
+          }
+        })();
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(linkWatch);
+    };
+  }, [deviceId, parentLocked]);
+
   useEffect(() => {
     // 2. Global Real-time Connection Status Listener
     let presenceSub: any = null;
@@ -133,7 +171,7 @@ export default function ParentDashboardScreen() {
     return () => {
       if (presenceSub) supabase.removeChannel(presenceSub);
     };
-  }, [deviceId, parentLocked]);
+  }, [deviceId, parentLocked, linkEpoch]);
 
   // Strict Parent lock — evaluated AFTER every hook so hook order stays stable
   // across lock/unlock transitions.

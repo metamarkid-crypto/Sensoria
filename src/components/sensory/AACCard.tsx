@@ -236,9 +236,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   image: {
-    width: '70%',
-    height: '70%',
-    marginBottom: 8,
+    // Fill ALL vertical space above the label at FULL card width instead of
+    // the old fixed 70%×70% square. resizeMode="contain" (in JSX) letterboxes
+    // inside whatever box flex leaves, so:
+    //  • 500×500 square pictograms render edge-to-edge (up from 70% width);
+    //  • tall 150×220 legacy sprites scale by HEIGHT and actually appear
+    //    LARGER instead of shrinking inside an empty square;
+    //  • the label row always fits — no overflow at textSize A-/A/A+ and no
+    //    clipping at any grid density (2/3/4/5 columns).
+    flex: 1,
+    width: '100%',
+    marginBottom: 4,
   },
   text: {
     fontWeight: '800',

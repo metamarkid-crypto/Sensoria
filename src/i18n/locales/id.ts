@@ -268,6 +268,7 @@ export const id = {
   'profile.toastIncompleteDesc': 'Nama lengkap dan panggilan harus diisi.',
   'profile.toastSaved': 'Berhasil Disimpan',
   'profile.toastSavedDesc': 'Profil pengguna telah diperbarui.',
+  'profile.toastSavedOfflineDesc': 'Profil tersimpan di perangkat, akan tersinkron saat online.',
   'profile.toastFailed': 'Gagal Menyimpan',
   'profile.toastSystemError': 'Terjadi kesalahan sistem.',
 
@@ -345,6 +346,7 @@ export const id = {
   'messages.add': 'Tambah',
   'messages.delete': 'Hapus',
   'messages.familyFallback': 'Keluarga',
+  'messages.pendingSync': 'Menunggu sinkron',
 
   // ── Onboarding ───────────────────────────────────────────────────────
   'onboarding.title': 'Kenalan Dulu Yuk! 🎈',

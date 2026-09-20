@@ -5,7 +5,8 @@ import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import Slider from '@react-native-community/slider';
 import { supabase } from '../services/db/supabase';
-import { useAACStore } from '../store/useAACStore';
+import { useAACStore, resolveChildDeviceId } from '../store/useAACStore';
+import { queueCloudOp } from '../services/db/sqlite';
 import { playTTS } from '../services/ai/audioManager';
 import { useTranslation } from '../i18n';
 
@@ -28,11 +29,16 @@ export default function VoiceSettingsScreen() {
     speakOnTap, setSpeakOnTap,
     soundFeedback, setSoundFeedback
   } = useAACStore();
+  const role = useAACStore((state) => state.role);
+  const deviceId = useAACStore((state) => state.deviceId);
 
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
 
   const syncToDatabase = useCallback(async (newSettings: any) => {
-    if (!childProfile?.device_id) return;
+    // Onboarding profiles historically carry no device_id; resolve flexibly
+    // so voice settings keep syncing on the child device (see store helper).
+    const targetDeviceId = resolveChildDeviceId(childProfile, deviceId, role);
+    if (!targetDeviceId || !childProfile) return;
     
     try {
       const mergedSettings = { ...(childProfile.settings || {}), ...newSettings };
@@ -40,9 +46,18 @@ export default function VoiceSettingsScreen() {
       const { error } = await supabase
         .from('child_profiles')
         .update({ settings: mergedSettings })
-        .eq('device_id', childProfile.device_id);
+        .eq('device_id', targetDeviceId);
         
-      if (error) throw error;
+      if (error) {
+        // Queue ONLY the fields this edit changed — the flusher re-merges them
+        // over the remote settings, so a replay never clobbers edits made from
+        // another device while we were offline.
+        await queueCloudOp('child_profiles.settings', {
+          device_id: targetDeviceId,
+          settings: newSettings,
+        });
+        throw error;
+      }
       
       useAACStore.setState({
         childProfile: { ...childProfile, settings: mergedSettings }
@@ -51,7 +66,7 @@ export default function VoiceSettingsScreen() {
     } catch (error) {
       console.error('Failed to sync voice settings', error);
     }
-  }, [childProfile]);
+  }, [childProfile, deviceId, role]);
 
   const debouncedSync = useCallback((newSettings: any) => {
     if (debounceTimer.current) clearTimeout(debounceTimer.current);

@@ -1,11 +1,17 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, 
   KeyboardAvoidingView, Platform, ScrollView, Modal, Alert, Image 
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontAwesome5 } from '@expo/vector-icons';
-import { supabase, sendAACMessage } from '../../services/db/supabase';
+import { supabase, sendAACMessage, flushPendingMessages, flushCloudOps } from '../../services/db/supabase';
+import {
+  getMessagesCache,
+  saveMessagesCache,
+  appendMessageToCache,
+  queuePendingMessage,
+} from '../../services/db/sqlite';
 import { useAACStore } from '../../store/useAACStore';
 import { formatTime } from '../../utils/format';
 import * as Haptics from 'expo-haptics';
@@ -29,6 +35,17 @@ export default function ParentMessagesScreen() {
   
   const flatListRef = useRef<FlatList>(null);
 
+  // ── Offline-first messaging data layer ─────────────────────────────────
+  // The inbox renders from the SQLite cache FIRST (instant, survives airplane
+  // mode and two-week gaps), then an authoritative network reseed merges over
+  // it when online. The realtime INSERT mirrors into the cache so the next
+  // offline open is complete too. Pending (outboxed) rows are included so a
+  // message sent offline stays visible until its cloud insert is confirmed.
+  const mergeCached = useCallback(async (channel: string) => {
+    const cached = await getMessagesCache(channel, 200);
+    if (cached.length > 0) setMessages(cached);
+  }, []);
+
   // 1. Data Fetching and Real-Time Sync (SAFE - NO TTS TRIGGER)
   // NOTE: This Parent UI listener only updates the visual FlatList.
   // The actual Audio/TTS playback on the Child's side is handled by the pre-existing listener on ChildAACScreen.tsx
@@ -36,15 +53,35 @@ export default function ParentMessagesScreen() {
     if (!pairingCode) return;
 
     const fetchMessages = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('messages')
         .select('*')
         .eq('channel_id', pairingCode)
         .order('timestamp', { ascending: false }); // Newest to oldest for inverted FlatList
-      if (data) setMessages(data);
+      if (error) {
+        // Offline / transport failure: KEEP whatever is on screen (the disk
+        // cache painted in 1a). Only a successful fetch may replace state —
+        // saveMessagesCache likewise refuses to clear on a failed reseed.
+        return;
+      }
+      if (data) {
+        setMessages(data);
+        await saveMessagesCache(pairingCode, data);
+      }
     };
 
-    fetchMessages();
+    void (async () => {
+      // 1a. Instant paint from disk (offline-first).
+      await mergeCached(pairingCode);
+      // 1b. Drain BOTH outboxes (messages + generic cloud ops) — before the
+      //     reseed, so queued rows don't briefly disappear then return.
+      await flushPendingMessages();
+      void flushCloudOps();
+      // 1c. Authoritative reseed. When offline this fails gracefully:
+      //     state keeps the disk cache (and saveMessagesCache also refuses to
+      //     clear on an empty/failed reseed, protecting pending rows).
+      await fetchMessages();
+    })();
 
     // Visual localized listener only
     const msgSub = supabase.channel('parent_messages_screen')
@@ -54,25 +91,70 @@ export default function ParentMessagesScreen() {
         table: 'messages',
         filter: `channel_id=eq.${pairingCode}`
       }, (payload) => {
-        setMessages((prev) => [payload.new, ...prev]);
+        // Dedupe the optimistic `tmp-` echo of THIS parent's own send: the
+        // realtime row (real cloud id) replaces it instead of stacking a
+        // second identical bubble.
+        setMessages((prev) => {
+          const withoutTmp = prev.filter(
+            (m) => !(typeof m.id === 'string' && m.id.startsWith('tmp-') && m.timestamp === payload.new.timestamp)
+          );
+          return [payload.new, ...withoutTmp];
+        });
+        void appendMessageToCache(payload.new);
       })
       .subscribe();
 
     return () => {
       supabase.removeChannel(msgSub);
     };
-  }, [pairingCode]);
+  }, [pairingCode, mergeCached]);
 
   const handleSend = async (text: string) => {
     if (!text.trim() || !pairingCode) return;
     
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await sendAACMessage(pairingCode, {
-      sender: 'Parent',
+    const payload = {
+      sender: 'Parent' as const,
       senderName: localParentName,
       text: text.trim(),
       timestamp: Date.now()
-    });
+    };
+    const sent = await sendAACMessage(pairingCode, payload);
+    
+    if (sent) {
+      // Optimistic paint. The realtime INSERT also mirrors to cache —
+      // INSERT OR REPLACE with the real cloud id makes this idempotent.
+      setMessages((prev) => [{
+        id: `tmp-${payload.timestamp}`,
+        channel_id: pairingCode,
+        sender_role: 'Parent',
+        sender_name: localParentName,
+        text_content: payload.text,
+        timestamp: payload.timestamp,
+        location_lat: null,
+        location_lng: null,
+      }, ...prev]);
+    } else {
+      // Offline / transport failure: queue in the outbox + show it as a
+      // pending row. flushPendingMessages() (next open / foreground) sends it
+      // and the re-fetch replaces the negative pending id with the real one.
+      // id = -timestamp matches queuePendingMessage's local-id scheme, so the
+      // FlatList key is stable across state/cache/outbox.
+      const row = {
+        id: -payload.timestamp,
+        channel_id: pairingCode,
+        sender_role: 'Parent',
+        sender_name: localParentName,
+        text_content: payload.text,
+        timestamp: payload.timestamp,
+        location_lat: null as number | null,
+        location_lng: null as number | null,
+        pending: 1,
+      };
+      await queuePendingMessage(row);
+      await appendMessageToCache(row);
+      setMessages((prev) => [row, ...prev]);
+    }
     
     setInputText('');
   };
@@ -116,8 +198,15 @@ export default function ParentMessagesScreen() {
 
   const renderMessage = ({ item }: { item: any }) => {
     const isChild = item.sender_role === 'Child';
-    const isCurrentUser = item.senderName === localParentName;
+    // Self-detection by the canonical role label — with a legacy guard:
+    // messages sent before role labels existed were stored as the old
+    // 'Orang Tua' default and must still render as THIS parent's bubble.
+    const isCurrentUser =
+      item.senderName === localParentName || item.senderName === 'Orang Tua';
     const isOtherParent = !isChild && !isCurrentUser;
+    // Outbox rows (queued while offline) carry pending=1 — show a sync badge
+    // until the flusher replaces them with their real cloud rows.
+    const isPending = item.pending === 1;
 
     let bubbleStyle = styles.bubbleChild;
     let textStyle = styles.textChild;
@@ -145,19 +234,27 @@ export default function ParentMessagesScreen() {
             </Text>
           )}
           
-          {/* Child Identity Header */}
+          {/* Child Identity Header (no gender emoji — the nickname is the identity) */}
           {isChild && (
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
               <Image 
-                source={childProfile?.gender === 'Boy' ? require('../../../assets/icon.png') : require('../../../assets/icon.png')} 
+                source={require('../../../assets/icon.png')} 
                 style={{ width: 20, height: 20, borderRadius: 10, marginRight: 6, backgroundColor: '#BAE6FD' }} 
               />
               <Text style={[styles.senderNameTag, { color: '#0369A1', marginBottom: 0 }]}>
-                {childProfile?.nickname || t('aac.childFallback')} {childProfile?.gender === 'Boy' ? '👦' : '👧'}
+                {childProfile?.nickname || t('aac.childFallback')}
               </Text>
             </View>
           )}
           
+          {/* Outbox badge: the row is local-only until the flusher lands it */}
+          {isPending && (
+            <View style={styles.pendingBadge}>
+              <FontAwesome5 name="clock" size={9} color="#B45309" style={{ marginRight: 4 }} />
+              <Text style={styles.pendingBadgeText}>{t('messages.pendingSync')}</Text>
+            </View>
+          )}
+
           <Text style={[styles.messageText, textStyle]}>
             {item.text_content}
           </Text>
@@ -308,6 +405,23 @@ const styles = StyleSheet.create({
   messageBubbleWrapper: {
     marginBottom: 12,
     flexDirection: 'row',
+  },
+  pendingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(251, 191, 36, 0.18)',
+    borderColor: 'rgba(180, 83, 9, 0.35)',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginBottom: 6,
+  },
+  pendingBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#B45309',
   },
   wrapperLeft: {
     justifyContent: 'flex-start',

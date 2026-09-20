@@ -62,6 +62,29 @@ export const resolveWordText = (
 };
 
 /**
+ * Resolve the device id to use for CLOUD WRITES about the child
+ * (child_profiles upsert/update).
+ *
+ * `childProfile.device_id` is the canonical value, but several store writers
+ * (Onboarding, recovery) historically omitted it — so profiles persisted
+ * before that fix carry NO device id. When THIS device IS the child, fall
+ * back to the store's own `deviceId` so saving the profile / syncing voice,
+ * appearance and accessibility settings keeps working and self-heals the
+ * missing field on the first successful write. A Parent device must resolve
+ * the child id via family_links (Pairing/ParentHome already store it in
+ * childProfile); with no linked child there is nothing to write → undefined.
+ */
+export const resolveChildDeviceId = (
+  childProfile: ChildProfile,
+  deviceId: string | null,
+  role: UserRole
+): string | undefined => {
+  if (childProfile?.device_id) return childProfile.device_id;
+  if (role === 'Child' && deviceId) return deviceId;
+  return undefined;
+};
+
+/**
  * Global premium entitlement (Master Blueprint — Combo rule).
  *
  * Protocol — "Compassionate Child, Strict Parent". The raw expiry boundaries

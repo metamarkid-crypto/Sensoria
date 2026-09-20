@@ -264,6 +264,7 @@ export const zh: Record<TranslationKey, string> = {
   'profile.toastIncompleteDesc': '必须填写全名和昵称。',
   'profile.toastSaved': '保存成功',
   'profile.toastSavedDesc': '用户资料已更新。',
+  'profile.toastSavedOfflineDesc': '已保存到设备，联网后将同步。',
   'profile.toastFailed': '保存失败',
   'profile.toastSystemError': '发生系统错误。',
 
@@ -341,6 +342,7 @@ export const zh: Record<TranslationKey, string> = {
   'messages.add': '添加',
   'messages.delete': '删除',
   'messages.familyFallback': '家人',
+  'messages.pendingSync': '等待同步',
 
   // ── Onboarding ───────────────────────────────────────────────────────
   'onboarding.title': '先来认识一下吧！🎈',

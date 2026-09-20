@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'rea
 import { FontAwesome5 } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { supabase, sendAACMessage } from '../../services/db/supabase';
+import { getMessagesCache, appendMessageToCache } from '../../services/db/sqlite';
 import { useAACStore } from '../../store/useAACStore';
 import { formatDate, formatTime, toTimestampMs } from '../../utils/format';
 import { playTTS } from '../../services/ai/audioManager';
@@ -175,7 +176,10 @@ export default function ParentHomeScreen() {
 
     let cancelled = false;
 
-    // 1. Recent child message (initial load).
+    // 1. Recent child message (initial load) — offline-first: when the
+    // network fetch returns nothing (airplane mode / dead socket), fall back
+    // to the newest CACHED row so the "last message" card survives weeks of
+    // not opening the app.
     (async () => {
       const { data } = await supabase
         .from('messages')
@@ -185,7 +189,13 @@ export default function ParentHomeScreen() {
         .order('timestamp', { ascending: false })
         .limit(1)
         .single();
-      if (!cancelled && data) setRecentMessage(data);
+      if (!cancelled && data) {
+        setRecentMessage(data);
+      } else if (!cancelled) {
+        const cached = await getMessagesCache(pairingCode, 1);
+        const lastChild = cached.find((m: any) => m.sender_role === 'Child');
+        if (lastChild) setRecentMessage(lastChild);
+      }
     })();
 
     // 2. Realtime: new child message → refresh recent + bump activity re-fetch.
@@ -199,6 +209,7 @@ export default function ParentHomeScreen() {
         if (payload.new.sender_role === 'Child') {
           setRecentMessage(payload.new);
           setRefreshTick((t) => t + 1);
+          void appendMessageToCache(payload.new);
         }
       })
       .subscribe();
@@ -210,23 +221,34 @@ export default function ParentHomeScreen() {
   }, [pairingCode]);
 
   // ── Child profile sync — authoritative initial fetch + live re-sync ──────
-  // Keyed on the RESOLVED child device_id so the realtime filter is never
-  // stale (an empty filter at mount would silently miss every profile edit).
+  // TWO-STAGE subscription: the linked child id is resolved FIRST into state,
+  // and the realtime channel is created ONLY AFTER that. The postgres_changes
+  // filter can therefore never be `device_id=eq.` (empty) — the old single
+  // effect subscribed with an empty filter at mount, which matched nothing and
+  // silently dropped every profile edit until an unrelated re-render rebuilt
+  // the effect. Re-runs on pairingCode too, so unlink/relink to a different
+  // child mid-session re-targets fetch + channel instead of watching the
+  // previous child forever.
+  const [linkedChildId, setLinkedChildId] = useState<string | null>(null);
+
   useEffect(() => {
     if (!deviceId) return;
 
     let cancelled = false;
-    let profileSub: any = null;
 
-    // 1. Resolve the child's device_id from family_links (authoritative), then
-    //    fetch the LATEST profile — never trust a stale persisted copy.
+    // 1. Resolve the child's device_id from family_links (authoritative;
+    //    .limit(1) — NOT .single() — so a multi-row anomaly can never kill the
+    //    pipeline), then fetch the LATEST profile — never trust a stale
+    //    persisted copy.
     (async () => {
-      const { data: link } = await supabase
+      const { data: links } = await supabase
         .from('family_links')
         .select('child_device_id')
         .eq('parent_device_id', deviceId)
-        .single();
-      const childId = link?.child_device_id ?? childProfile?.device_id;
+        .limit(1);
+      const childId = links?.[0]?.child_device_id ?? childProfile?.device_id;
+      if (cancelled) return;
+      setLinkedChildId(childId ?? null);
       if (!childId) return;
 
       const { data: profile } = await supabase
@@ -234,28 +256,36 @@ export default function ParentHomeScreen() {
         .select('*')
         .eq('device_id', childId)
         .single();
-      if (cancelled) return;
-      if (profile) {
-        const current = useAACStore.getState().childProfile;
-        useAACStore.getState().setChildProfile({
-          ...current,
-          device_id: childId,
-          nickname: profile.nickname ?? current?.nickname,
-          full_name: profile.full_name ?? current?.full_name,
-          fullName: profile.full_name ?? current?.fullName,
-          gender: profile.settings?.childProfileGender ?? current?.gender,
-          settings: profile.settings ?? current?.settings,
-        });
-      }
+      if (cancelled || !profile) return;
+      const current = useAACStore.getState().childProfile;
+      useAACStore.getState().setChildProfile({
+        ...current,
+        device_id: childId,
+        nickname: profile.nickname ?? current?.nickname,
+        full_name: profile.full_name ?? current?.full_name,
+        fullName: profile.full_name ?? current?.fullName,
+        gender: profile.settings?.childProfileGender ?? current?.gender,
+        settings: profile.settings ?? current?.settings,
+      });
     })();
 
-    // 2. Live re-sync: child edits their profile → mirror it immediately.
-    profileSub = supabase.channel('home_child_profile')
+    return () => {
+      cancelled = true;
+    };
+  }, [deviceId, pairingCode, childProfile?.device_id]);
+
+  // 2. Live re-sync: child edits their profile → mirror it immediately.
+  //    Subscribed against the RESOLVED id only — the filter is never empty,
+  //    and the callback reads the store fresh so it can never go stale.
+  useEffect(() => {
+    if (!linkedChildId) return;
+
+    const profileSub = supabase.channel('home_child_profile')
       .on('postgres_changes', {
         event: 'UPDATE',
         schema: 'public',
         table: 'child_profiles',
-        filter: `device_id=eq.${childProfile?.device_id || ''}`
+        filter: `device_id=eq.${linkedChildId}`
       }, (payload: any) => {
         if (payload.new) {
           const currentProfile = useAACStore.getState().childProfile;
@@ -272,10 +302,9 @@ export default function ParentHomeScreen() {
       .subscribe();
 
     return () => {
-      cancelled = true;
-      if (profileSub) supabase.removeChannel(profileSub);
+      supabase.removeChannel(profileSub);
     };
-  }, [deviceId, childProfile?.device_id]);
+  }, [linkedChildId]);
 
   // ── Activity analytics: real data for today / 7d / 30d ────────────────────
   useEffect(() => {

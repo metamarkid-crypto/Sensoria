@@ -7,6 +7,7 @@ import Toast, { BaseToast, ErrorToast } from 'react-native-toast-message';
 import AppNavigator from './src/navigation/AppNavigator';
 import { useAACStore } from './src/store/useAACStore';
 import { subscribeEntitlementRealtime } from './src/services/db/entitlementRealtime';
+import { flushPendingMessages, flushCloudOps } from './src/services/db/supabase';
 import SplashGate from './src/components/SplashGate';
 
 Sentry.init({
@@ -150,6 +151,16 @@ function EntitlementLifecycle() {
     return () => clearInterval(id);
   }, [role, deviceId, tickPremiumGate]);
 
+  // Offline-first messaging: drain the outbox once at startup — messages the
+  // parent queued while offline go to the cloud the moment the app opens
+  // online (each failed insert is already visible locally as a pending row).
+  // The generic cloud outbox (locations, custom words, profiles, settings)
+  // drains through the same triggers.
+  useEffect(() => {
+    void flushPendingMessages();
+    void flushCloudOps();
+  }, []);
+
   // Realtime entitlement watcher — remote renewals/cancellations land on a
   // live session in under a second instead of waiting for the next
   // foreground resume. Events funnel into refreshEntitlement() (single
@@ -179,6 +190,11 @@ function EntitlementLifecycle() {
         void refresh(); // authoritative re-read (payments settled off-app)
       }
       void refreshSwitch();
+      // Foreground resume = the classic "was offline, now online" moment:
+      // drain any outboxed parent messages immediately (idempotent, no-op
+      // when the queue is empty or still offline).
+      void flushPendingMessages();
+      void flushCloudOps();
     });
     return () => sub.remove();
   }, [refreshEntitlement]);

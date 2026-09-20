@@ -21,6 +21,7 @@
 import * as TaskManager from 'expo-task-manager';
 import * as Location from 'expo-location';
 import { supabase } from '../db/supabase';
+import { queueCloudOp } from '../db/sqlite';
 import { useAACStore } from '../../store/useAACStore';
 import { evaluateAccess } from '../db/entitlement';
 
@@ -72,18 +73,25 @@ export const writeLocationSnapshot = async (
   }
 
   // History row — the Parent map subscribes to INSERTs on this table.
-  const { error: histError } = await supabase.from('locations').insert({
+  const historyPayload = {
     child_device_id: deviceId,
     latitude,
     longitude,
     accuracy: typeof accuracy === 'number' ? accuracy : null,
     address,
-  });
+  };
+  const { error: histError } = await supabase.from('locations').insert(historyPayload);
   if (histError) {
-    console.warn('[BackgroundLocation] locations insert failed:', histError.message);
+    console.warn('[BackgroundLocation] locations insert failed (queued):', histError.message);
+    // Offline-first: the trail point is REAL data — queue for replay so the
+    // parent's map history keeps every point, not just the online ones.
+    await queueCloudOp('locations.insert', historyPayload);
   }
 
   // Live presence — keeps ParentDashboard's `devices` realtime channel fresh.
+  // Deliberately NOT queued on failure: last_seen/coords are stale the moment
+  // this write fails, and replaying them would LIE about the child's presence.
+  // Presence self-corrects on the next tracker write once back online.
   const { error: presenceError } = await supabase
     .from('devices')
     .update({
@@ -94,7 +102,7 @@ export const writeLocationSnapshot = async (
     })
     .eq('id', deviceId);
   if (presenceError) {
-    console.warn('[BackgroundLocation] devices presence update failed:', presenceError.message);
+    console.warn('[BackgroundLocation] devices presence update failed (skipped, stale-by-nature):', presenceError.message);
   }
 };
 
