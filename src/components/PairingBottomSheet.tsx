@@ -692,6 +692,7 @@ export default function PairingBottomSheet({ isVisible, onClose }: Props) {
           </View>
 
           <ScrollView
+            style={{ flexShrink: 1 }}
             showsVerticalScrollIndicator={false}
             bounces={false}
             keyboardShouldPersistTaps="handled"
@@ -878,6 +879,7 @@ const styles = StyleSheet.create({
     color: '#4CAF50',
   },
   sheetAddButton: {
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

@@ -320,6 +320,24 @@ export default function ChildAACScreen() {
     const fullText = sentenceToWrap.map(w => resolveWordText(w, language)).join(' ');
     
     if (pairingCode) {
+      // Only send when a parent device is ACTUALLY connected — a child can hold
+      // a pairing code long before any parent pairs, and those orphan messages
+      // would otherwise be written to Supabase with no recipient.
+      let connected = false;
+      if (deviceId) {
+        const { data: links } = await supabase
+          .from('family_links')
+          .select('id')
+          .eq('child_device_id', deviceId)
+          .limit(1);
+        connected = Array.isArray(links) && links.length > 0;
+      }
+
+      if (!connected) {
+        Toast.show({ type: 'info', text1: t('common.failed'), text2: t('aac.toastNotLinked'), position: 'top' });
+        return;
+      }
+
       await sendAACMessage(pairingCode, {
         sender: 'Child',
         senderName: childProfile?.nickname || t('aac.childFallback'),

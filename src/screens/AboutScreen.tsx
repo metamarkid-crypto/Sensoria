@@ -35,7 +35,19 @@ export default function AboutScreen() {
           .single();
 
         if (!error && data?.content_json) {
-          setAboutContent(data.content_json);
+          // PostgREST returns jsonb as an object, text as a string — normalize
+          // both so a schema drift (jsonb vs text) can never blank the screen.
+          let parsed = data.content_json;
+          if (typeof parsed === 'string') {
+            try {
+              parsed = JSON.parse(parsed);
+            } catch {
+              parsed = null;
+            }
+          }
+          if (parsed && typeof parsed === 'object') {
+            setAboutContent(parsed as AboutContent);
+          }
         }
       } catch (e) {
         console.warn('Offline Mode: Failed to fetch About content', e);
@@ -75,7 +87,7 @@ export default function AboutScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
         
         {/* App Logo & Name */}
         <View style={styles.logoContainer}>
@@ -156,6 +168,9 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#1A2980',
+  },
+  scrollView: {
+    flex: 1,
   },
   content: {
     padding: 24,

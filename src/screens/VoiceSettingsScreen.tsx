@@ -123,7 +123,7 @@ export default function VoiceSettingsScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
         
         {/* Pilih Suara */}
         <View style={styles.section}>
@@ -236,6 +236,9 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#1A2980',
+  },
+  scrollView: {
+    flex: 1,
   },
   content: {
     padding: 20,

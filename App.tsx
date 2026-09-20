@@ -192,14 +192,15 @@ function App() {
       <StatusBar style="auto" />
       {/* Brand gate: holds the native splash until the persisted store has
           rehydrated (killing the RoleSelection flash) and plays the seamless
-          hero + wordmark + tagline reveal. Renders above the navigator AND
-          above the Sentry boundary (an error boundary can't intercept a
-          sibling), but below Toast (toast must top everything). */}
-      <SplashGate />
+          hero + wordmark + tagline reveal. Rendered AFTER the navigator so
+          Android's elevation tie-break also favors the overlay, and above
+          the Sentry boundary (an error boundary can't intercept a sibling).
+          Toast stays on top (toast must top everything). */}
       <EntitlementLifecycle />
       <Sentry.ErrorBoundary fallback={ErrorFallbackScreen}>
         <AppNavigator />
       </Sentry.ErrorBoundary>
+      <SplashGate />
       <Toast config={toastConfig} />
     </SafeAreaProvider>
   );

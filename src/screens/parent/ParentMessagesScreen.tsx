@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { supabase, sendAACMessage } from '../../services/db/supabase';
 import { useAACStore } from '../../store/useAACStore';
+import { formatTime } from '../../utils/format';
 import * as Haptics from 'expo-haptics';
 import { useAccessibleAction } from '../../hooks/useAccessibleAction';
 import { useTranslation } from '../../i18n';
@@ -161,7 +162,7 @@ export default function ParentMessagesScreen() {
             {item.text_content}
           </Text>
           <Text style={[styles.timestamp, timeStyle]}>
-            {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            {formatTime(item.timestamp)}
           </Text>
         </View>
       </View>

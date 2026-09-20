@@ -4,13 +4,126 @@ import { FontAwesome5 } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { supabase, sendAACMessage } from '../../services/db/supabase';
 import { useAACStore } from '../../store/useAACStore';
-import { formatDate } from '../../utils/format';
+import { formatDate, formatTime, toTimestampMs } from '../../utils/format';
 import { playTTS } from '../../services/ai/audioManager';
 import { LinearGradient } from 'expo-linear-gradient';
 import Toast from 'react-native-toast-message';
 import * as Haptics from 'expo-haptics';
 import { useAccessibleAction } from '../../hooks/useAccessibleAction';
 import { useTranslation } from '../../i18n';
+
+// ── Activity analytics (pure, testable) ─────────────────────────────────────
+// Correctness notes:
+//  • timestamps are normalized via toTimestampMs (PostgREST returns bigint as
+//    string, so new Date(string) would be Invalid Date).
+//  • unique words preserve CJK so trilingual (ZH) vocabulary is counted, not
+//    silently erased by an [a-z0-9]-only strip.
+//  • the four stats are all REAL and mutually consistent:
+//      messages  = child + parent (total communication volume)
+//      requests  = child messages (the child's AAC requests)
+//      responses = parent messages (social responses)
+//      unique    = distinct words the child used
+//    so messages ≈ requests + responses, never a hardcoded zero.
+
+type ActivityRange = 'today' | '7d' | '30d';
+
+interface ActivityStats {
+  messages: number;
+  requests: number;
+  responses: number;
+  uniqueWords: number;
+  activeDays: number;
+  chart: number[];
+  chartLabels: string[];
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Inclusive lower bound (epoch ms) for a range, ending at `nowMs`. */
+function rangeStartMs(range: ActivityRange, nowMs: number): number {
+  if (range === 'today') {
+    const d = new Date(nowMs);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  }
+  const days = range === '7d' ? 7 : 30;
+  return nowMs - (days - 1) * DAY_MS;
+}
+
+function dayStartMs(ms: number): number {
+  const d = new Date(ms);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+
+function computeActivity(rows: any[], range: ActivityRange, nowMs: number): ActivityStats {
+  const child = rows.filter((r) => r.sender_role === 'Child');
+  const parent = rows.filter((r) => r.sender_role === 'Parent');
+
+  const words = new Set<string>();
+  const activeDays = new Set<string>();
+
+  let chart: number[];
+  let chartLabels: string[];
+
+  if (range === 'today') {
+    chart = new Array(24).fill(0);
+    chartLabels = ['00', '04', '08', '12', '16', '20', '24'];
+  } else if (range === '7d') {
+    chart = new Array(7).fill(0);
+    chartLabels = new Array(7).fill(0).map((_, i) =>
+      String(new Date(nowMs - (6 - i) * DAY_MS).getDate()),
+    );
+  } else {
+    chart = new Array(30).fill(0);
+    chartLabels = [];
+    for (let i = 0; i < 30; i += 5) {
+      chartLabels.push(String(new Date(nowMs - (29 - i) * DAY_MS).getDate()));
+    }
+  }
+
+  for (const m of child) {
+    const ms = toTimestampMs(m.timestamp);
+    if (Number.isNaN(ms)) continue;
+
+    if (m.text_content) {
+      String(m.text_content).toLowerCase().split(/\s+/).forEach((w: string) => {
+        const clean = w.replace(/[^a-z0-9\u4e00-\u9fff]/g, '');
+        if (clean) words.add(clean);
+      });
+    }
+
+    const d = new Date(ms);
+    activeDays.add(`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`);
+
+    if (range === 'today') {
+      chart[d.getHours()]++;
+    } else {
+      const days = range === '7d' ? 7 : 30;
+      const daysAgo = Math.round((dayStartMs(nowMs) - dayStartMs(ms)) / DAY_MS);
+      const idx = days - 1 - daysAgo;
+      if (idx >= 0 && idx < days) chart[idx]++;
+    }
+  }
+
+  return {
+    messages: child.length + parent.length,
+    requests: child.length,
+    responses: parent.length,
+    uniqueWords: words.size,
+    activeDays: activeDays.size,
+    chart,
+    chartLabels,
+  };
+}
+
+const EMPTY_ACTIVITY: ActivityStats = {
+  messages: 0,
+  requests: 0,
+  responses: 0,
+  uniqueWords: 0,
+  activeDays: 0,
+  chart: new Array(24).fill(0),
+  chartLabels: ['00', '04', '08', '12', '16', '20', '24'],
+};
 
 export default function ParentHomeScreen() {
   const navigation = useNavigation<any>();
@@ -21,9 +134,8 @@ export default function ParentHomeScreen() {
   
   const { childStatus } = useAACStore();
   const currentAddress = childStatus.lastAddress || t('home.locationUnavailable');
-  const [todayMessageCount, setTodayMessageCount] = useState<number>(0);
   
-  // NEW: Comprehensive Activity Widget State
+  // Comprehensive Activity Widget State
   const ACTIVITY_TABS = [
     { id: 'today', labelKey: 'home.tabToday' },
     { id: '7d', labelKey: 'home.tab7Days' },
@@ -31,9 +143,19 @@ export default function ParentHomeScreen() {
   ] as const;
   type TabId = typeof ACTIVITY_TABS[number]['id'];
 
-  const [todayUniqueWords, setTodayUniqueWords] = useState<number>(0);
-  const [chartData, setChartData] = useState<number[]>(new Array(24).fill(0));
   const [activeTab, setActiveTab] = useState<TabId>('today');
+  const [activity, setActivity] = useState<ActivityStats>(EMPTY_ACTIVITY);
+  // Bumped on every child realtime INSERT so the active range re-fetches —
+  // a live tap on the child's board is reflected in the stats immediately.
+  const [refreshTick, setRefreshTick] = useState<number>(0);
+
+  // Switching range clears the previous range's numbers immediately so the
+  // widget never shows 7d/30d data under the wrong tab while re-fetching.
+  const selectTab = (tab: TabId) => {
+    if (tab === activeTab) return;
+    setActivity(EMPTY_ACTIVITY);
+    setActiveTab(tab);
+  };
 
   // ── Proactive Upgrade Banner (stealth kill-switch) ──────────────────────────
   // Reads the SHARED store flag, refreshed by the app lifecycle on boot and
@@ -47,11 +169,14 @@ export default function ParentHomeScreen() {
   const showUpgradeBanner =
     webPaymentActive && premium.isPremium && premium.status === 'trial';
 
+  // ── Recent message + realtime ─────────────────────────────────────────────
   useEffect(() => {
     if (!pairingCode) return;
 
-    // 1. Fetch recent message & subscribe
-    const fetchRecent = async () => {
+    let cancelled = false;
+
+    // 1. Recent child message (initial load).
+    (async () => {
       const { data } = await supabase
         .from('messages')
         .select('*')
@@ -60,49 +185,10 @@ export default function ParentHomeScreen() {
         .order('timestamp', { ascending: false })
         .limit(1)
         .single();
-      if (data) setRecentMessage(data);
-    };
-    fetchRecent();
+      if (!cancelled && data) setRecentMessage(data);
+    })();
 
-    // The Activity Analytics Engine: Fetch messages today to populate Comprehensive Widget
-    const fetchTodayData = async () => {
-      const startOfDay = new Date();
-      startOfDay.setHours(0,0,0,0);
-      const endOfDay = new Date();
-      endOfDay.setHours(23,59,59,999);
-
-      const { data } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('channel_id', pairingCode)
-        .eq('sender_role', 'Child')
-        .gte('timestamp', startOfDay.getTime())
-        .lte('timestamp', endOfDay.getTime());
-        
-      if (data) {
-        setTodayMessageCount(data.length);
-        
-        const words = new Set<string>();
-        const hourlyBlocks = new Array(24).fill(0);
-        
-        data.forEach((msg: any) => {
-          if (msg.text_content) {
-            msg.text_content.toLowerCase().split(/\s+/).forEach((w: string) => {
-              const cleanWord = w.replace(/[^a-z0-9]/g, '');
-              if (cleanWord) words.add(cleanWord);
-            });
-          }
-          
-          const h = new Date(msg.timestamp).getHours();
-          hourlyBlocks[h]++;
-        });
-        
-        setChartData(hourlyBlocks);
-        setTodayUniqueWords(words.size);
-      }
-    };
-    fetchTodayData();
-
+    // 2. Realtime: new child message → refresh recent + bump activity re-fetch.
     const msgSub = supabase.channel('home_recent_message')
       .on('postgres_changes', {
         event: 'INSERT',
@@ -112,12 +198,59 @@ export default function ParentHomeScreen() {
       }, (payload) => {
         if (payload.new.sender_role === 'Child') {
           setRecentMessage(payload.new);
-          setTodayMessageCount(prev => prev + 1);
+          setRefreshTick((t) => t + 1);
         }
       })
       .subscribe();
 
-    const profileSub = supabase.channel('home_child_profile')
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(msgSub);
+    };
+  }, [pairingCode]);
+
+  // ── Child profile sync — authoritative initial fetch + live re-sync ──────
+  // Keyed on the RESOLVED child device_id so the realtime filter is never
+  // stale (an empty filter at mount would silently miss every profile edit).
+  useEffect(() => {
+    if (!deviceId) return;
+
+    let cancelled = false;
+    let profileSub: any = null;
+
+    // 1. Resolve the child's device_id from family_links (authoritative), then
+    //    fetch the LATEST profile — never trust a stale persisted copy.
+    (async () => {
+      const { data: link } = await supabase
+        .from('family_links')
+        .select('child_device_id')
+        .eq('parent_device_id', deviceId)
+        .single();
+      const childId = link?.child_device_id ?? childProfile?.device_id;
+      if (!childId) return;
+
+      const { data: profile } = await supabase
+        .from('child_profiles')
+        .select('*')
+        .eq('device_id', childId)
+        .single();
+      if (cancelled) return;
+      if (profile) {
+        const current = useAACStore.getState().childProfile;
+        useAACStore.getState().setChildProfile({
+          ...current,
+          device_id: childId,
+          nickname: profile.nickname ?? current?.nickname,
+          full_name: profile.full_name ?? current?.full_name,
+          fullName: profile.full_name ?? current?.fullName,
+          gender: profile.settings?.childProfileGender ?? current?.gender,
+          settings: profile.settings ?? current?.settings,
+        });
+      }
+    })();
+
+    // 2. Live re-sync: child edits their profile → mirror it immediately.
+    profileSub = supabase.channel('home_child_profile')
       .on('postgres_changes', {
         event: 'UPDATE',
         schema: 'public',
@@ -139,10 +272,40 @@ export default function ParentHomeScreen() {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(msgSub);
-      supabase.removeChannel(profileSub);
+      cancelled = true;
+      if (profileSub) supabase.removeChannel(profileSub);
     };
-  }, [pairingCode]);
+  }, [deviceId, childProfile?.device_id]);
+
+  // ── Activity analytics: real data for today / 7d / 30d ────────────────────
+  useEffect(() => {
+    if (!pairingCode) return;
+
+    let cancelled = false;
+
+    (async () => {
+      const nowMs = Date.now();
+      const startMs = rangeStartMs(activeTab, nowMs);
+
+      // Lower-bound only: no upper bound, so a child message stamped a few
+      // seconds in the "future" (device clock skew) is never dropped.
+      const { data, error } = await supabase
+        .from('messages')
+        .select('sender_role, text_content, timestamp')
+        .eq('channel_id', pairingCode)
+        .gte('timestamp', startMs)
+        .order('timestamp', { ascending: true });
+
+      if (cancelled) return;
+
+      // Degrade to zeros — never show a half-baked or stale widget.
+      setActivity(computeActivity(error ? [] : (data ?? []), activeTab, nowMs));
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pairingCode, activeTab, refreshTick]);
 
   const handleQuickReply = async (text: string) => {
     if (!pairingCode) return;
@@ -215,7 +378,7 @@ export default function ParentHomeScreen() {
           </View>
           {recentMessage && (
             <Text style={styles.messageTime}>
-              {new Date(recentMessage.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              {formatTime(recentMessage.timestamp)}
             </Text>
           )}
         </View>
@@ -333,7 +496,7 @@ export default function ParentHomeScreen() {
               <TouchableOpacity 
                 key={tab.id}
                 style={[styles.activityTab, activeTab === tab.id && styles.activityTabActive]}
-                onPress={() => setActiveTab(tab.id)}
+                onPress={() => selectTab(tab.id)}
               >
                 <Text style={[styles.activityTabText, activeTab === tab.id && styles.activityTabTextActive]}>
                   {t(tab.labelKey)}
@@ -342,14 +505,14 @@ export default function ParentHomeScreen() {
             ))}
           </View>
 
-          {/* 2x2 Stats Grid */}
+          {/* 2x2 Stats Grid — all REAL values for the active range */}
           <View style={styles.statsGrid}>
             <View style={styles.statBox}>
               <View style={[styles.statIconWrap, { backgroundColor: '#E0F2FE' }]}>
                 <FontAwesome5 name="comment-dots" size={16} color="#0284C7" />
               </View>
               <View>
-                <Text style={styles.statValue}>{todayMessageCount}</Text>
+                <Text style={styles.statValue}>{activity.messages}</Text>
                 <Text style={styles.statLabel}>{t('home.statMessages')}</Text>
               </View>
             </View>
@@ -359,7 +522,7 @@ export default function ParentHomeScreen() {
                 <FontAwesome5 name="comment-medical" size={16} color="#059669" />
               </View>
               <View>
-                <Text style={styles.statValue}>{todayUniqueWords}</Text>
+                <Text style={styles.statValue}>{activity.uniqueWords}</Text>
                 <Text style={styles.statLabel}>{t('home.statUniqueWords')}</Text>
               </View>
             </View>
@@ -369,7 +532,7 @@ export default function ParentHomeScreen() {
                 <FontAwesome5 name="sun" size={16} color="#EA580C" />
               </View>
               <View>
-                <Text style={styles.statValue}>0</Text>
+                <Text style={styles.statValue}>{activity.requests}</Text>
                 <Text style={styles.statLabel}>{t('home.statRequests')}</Text>
               </View>
             </View>
@@ -379,7 +542,7 @@ export default function ParentHomeScreen() {
                 <FontAwesome5 name="puzzle-piece" size={16} color="#9333EA" />
               </View>
               <View>
-                <Text style={styles.statValue}>0</Text>
+                <Text style={styles.statValue}>{activity.responses}</Text>
                 <Text style={styles.statLabel}>{t('home.statSocialResponses')}</Text>
               </View>
             </View>
@@ -389,12 +552,12 @@ export default function ParentHomeScreen() {
             {t('home.commActivity')}
           </Text>
 
-          {/* Custom Flexbox Bar Chart */}
+          {/* Custom Flexbox Bar Chart — buckets & axis follow the active range */}
           <View style={styles.chartContainer}>
             <View style={styles.barsRow}>
-              {chartData.map((val, idx) => {
+              {activity.chart.map((val, idx) => {
                 // Determine bar color intensity based on value relative to max
-                const max = Math.max(...chartData, 1);
+                const max = Math.max(...activity.chart, 1);
                 const heightPct = Math.max((val / max) * 100, 5); // min 5% height
                 
                 let color = '#93C5FD'; // Low intensity
@@ -411,13 +574,9 @@ export default function ParentHomeScreen() {
             </View>
             
             <View style={styles.chartXAxis}>
-              <Text style={styles.chartLabel}>00</Text>
-              <Text style={styles.chartLabel}>04</Text>
-              <Text style={styles.chartLabel}>08</Text>
-              <Text style={styles.chartLabel}>12</Text>
-              <Text style={styles.chartLabel}>16</Text>
-              <Text style={styles.chartLabel}>20</Text>
-              <Text style={styles.chartLabel}>24</Text>
+              {activity.chartLabels.map((label, idx) => (
+                <Text key={idx} style={styles.chartLabel}>{label}</Text>
+              ))}
             </View>
           </View>
           

@@ -152,10 +152,18 @@ export default function SplashGate() {
 
 const styles = StyleSheet.create({
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 10,
+    // Must OUT-RANK every elevation inside the navigator: Android z-orders
+    // siblings by TOTAL accumulated elevation, so an overlay tied with the
+    // sentence bar (elevation 10) would let the navigator's subtree paint
+    // OVER the splash — the brand layer appears clipped mid-reveal.
+    elevation: 999,
     zIndex: 999,
   },
   backdropLight: {
@@ -165,8 +173,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#0B2545',
   },
   hero: {
-    width: 220,
-    height: 220,
+    // Match app.json splash imageWidth (200) so the native→overlay handoff
+    // doesn't "jump" the glyph size mid-launch.
+    width: 200,
+    height: 200,
     marginBottom: 18,
   },
   brandBlock: {

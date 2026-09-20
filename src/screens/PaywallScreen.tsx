@@ -259,9 +259,7 @@ export default function PaywallScreen() {
         </TouchableOpacity>
       ) : null}
 
-      <TouchableOpacity style={styles.primaryBtn} onPress={goBack}>
-        <Text style={styles.primaryBtnText}>{t('common.back')}</Text>
-      </TouchableOpacity>
+      {/* No "Kembali" button here — the header's close (X) already dismisses. */}
     </View>
   );
 

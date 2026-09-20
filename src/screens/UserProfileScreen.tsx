@@ -102,7 +102,7 @@ export default function UserProfileScreen() {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
         style={{ flex: 1 }}
       >
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
           {/* Avatar Placeholder */}
           <View style={styles.avatarContainer}>
             <View style={styles.avatarPlaceholder}>
@@ -213,6 +213,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#2488FF',
+  },
+  scrollView: {
+    flex: 1,
   },
   content: {
     padding: 24,

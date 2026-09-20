@@ -213,6 +213,9 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
+    // Generous bottom padding so the last menu row is never cut off when the
+    // list grows (long language names / extra settings entries).
+    paddingBottom: 48,
   },
   card: {
     backgroundColor: '#FFFFFF',

@@ -95,11 +95,40 @@ export const transcribeAudio = async (audioUri: string): Promise<string> => {
 };
 
 /** Categories a custom card can belong to (mirrors the Child tab bar ids). */
-export type ImageTagCategory = 'pronoun' | 'verb' | 'noun' | 'emotion' | 'social';
+export type ImageTagCategory =
+  | 'pronoun'
+  | 'verb'
+  | 'noun'
+  | 'emotion'
+  | 'social'
+  | 'body'
+  | 'number'
+  | 'people'
+  | 'food'
+  | 'place'
+  | 'time'
+  | 'animal'
+  | 'clothing'
+  | 'color';
 
 export type ImageTagResult = { id: string; en: string; zh: string; category: ImageTagCategory };
 
-const VALID_TAG_CATEGORIES: readonly string[] = ['pronoun', 'verb', 'noun', 'emotion', 'social'];
+const VALID_TAG_CATEGORIES: readonly string[] = [
+  'pronoun',
+  'verb',
+  'noun',
+  'emotion',
+  'social',
+  'body',
+  'number',
+  'people',
+  'food',
+  'place',
+  'time',
+  'animal',
+  'clothing',
+  'color',
+];
 
 /**
  * Returned when the model answer cannot be trusted (parse failure / missing
@@ -130,7 +159,7 @@ export const tagImageWithBilingualNames = async (imageUri: string): Promise<Imag
               },
             },
             {
-              text: 'Identify the main object in this image with a single, simple word suitable for a child. Give the word in Indonesian, English, and Mandarin, and classify it into exactly one AAC category. Return ONLY a JSON object in this exact format, with no markdown formatting or backticks: {"id": "word in indonesian", "en": "word in english", "zh": "word in mandarin", "category": "pronoun|verb|noun|emotion|social"}',
+              text: 'Identify the main object in this image with a single, simple word suitable for a child. Give the word in Indonesian, English, and Mandarin, and classify it into exactly one AAC category. Return ONLY a JSON object in this exact format, with no markdown formatting or backticks: {"id": "word in indonesian", "en": "word in english", "zh": "word in mandarin", "category": "pronoun|verb|noun|emotion|social|body|number|people|food|place|time|animal|clothing|color"}',
             },
           ],
         },

@@ -62,7 +62,7 @@ export default function OnboardingScreen({ navigation }: any) {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
         style={styles.container}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           <Text style={styles.title}>{t('onboarding.title')}</Text>
           <Text style={styles.subtitle}>{t('onboarding.subtitle')}</Text>
 
@@ -125,6 +125,7 @@ export default function OnboardingScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   container: { flex: 1 },
+  scrollView: { flex: 1 },
   scrollContent: {
     flexGrow: 1,
     padding: 24,
