@@ -52,7 +52,7 @@ const fail = (msg) => { failures++; console.log('  ✗ FAIL:', msg); };
 const ok = (msg) => console.log('  ✓', msg);
 
 // ── 1 + 2. Card labels + tap-speech text per language ─────────────────────
-console.log('\n[1] Card labels (resolveWordText) — 57 seed words × 3 languages');
+console.log(`\n[1] Card labels (resolveWordText) — ${words.length} seed words × 3 languages`);
 for (const w of words) {
   for (const lang of ['id', 'en', 'zh']) {
     const label = resolveWordText(w, lang);
@@ -63,7 +63,7 @@ for (const w of words) {
     }
   }
 }
-if (!failures) ok('all 171 (word × language) labels resolved non-empty; zh labels contain Han characters');
+if (!failures) ok(`all ${words.length * 3} (word × language) labels resolved non-empty; zh labels contain Han characters`);
 
 // ── 3. Local audio asset coverage ──────────────────────────────────────────
 console.log('\n[2] Local audio resolution — seed words × language × profile (Child=pria, ayah, ibu)');

@@ -3,5 +3,5 @@
   "compilerOptions": {
     "strict": true
   },
-  "exclude": ["admin", "node_modules"]
+  "exclude": ["admin", "go-merchant", "qris-api", "node_modules"]
 }

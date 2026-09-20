@@ -5,26 +5,31 @@ let db: SQLite.SQLiteDatabase | null = null;
 
 export const initDB = async () => {
   try {
-    if (db) return; // Prevent re-opening connection which causes NPE in React Native
-    db = await SQLite.openDatabaseAsync('aac_sensoria.db');
-    
-    // Create words table
-    await db.execAsync(`
-      CREATE TABLE IF NOT EXISTS aac_words (
-        id TEXT PRIMARY KEY,
-        word_id TEXT NOT NULL,
-        word_zh TEXT NOT NULL,
-        imageUrl TEXT NOT NULL,
-        categoryId TEXT NOT NULL,
-        isCustom INTEGER DEFAULT 0
-      );
-      
-      CREATE TABLE IF NOT EXISTS audio_cache_metadata (
-        file_uri TEXT PRIMARY KEY,
-        file_size INTEGER NOT NULL,
-        last_accessed INTEGER NOT NULL
-      );
-    `);
+    // Open lazily but NEVER re-open (re-opening causes NPE in React Native).
+    // The migrations below are all idempotent, so they safely run on EVERY
+    // call — including Fast-Refresh re-mounts where `db` already survives and
+    // a naive early-return would silently skip the dictionary sync.
+    if (!db) {
+      db = await SQLite.openDatabaseAsync('aac_sensoria.db');
+
+      // Create words table
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS aac_words (
+          id TEXT PRIMARY KEY,
+          word_id TEXT NOT NULL,
+          word_zh TEXT NOT NULL,
+          imageUrl TEXT NOT NULL,
+          categoryId TEXT NOT NULL,
+          isCustom INTEGER DEFAULT 0
+        );
+
+        CREATE TABLE IF NOT EXISTS audio_cache_metadata (
+          file_uri TEXT PRIMARY KEY,
+          file_size INTEGER NOT NULL,
+          last_accessed INTEGER NOT NULL
+        );
+      `);
+    }
     
     // Migration: NON-DESTRUCTIVE favorites. `is_favorite` is a pure boolean
     // overlay — favoriting NEVER touches categoryId, so a card always stays
@@ -72,14 +77,26 @@ export const initDB = async () => {
       console.warn('word_en backfill skipped:', e);
     }
 
-    // Migration: Update dictionary to full 57 core words and ENFORCE SORTING (keep custom words safe)
+    // Migration: sync the FULL dictionary (all categories). NON-DESTRUCTIVE:
+    //   • custom cards are never touched,
+    //   • favorites are preserved (is_favorite is never overwritten),
+    //   • existing seeded rows only get their labels/category refreshed.
+    // Sentinels: re-sync when the seeded row count is below the seed total OR
+    // the last seed word (highest id) is missing — this pushes newly-added
+    // words to EXISTING installs without wiping favorites, unlike the old
+    // DELETE-then-INSERT re-seed.
+    const seedData: AACWord[] = require('../../../assets/data/arasaac.json');
+    const lastSeedId = seedData[seedData.length - 1]?.id;
     const defaultWordsCount = await db.getAllAsync<{ count: number }>("SELECT COUNT(*) as count FROM aac_words WHERE isCustom = 0");
-    const mauCheck = await db.getAllAsync<{ id: string }>("SELECT id FROM aac_words WHERE word_id = 'Mau' AND isCustom = 0 LIMIT 1");
-    
-    // If we have fewer than 50 words OR 'Mau' is not at ID 3 (meaning it's not sorted correctly yet)
-    if ((defaultWordsCount && defaultWordsCount[0].count < 50) || (mauCheck && mauCheck.length > 0 && mauCheck[0].id !== '3')) {
-      await db.runAsync('DELETE FROM aac_words WHERE isCustom = 0');
-      await seedDefaultARASAACWords();
+    const lastSeedCheck = lastSeedId
+      ? await db.getAllAsync<{ id: string }>("SELECT id FROM aac_words WHERE id = ? AND isCustom = 0 LIMIT 1", [lastSeedId])
+      : [];
+
+    if (
+      (defaultWordsCount && defaultWordsCount[0].count < seedData.length) ||
+      (lastSeedId && lastSeedCheck.length === 0)
+    ) {
+      await syncDefaultWords(seedData);
     }
   } catch (error) {
     console.error('Error initializing SQLite:', error);
@@ -95,14 +112,26 @@ const findSeedCategory = (id: string): string | null => {
   }
 };
 
-const seedDefaultARASAACWords = async () => {
+/**
+ * Upsert the full seed dictionary. NON-DESTRUCTIVE:
+ *   • INSERT for new words,
+ *   • UPDATE labels/image/category for existing seeded rows,
+ *   • never touches is_favorite or isCustom (favorites + custom cards survive).
+ */
+const syncDefaultWords = async (seedData: AACWord[]) => {
   if (!db) return;
-  
+
   try {
-    // Memuat JSON Data Trilingual
-    const seedData: AACWord[] = require('../../../assets/data/arasaac.json');
-    
-    const statement = await db.prepareAsync('INSERT INTO aac_words (id, word_id, word_en, word_zh, imageUrl, categoryId, isCustom) VALUES ($id, $word_id, $word_en, $word_zh, $img, $cat, 0)');
+    const statement = await db.prepareAsync(
+      `INSERT INTO aac_words (id, word_id, word_en, word_zh, imageUrl, categoryId, isCustom)
+       VALUES ($id, $word_id, $word_en, $word_zh, $img, $cat, 0)
+       ON CONFLICT(id) DO UPDATE SET
+         word_id = excluded.word_id,
+         word_en = excluded.word_en,
+         word_zh = excluded.word_zh,
+         imageUrl = excluded.imageUrl,
+         categoryId = excluded.categoryId`
+    );
     for (const word of seedData) {
       await statement.executeAsync({
         $id: word.id,
@@ -110,12 +139,12 @@ const seedDefaultARASAACWords = async () => {
         $word_en: word.word_en || null,
         $word_zh: word.word_zh,
         $img: word.imageUrl || null,
-        $cat: word.categoryId
+        $cat: word.categoryId,
       });
     }
     await statement.finalizeAsync();
   } catch (error) {
-    console.error('Error seeding data:', error);
+    console.error('Error syncing seed data:', error);
   }
 };
 

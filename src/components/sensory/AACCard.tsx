@@ -83,6 +83,42 @@ const AACCard = React.memo(({ item, onPress, onLongPress }: AACCardProps) => {
         bgColor = '#FFFbeb'; // Soft Yellow
         borderColor = '#FDE68A';
         break;
+      case 'body':
+        bgColor = '#FFF5F5'; // Soft Red
+        borderColor = '#FECACA';
+        break;
+      case 'number':
+        bgColor = '#F0FDFA'; // Soft Cyan
+        borderColor = '#A5F3FC';
+        break;
+      case 'people':
+        bgColor = '#EEF2FF'; // Soft Indigo
+        borderColor = '#C7D2FE';
+        break;
+      case 'food':
+        bgColor = '#FFF1F2'; // Soft Rose
+        borderColor = '#FECDD3';
+        break;
+      case 'place':
+        bgColor = '#F0F9FF'; // Soft Sky
+        borderColor = '#BAE6FD';
+        break;
+      case 'time':
+        bgColor = '#F0FDFA'; // Soft Teal
+        borderColor = '#99F6E4';
+        break;
+      case 'animal':
+        bgColor = '#F7FEE7'; // Soft Lime
+        borderColor = '#D9F99D';
+        break;
+      case 'clothing':
+        bgColor = '#FDF4FF'; // Soft Fuchsia
+        borderColor = '#F5D0FE';
+        break;
+      case 'color':
+        bgColor = '#FAF5FF'; // Soft Purple
+        borderColor = '#E9D5FF';
+        break;
       default:
         bgColor = '#FFFFFF';
         borderColor = '#F1F5F9';

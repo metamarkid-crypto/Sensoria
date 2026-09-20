@@ -50,6 +50,15 @@ const AUTO_TAG_CATEGORIES = [
   { id: 'noun', labelKey: 'aac.catNoun', icon: 'apple-alt', color: '#3B82F6' },
   { id: 'emotion', labelKey: 'aac.catEmotion', icon: 'smile', color: '#F59E0B' },
   { id: 'social', labelKey: 'aac.catSocial', icon: 'hands-helping', color: '#8B5CF6' },
+  { id: 'body', labelKey: 'aac.catBody', icon: 'child', color: '#FECACA' },
+  { id: 'number', labelKey: 'aac.catNumber', icon: 'sort-numeric-up', color: '#A5F3FC' },
+  { id: 'people', labelKey: 'aac.catPeople', icon: 'users', color: '#C7D2FE' },
+  { id: 'food', labelKey: 'aac.catFood', icon: 'utensils', color: '#FECDD3' },
+  { id: 'place', labelKey: 'aac.catPlace', icon: 'map-marker-alt', color: '#BAE6FD' },
+  { id: 'time', labelKey: 'aac.catTime', icon: 'clock', color: '#99F6E4' },
+  { id: 'animal', labelKey: 'aac.catAnimal', icon: 'paw', color: '#D9F99D' },
+  { id: 'clothing', labelKey: 'aac.catClothing', icon: 'tshirt', color: '#F5D0FE' },
+  { id: 'color', labelKey: 'aac.catColor', icon: 'palette', color: '#E9D5FF' },
 ] as const;
 
 export default function ChildAACScreen() {
@@ -596,6 +605,15 @@ export default function ChildAACScreen() {
     { id: 'noun', labelKey: 'aac.catNoun', icon: 'apple-alt', color: '#BFDBFE', rgba: '191, 219, 254' },
     { id: 'emotion', labelKey: 'aac.catEmotion', icon: 'smile', color: '#FDE68A', rgba: '253, 230, 138' },
     { id: 'social', labelKey: 'aac.catSocial', icon: 'hands-helping', color: '#DDD6FE', rgba: '221, 214, 254' },
+    { id: 'body', labelKey: 'aac.catBody', icon: 'child', color: '#FECACA', rgba: '254, 202, 202' },
+    { id: 'number', labelKey: 'aac.catNumber', icon: 'sort-numeric-up', color: '#A5F3FC', rgba: '165, 243, 252' },
+    { id: 'people', labelKey: 'aac.catPeople', icon: 'users', color: '#C7D2FE', rgba: '199, 210, 254' },
+    { id: 'food', labelKey: 'aac.catFood', icon: 'utensils', color: '#FECDD3', rgba: '254, 205, 211' },
+    { id: 'place', labelKey: 'aac.catPlace', icon: 'map-marker-alt', color: '#BAE6FD', rgba: '186, 230, 253' },
+    { id: 'time', labelKey: 'aac.catTime', icon: 'clock', color: '#99F6E4', rgba: '153, 246, 228' },
+    { id: 'animal', labelKey: 'aac.catAnimal', icon: 'paw', color: '#D9F99D', rgba: '217, 249, 157' },
+    { id: 'clothing', labelKey: 'aac.catClothing', icon: 'tshirt', color: '#F5D0FE', rgba: '245, 208, 254' },
+    { id: 'color', labelKey: 'aac.catColor', icon: 'palette', color: '#E9D5FF', rgba: '233, 213, 255' },
   ] as const;
 
   return (
