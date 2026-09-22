@@ -68,20 +68,33 @@ function buildApp(opts = {}) {
   app.use('/api/qris-status', ipRateLimit);
 
   // -- raw body → HMAC → routes ------------------------------------------------
+  // Mobile mount: signed with QRIS_API_SECRET (the APK-embedded secret). This
+  // is a scanner filter only — real security is server-side amount/plan
+  // resolution (blueprint A4.5).
   app.use(
     '/api',
     express.raw({ type: 'application/json', limit: '64kb' }),
-    hmacVerify(opts.hmac || {}),
+    hmacVerify(opts.hmac || { secretEnv: 'QRIS_API_SECRET' }),
     mobileRoutes.router,
   );
 
-  // -- /internal/* : dashboard server actions (same HMAC doctrine) -------------
+  // -- /internal/* : dashboard server actions -----------------------------------
+  // HARDENING C-4 — two independent gates, because these routes can redirect
+  // every customer payment (POST /internal/merchant/qr replaces the static
+  // QRIS payload):
+  //   1. IP allowlist (QRIS_INTERNAL_ALLOWLIST) — defaults to loopback only.
+  //   2. A SEPARATE HMAC secret (QRIS_INTERNAL_SECRET). The mobile secret
+  //      ships inside the APK, so it must NEVER be able to sign /internal/*.
+  //      Falls back to QRIS_API_SECRET only when the dedicated secret is
+  //      absent, so an un-migrated deployment keeps working (with a loud warn).
+  //
   // JSON bodies AND raw image uploads (qr-image) both flow through here; the
   // multipart case is parsed after HMAC in the route (tiny, no extra dep).
   app.use(
     '/internal',
+    internalIpAllowlist(opts.internalAllowlist),
     express.raw({ type: '*/*', limit: '8mb' }),
-    hmacVerify(opts.hmac || {}),
+    hmacVerify(opts.internalHmac || opts.hmac || { secretEnv: 'QRIS_INTERNAL_SECRET' }),
     parseMultipart,
     internalRoutes.router,
   );
@@ -147,6 +160,53 @@ function parseMultipart(req, res, next) {
   return next();
 }
 
+/**
+ * IP allowlist for /internal/*  (HARDENING C-4).
+ *
+ * These routes can re-point every customer payment to another bank account,
+ * so this is an OPT-IN extra gate on top of the separate HMAC secret.
+ *
+ * The PRIMARY defence is the separate QRIS_INTERNAL_SECRET (see app.js mount);
+ * this allowlist is optional hardening for operators who know the dashboard's
+ * source IP. It is DISABLED by default because a single-server aaPanel/Nginx
+ * deployment calls https://app.aacsensoria.id and hairpins back through the
+ * server's own public IP — a loopback default would wrongly 403 the dashboard
+ * (the exact "tidak dapat diakses dari jaringan ini" symptom).
+ *
+ * QRIS_INTERNAL_ALLOWLIST: comma-separated IPs. When unset/empty → check is
+ * skipped (HMAC still enforced). Set it to lock /internal/* to specific IPs,
+ * e.g. QRIS_INTERNAL_ALLOWLIST=127.0.0.1,::1,10.0.0.5. Set * to explicitly
+ * allow everything.
+ */
+function internalIpAllowlist(override) {
+  const raw = override ?? process.env.QRIS_INTERNAL_ALLOWLIST ?? '';
+  const list = String(raw)
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  // Unconfigured → rely on the separate HMAC secret alone (never break the
+  // dashboard). Explicit `*` → same, but intentional.
+  if (list.length === 0 || list.includes('*')) {
+    return function internalAllowlist(req, res, next) {
+      return next();
+    };
+  }
+
+  return function internalAllowlist(req, res, next) {
+    const ip = req.ip || req.socket?.remoteAddress || '';
+    // Normalize IPv4-mapped IPv6 (::ffff:127.0.0.1 → 127.0.0.1) so operators
+    // only have to list the familiar form.
+    const bare = ip.replace(/^::ffff:/, '');
+    if (list.includes(ip) || list.includes(bare)) return next();
+    console.warn('[qris-api] /internal ditolak untuk IP', ip);
+    return res.status(403).json({
+      error: 'FORBIDDEN',
+      message: 'Endpoint internal tidak dapat diakses dari jaringan ini.',
+    });
+  };
+}
+
 /** Minimal window limiter (no external dep): max requests per IP per window. */
 function makeIpRateLimit() {
   const WINDOW_MS = parseInt(process.env.QRIS_RATE_WINDOW_MS || '60000', 10);
@@ -173,6 +233,20 @@ function makeIpRateLimit() {
 
 /** Start listening unless imported by tests/supervisor. */
 if (require.main === module) {
+  // Fail-fast / loud-warn on the C-4 secret separation.
+  if (!process.env.QRIS_INTERNAL_SECRET) {
+    console.warn(
+      '[qris-api] PERINGATAN KEAMANAN: QRIS_INTERNAL_SECRET belum di-set — /internal/* ' +
+        'masih memakai QRIS_API_SECRET yang ikut terkirim di dalam APK. ' +
+        'Set secret terpisah (lihat .env.example) lalu isi QRIS_API_SECRET yang sama di admin/.env.local.',
+    );
+  } else if (process.env.QRIS_INTERNAL_SECRET === process.env.QRIS_API_SECRET) {
+    console.warn(
+      '[qris-api] PERINGATAN KEAMANAN: QRIS_INTERNAL_SECRET identik dengan QRIS_API_SECRET — ' +
+        'pemisahan tidak berguna. Gunakan nilai acak yang berbeda.',
+    );
+  }
+
   const app = buildApp();
   const PORT = parseInt(process.env.PORT || '3200', 10);
   app.listen(PORT, () => {
@@ -190,4 +264,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { buildApp, makeIpRateLimit };
+module.exports = { buildApp, makeIpRateLimit, internalIpAllowlist };

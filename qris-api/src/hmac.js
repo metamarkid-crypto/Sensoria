@@ -47,15 +47,25 @@ function safeEqualHex(a, b) {
  *
  * MUST be mounted AFTER the raw-body parser (the signature covers the exact
  * bytes the client signed — a re-serialized JSON body would fail).
+ *
+ * SECRET SEPARATION (C-4): pass `opts.secretEnv = 'QRIS_INTERNAL_SECRET'` for
+ * the /internal/* mount so privileged admin routes are NOT verifiable with the
+ * mobile secret that ships inside the APK. See app.js for the wiring and
+ * .env.example for the operational note.
  */
 function hmacVerify(opts = {}) {
-  const secret = opts.secret || process.env.QRIS_API_SECRET;
+  const secret =
+    opts.secret ||
+    (opts.secretEnv ? process.env[opts.secretEnv] : null) ||
+    process.env.QRIS_API_SECRET;
   const maxSkew = Number.isFinite(opts.maxSkewSeconds)
     ? opts.maxSkewSeconds
     : parseInt(process.env.QRIS_HMAC_MAX_SKEW || String(DEFAULT_MAX_SKEW_SECONDS), 10);
 
   if (!secret) {
-    throw new Error('hmac: QRIS_API_SECRET wajib di-set (env atau opts.secret).');
+    throw new Error(
+      `hmac: ${opts.secretEnv || 'QRIS_API_SECRET'} wajib di-set (env atau opts.secret).`,
+    );
   }
 
   return function hmacMiddleware(req, res, next) {

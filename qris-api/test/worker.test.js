@@ -358,7 +358,7 @@ test('sweep result accounting matches side effects', async () => {
     { referenceId: 'JRN-OK', amountIdr: 49000, paymentTime: new Date().toISOString(), merchantId: m.merchant_id },
   ];
   const result = await runSweep(store);
-  assert.deepEqual(result, { expired: 1, polled: 1, settled: 1 });
+  assert.deepEqual(result, { expired: 1, polled: 1, settled: 1, reconciled: 0 });
 });
 
 test('createWorker.start validates the cron pattern', () => {
@@ -401,6 +401,53 @@ test('overlap guard: second runOnce while a sweep is in flight returns null', as
 
   release();
   const firstResult = await first;
-  assert.deepEqual(firstResult, { expired: 0, polled: 0, settled: 0 });
+  assert.deepEqual(firstResult, { expired: 0, polled: 0, settled: 0, reconciled: 0 });
   assert.equal(worker.isSweeping, false);
+});
+
+// ---------------------------------------------------------------------------
+// C-5: stranded settlement reconciliation
+// ---------------------------------------------------------------------------
+
+test('C-5: a claimed-but-unsettled order is reconciled by the sweep (no money lost)', async () => {
+  resetGobiz();
+  const { db, store } = makeStore();
+  const m = makeMerchant(db);
+
+  // Simulate the failure mode: the journal was claimed (matched_journal_id set)
+  // but settle_transaction threw BEFORE markOrderPaid — the order is stranded.
+  const stranded = makeOrder(db, m, {
+    status: 'pending',
+    matched_journal_id: 'JRN-STRANDED-1',
+    raw_journal: { referenceId: 'JRN-STRANDED-1' },
+  });
+  seedLedger(db, stranded);
+
+  // No journals to poll this sweep — the poll path would otherwise skip the
+  // stranded order (claimedRefs), which is the exact bug being fixed.
+  journalScript = [];
+
+  const result = await runSweep(store);
+  assert.equal(result.reconciled, 1, 'stranded order must be reconciled');
+
+  const order = db._state.qris_orders.find((o) => o.id === stranded.id);
+  const ledger = db._state.transactions.find((t) => t.transaction_ref === stranded.transaction_ref);
+  assert.equal(order.status, 'paid', 'order mirror must flip to paid');
+  assert.equal(ledger.status, 'paid', 'ledger must flip to paid');
+});
+
+test('C-5: reconciliation is idempotent — a paid order is not double-settled', async () => {
+  resetGobiz();
+  const { db, store } = makeStore();
+  const m = makeMerchant(db);
+  const paid = makeOrder(db, m, {
+    status: 'paid',
+    matched_journal_id: 'JRN-DONE-1',
+  });
+  seedLedger(db, paid);
+  db._state.transactions.find((t) => t.transaction_ref === paid.transaction_ref).status = 'paid';
+
+  const result = await runSweep(store);
+  assert.equal(result.reconciled, 0, 'already-paid order must not count as reconciled');
+  assert.equal(paid.status, 'paid');
 });

@@ -1,0 +1,191 @@
+name: Android AAB (Play Store) 🏪
+
+# Builds the PRODUCTION App Bundle (.aab) for Google Play — via GRADLE on the
+# GitHub runner, NOT via EAS cloud.
+#
+# WHY NOT EAS CLOUD (strategy note):
+#   The GitHub APK pipeline (android-build.yml) injects 13 EXPO_PUBLIC_* app
+#   secrets into .env at build time — they are baked into the JS bundle. EAS
+#   cloud builds cannot read GitHub Secrets, so an EAS-built AAB would ship a
+#   dead bundle (supabase.ts throws on missing EXPO_PUBLIC_SUPABASE_URL).
+#   EAS is therefore used ONLY to create/hold the release keystore (first
+#   build); this workflow builds the real AAB locally with the same env as
+#   the APK pipeline, signed with a keystore supplied through repo secrets.
+#
+# Required GitHub secrets:
+#   APP secrets (identical to android-build.yml):
+#     EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY /
+#     EXPO_PUBLIC_GOOGLE_MAPS_API_KEY / EXPO_PUBLIC_GEMINI_API_KEY /
+#     EXPO_PUBLIC_FISH_AUDIO_API_KEY / EXPO_PUBLIC_VOICE_* (6) /
+#     EXPO_PUBLIC_QRIS_API_SECRET
+#   Keystore signing (4):
+#     ANDROID_KEYSTORE_BASE64     — base64 of the release .keystore file
+#     ANDROID_KEYSTORE_PASSWORD   — keystore store password
+#     ANDROID_KEYSTORE_ALIAS      — key alias (EAS default: my-key-alias)
+#     ANDROID_KEY_PASSWORD        — key password
+#   Optional:
+#     PLAY_SERVICE_ACCOUNT_JSON   — auto-upload the AAB to the Play internal
+#                                   track as a DRAFT when set.
+#
+# Triggers: pushing a `v*` tag, or manual workflow_dispatch.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-aab:
+    name: Build & Publish AAB
+    runs-on: ubuntu-latest
+    env:
+      SENTRY_DISABLE_AUTO_UPLOAD: true
+
+    steps:
+      - name: 🧹 Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: false # local gradle build — keep the SDK
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: ☕ Setup Java (JDK 17)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: 📦 Install Dependencies
+        run: npm ci || npm install
+
+      - name: 🔐 Create .env file (13 app secrets)
+        run: |
+          echo "EXPO_PUBLIC_SUPABASE_URL=${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}" >> .env
+          echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}" >> .env
+          echo "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=${{ secrets.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY }}" >> .env
+          echo "EXPO_PUBLIC_GEMINI_API_KEY=${{ secrets.EXPO_PUBLIC_GEMINI_API_KEY }}" >> .env
+          echo "EXPO_PUBLIC_FISH_AUDIO_API_KEY=${{ secrets.EXPO_PUBLIC_FISH_AUDIO_API_KEY }}" >> .env
+          echo "EXPO_PUBLIC_VOICE_GIRL=${{ secrets.EXPO_PUBLIC_VOICE_GIRL }}" >> .env
+          echo "EXPO_PUBLIC_VOICE_GIRL_2=${{ secrets.EXPO_PUBLIC_VOICE_GIRL_2 }}" >> .env
+          echo "EXPO_PUBLIC_VOICE_BOY=${{ secrets.EXPO_PUBLIC_VOICE_BOY }}" >> .env
+          echo "EXPO_PUBLIC_VOICE_BOY_2=${{ secrets.EXPO_PUBLIC_VOICE_BOY_2 }}" >> .env
+          echo "EXPO_PUBLIC_VOICE_DAD=${{ secrets.EXPO_PUBLIC_VOICE_DAD }}" >> .env
+          echo "EXPO_PUBLIC_VOICE_MOM=${{ secrets.EXPO_PUBLIC_VOICE_MOM }}" >> .env
+          echo "EXPO_PUBLIC_QRIS_API_SECRET=${{ secrets.EXPO_PUBLIC_QRIS_API_SECRET }}" >> .env
+
+      - name: ✅ Version parity (app.json ↔ app.playstore.json)
+        run: |
+          node -e "
+            const a = require('./app.json').expo, p = require('./app.playstore.json').expo;
+            if (a.version !== p.version || a.android.versionCode !== p.android.versionCode) {
+              console.error('❌ Versi tidak sinkron: app.json=' + a.version + '/' + a.android.versionCode +
+                ' vs app.playstore.json=' + p.version + '/' + p.android.versionCode);
+              console.error('   Bump KEDUA file bersamaan agar build Play & APK tidak berbeda versi.');
+              process.exit(1);
+            }
+            console.log('✅ Versi sinkron: ' + a.version + ' (versionCode ' + a.android.versionCode + ')');
+          "
+
+      - name: 🔀 Swap to Play Store config (foreground-only location)
+        run: |
+          mv app.json app.github.json
+          cp app.playstore.json app.json
+          echo "App config aktif: app.playstore.json (ACCESS_BACKGROUND_LOCATION OFF)"
+
+      - name: 🏗️ Expo Prebuild (generate native code, foreground-only)
+        run: npx expo prebuild --platform android --clean
+
+      - name: 🔑 Setup release keystore from repo secrets
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEYSTORE_ALIAS: ${{ secrets.ANDROID_KEYSTORE_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ] || [ -z "$ANDROID_KEYSTORE_PASSWORD" ] || [ -z "$ANDROID_KEYSTORE_ALIAS" ] || [ -z "$ANDROID_KEY_PASSWORD" ]; then
+            echo "❌ Secret keystore belum lengkap. Set 4 secret berikut di repo:"
+            echo "   ANDROID_KEYSTORE_BASE64  (base64 file .keystore)"
+            echo "   ANDROID_KEYSTORE_PASSWORD / ANDROID_KEYSTORE_ALIAS / ANDROID_KEY_PASSWORD"
+            echo "   Lihat docs/PLAYSTORE_RELEASE_GUIDE.md → bagian Keystore."
+            exit 1
+          fi
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/app/upload-keystore.keystore
+          KEYTOOL=$(find "$JAVA_HOME_17_X64" -name keytool 2>/dev/null | head -1 || echo keytool)
+          "$KEYTOOL" -list -keystore android/app/upload-keystore.keystore \
+            -storepass "$ANDROID_KEYSTORE_PASSWORD" -alias "$ANDROID_KEYSTORE_ALIAS" > /dev/null 2>&1 \
+            || { echo "❌ Keystore/alias/password tidak cocok — cek ulang 4 secret keystore."; exit 1; }
+          # echo-based writes (bukan heredoc ter-indentasi — terminator heredoc
+          # harus di kolom 0, indentasi YAML membuat file rusak/skrip telanjang).
+          {
+            echo "storeFile=upload-keystore.keystore"
+            echo "storePassword=$ANDROID_KEYSTORE_PASSWORD"
+            echo "keyAlias=$ANDROID_KEYSTORE_ALIAS"
+            echo "keyPassword=$ANDROID_KEY_PASSWORD"
+          } > android/keystore.properties
+          echo "✅ Keystore terverifikasi (alias: $ANDROID_KEYSTORE_ALIAS)"
+
+      - name: 🩹 Patch release signing (keystore.properties → build.gradle)
+        run: node scripts/patch-release-signing.js
+
+      - name: 🔨 Build AAB using Gradle
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew bundleRelease
+
+      - name: 🏷️ Attach AAB to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ls -la android/app/build/outputs/bundle/release/
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="aab-v${VERSION}-r${{ github.run_number }}"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            TITLE="Sensoria AAB v${VERSION} (${{ github.ref_name }})"
+          else
+            TITLE="Sensoria AAB v${VERSION} (build #${{ github.run_number }})"
+          fi
+          gh release create "$TAG" \
+            android/app/build/outputs/bundle/release/app-release.aab \
+            --title "$TITLE" \
+            --notes "Production App Bundle untuk Google Play (package id.sensoria.aac, foreground-only location).
+
+          Dibangun oleh GitHub Actions dengan seluruh EXPO_PUBLIC_* secrets repo ini dan
+          ditandatangani release keystore (bukan debug). Upload manual: Play Console →
+          Testing → Closed testing → Create release → upload app-release.aab." || \
+          gh release upload "$TAG" \
+            android/app/build/outputs/bundle/release/app-release.aab --clobber
+
+      - name: 📤 Upload AAB to Google Play (internal track, draft)
+        env:
+          PLAY_SA: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -z "$PLAY_SA" ]; then
+            echo "ℹ️ PLAY_SERVICE_ACCOUNT_JSON tidak diset — upload Play dilewati (AAB tetap tersedia di GitHub Release)."
+            exit 0
+          fi
+          echo "$PLAY_SA" > play-sa.json
+          npx eas-cli@latest submit \
+            --platform android \
+            --non-interactive \
+            --android-service-account-key-file play-sa.json \
+            --android-track internal \
+            --android-release-status draft \
+            --path android/app/build/outputs/bundle/release/app-release.aab \
+          && rm play-sa.json && echo "✅ AAB ter-upload ke Play internal track (draft)."

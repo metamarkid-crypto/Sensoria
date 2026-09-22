@@ -513,7 +513,7 @@ test('worker/run: returns sweep accounting without throwing on empty DB', async 
   try {
     const res = await signedReq(server, 'POST', '/internal/worker/run', { body: {} });
     assert.equal(res.status, 200);
-    assert.deepEqual(res.body, { ok: true, expired: 0, polled: 0, settled: 0 });
+    assert.deepEqual(res.body, { ok: true, expired: 0, polled: 0, settled: 0, reconciled: 0 });
   } finally { server.close(); }
 });
 
@@ -539,4 +539,142 @@ test('internal endpoints are HMAC-gated (unsigned request rejected)', async () =
     assert.equal(res.status, 401);
     assert.equal(res.body.error, 'MISSING_SIGNATURE');
   } finally { server.close(); }
+});
+
+// ---------------------------------------------------------------------------
+// C-4: /internal/* must be gated by a SEPARATE secret, never the APK-embedded
+// mobile secret.
+// ---------------------------------------------------------------------------
+
+test('C-4: /internal/* rejects a signature made with the MOBILE secret', async () => {
+  resetGobiz();
+  const db = makeFakeDb();
+
+  // Simulate the production split: internal secret is a DIFFERENT value.
+  const prevInternal = process.env.QRIS_INTERNAL_SECRET;
+  process.env.QRIS_INTERNAL_SECRET = 'internal-only-secret';
+
+  const app = buildTestApp(db);
+  const server = await listen(app);
+  try {
+    const payload = Buffer.from(JSON.stringify({}), 'utf8');
+    const stamp = Math.floor(Date.now() / 1000);
+    // Sign with QRIS_API_SECRET (the value that ships in the APK).
+    const mobileSig = signPayload(payload.toString('utf8'), 'test-secret-internal', stamp);
+
+    const res = await new Promise((resolve, reject) => {
+      const r = http.request(
+        {
+          host: '127.0.0.1', port: server.address().port, method: 'POST', path: '/internal/worker/run',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': String(payload.length),
+            'X-Sensoria-Timestamp': String(stamp),
+            'X-Sensoria-Sign': mobileSig,
+          },
+        },
+        (rs) => {
+          let d = '';
+          rs.on('data', (c) => (d += c));
+          rs.on('end', () => resolve({ status: rs.statusCode, body: JSON.parse(d) }));
+        },
+      );
+      r.on('error', reject);
+      r.end(payload);
+    });
+
+    assert.equal(res.status, 401, 'mobile-secret signature must be rejected on /internal/*');
+    assert.equal(res.body.error, 'BAD_SIGNATURE');
+  } finally {
+    server.close();
+    if (prevInternal === undefined) delete process.env.QRIS_INTERNAL_SECRET;
+    else process.env.QRIS_INTERNAL_SECRET = prevInternal;
+  }
+});
+
+test('C-4: /internal/* accepts a signature made with the INTERNAL secret', async () => {
+  resetGobiz();
+  const db = makeFakeDb();
+
+  const prevInternal = process.env.QRIS_INTERNAL_SECRET;
+  process.env.QRIS_INTERNAL_SECRET = 'internal-only-secret';
+
+  const app = buildTestApp(db);
+  const server = await listen(app);
+  try {
+    const payload = Buffer.from(JSON.stringify({}), 'utf8');
+    const stamp = Math.floor(Date.now() / 1000);
+    const internalSig = signPayload(payload.toString('utf8'), 'internal-only-secret', stamp);
+
+    const res = await new Promise((resolve, reject) => {
+      const r = http.request(
+        {
+          host: '127.0.0.1', port: server.address().port, method: 'POST', path: '/internal/worker/run',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': String(payload.length),
+            'X-Sensoria-Timestamp': String(stamp),
+            'X-Sensoria-Sign': internalSig,
+          },
+        },
+        (rs) => {
+          let d = '';
+          rs.on('data', (c) => (d += c));
+          rs.on('end', () => resolve({ status: rs.statusCode, body: JSON.parse(d) }));
+        },
+      );
+      r.on('error', reject);
+      r.end(payload);
+    });
+
+    assert.equal(res.status, 200, 'internal-secret signature must be accepted on /internal/*');
+  } finally {
+    server.close();
+    if (prevInternal === undefined) delete process.env.QRIS_INTERNAL_SECRET;
+    else process.env.QRIS_INTERNAL_SECRET = prevInternal;
+  }
+});
+
+test('C-4: /internal/* is IP-allowlisted when explicitly configured (non-listed blocked)', async () => {
+  resetGobiz();
+  const db = makeFakeDb();
+
+  const prevAllow = process.env.QRIS_INTERNAL_ALLOWLIST;
+  process.env.QRIS_INTERNAL_ALLOWLIST = '10.0.0.99'; // anything but loopback
+
+  const app = buildTestApp(db);
+  const server = await listen(app);
+  try {
+    const payload = Buffer.from(JSON.stringify({}), 'utf8');
+    const stamp = Math.floor(Date.now() / 1000);
+    const sig = signPayload(payload.toString('utf8'), 'test-secret-internal', stamp);
+
+    const res = await new Promise((resolve, reject) => {
+      const r = http.request(
+        {
+          host: '127.0.0.1', port: server.address().port, method: 'POST', path: '/internal/worker/run',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': String(payload.length),
+            'X-Sensoria-Timestamp': String(stamp),
+            'X-Sensoria-Sign': sig,
+          },
+        },
+        (rs) => {
+          let d = '';
+          rs.on('data', (c) => (d += c));
+          rs.on('end', () => resolve({ status: rs.statusCode, body: JSON.parse(d) }));
+        },
+      );
+      r.on('error', reject);
+      r.end(payload);
+    });
+
+    assert.equal(res.status, 403, 'non-allowlisted IP must be blocked before HMAC');
+    assert.equal(res.body.error, 'FORBIDDEN');
+  } finally {
+    server.close();
+    if (prevAllow === undefined) delete process.env.QRIS_INTERNAL_ALLOWLIST;
+    else process.env.QRIS_INTERNAL_ALLOWLIST = prevAllow;
+  }
 });

@@ -136,10 +136,53 @@ async function instantVerify(store, order) {
   return store.getOrderById(store.db, order.id);
 }
 
+/**
+ * C-5 — RECONCILE STRANDED SETTLEMENTS.
+ *
+ * If settle_transaction throws AFTER claimJournal won (e.g. plan deactivated
+ * mid-flight), the order is left 'pending' with matched_journal_id set. The
+ * normal poll path skips those (claimedRefs), so without this pass they would
+ * never be retried and would eventually expire as 'failed' — the customer
+ * paid but never received their subscription.
+ *
+ * settle_transaction is idempotent (returns false when the ledger row is no
+ * longer 'pending'), so re-invoking it here is always safe. Returns the
+ * number of orders successfully settled by THIS call.
+ */
+async function reconcileStrandedSettlements(store, { log = console } = {}) {
+  let stranded;
+  try {
+    stranded = await store.listStrandedSettlements(store.db);
+  } catch (err) {
+    log.error('[settle] listStrandedSettlements gagal:', err.code || err.message);
+    return 0;
+  }
+
+  let settled = 0;
+  for (const order of stranded) {
+    try {
+      const ok = await store.settleOrder(store.db, order.transaction_ref, order.raw_journal ?? null);
+      if (ok) {
+        await store.markOrderPaid(store.db, order.id, order.matched_journal_id);
+        settled += 1;
+        log.log('[settle] RECONCILED', order.transaction_ref, '— tadi nyangkut, sekarang selesai.');
+      } else {
+        // Ledger no longer pending (someone else settled/refunded it) — finish
+        // the mirror so the order isn't re-scanned forever.
+        log.log('[settle] stranded', order.transaction_ref, 'sudah beres di ledger (false) — sinkronkan status.');
+      }
+    } catch (err) {
+      log.error('[settle] reconcile gagal untuk', order.transaction_ref, err.code || err.message);
+    }
+  }
+  return settled;
+}
+
 module.exports = {
   pollAndSettle,
   settleFromMutations,
   instantVerify,
+  reconcileStrandedSettlements,
   paymentTimeInWindow,
   GOBIZ_JOURNAL_TIME_TOLERANCE_MS,
 };

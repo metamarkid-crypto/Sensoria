@@ -53,28 +53,18 @@ export default function ParentSettingsListScreen() {
           : t('settings.seePlans')
     : t('settings.soonComing');
 
-  // Live mode → tappable row that opens the Paywall (which independently
-  // re-verifies the kill-switch before ever showing pricing).
-  // Review mode → inert, non-clickable placeholder. No route, no navigation.
-  const subscriptionItem: SettingsItem = liveMode
-    ? {
-        id: 'premium',
-        titleKey: 'settings.subscription',
-        subtitle: subscriptionSubtitle,
-        icon: 'crown',
-        iconColor: '#D97706',
-        iconBg: '#FFFBEB',
-        route: 'Paywall',
-      }
-    : {
-        id: 'premium',
-        titleKey: 'settings.premium',
-        subtitle: subscriptionSubtitle,
-        icon: 'lock',
-        iconColor: '#94A3B8',
-        iconBg: '#F8FAFC',
-        disabled: true,
-      };
+  // Live mode only — the row is REMOVED entirely during review (see render
+  // below): "Premium · Segera Hadir" would still reveal that a paid product
+  // exists, which the reviewer-facing app must never do.
+  const subscriptionItem: SettingsItem = {
+    id: 'premium',
+    titleKey: 'settings.subscription',
+    subtitle: subscriptionSubtitle,
+    icon: 'crown',
+    iconColor: '#D97706',
+    iconBg: '#FFFBEB',
+    route: 'Paywall',
+  };
 
   // Current language label for the row subtitle (e.g. "Indonesia").
   const languageLabel =
@@ -156,9 +146,12 @@ export default function ParentSettingsListScreen() {
           )}
         </View>
 
-        {/* Account & billing, deliberately quiet and low in the hierarchy. */}
+        {/* Account & billing, deliberately quiet and low in the hierarchy.
+            STEALTH: during App Review the billing row is removed entirely —
+            "Premium · Segera Hadir" would still expose that a paid product
+            exists, which the reviewer-facing app must never do. */}
         <View style={[styles.card, styles.groupGap]}>
-          {renderRow(subscriptionItem, true)}
+          {liveMode ? renderRow(subscriptionItem, true) : null}
           {renderRow(aboutItem, false)}
         </View>
 

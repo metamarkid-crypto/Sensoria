@@ -112,44 +112,29 @@ export default function SettingsScreen() {
             slightly separated from the functional settings. */}
         <View style={[styles.card, styles.groupGap]}>
           {/* Live mode → tappable row that opens the Paywall modal (registered
-              on the Child stack in AppNavigator). Review mode → inert,
-              non-clickable placeholder. No navigation, no pricing. */}
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => navigation.navigate('Paywall')}
-            activeOpacity={0.7}
-            disabled={!liveMode}
-          >
-            <View style={styles.menuItemLeft}>
-              <View
-                style={[
-                  styles.iconBox,
-                  liveMode ? styles.iconBoxPremium : styles.iconBoxLocked,
-                ]}
-              >
-                {liveMode ? (
+              on the Child stack in AppNavigator). Review mode → row hidden
+              entirely: no title, no badge, no navigation — nothing for a
+              reviewer to interpret as an unpurchasable product. */}
+          {liveMode ? (
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => navigation.navigate('Paywall')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.menuItemLeft}>
+                <View style={[styles.iconBox, styles.iconBoxPremium]}>
                   <FontAwesome5 name="crown" size={16} color="#D97706" />
-                ) : (
-                  <FontAwesome5 name="lock" size={16} color="#94A3B8" />
-                )}
+                </View>
+                <View style={styles.menuItemText}>
+                  <Text style={styles.menuItemTitle}>{t('settings.subscription')}</Text>
+                  <Text style={styles.menuItemSubtitle} numberOfLines={1}>
+                    {subscriptionSubtitle}
+                  </Text>
+                </View>
               </View>
-              <View style={styles.menuItemText}>
-                <Text style={[styles.menuItemTitle, !liveMode && styles.menuItemTitleDisabled]}>
-                  {liveMode ? t('settings.subscription') : t('settings.premium')}
-                </Text>
-                <Text style={styles.menuItemSubtitle} numberOfLines={1}>
-                  {subscriptionSubtitle}
-                </Text>
-              </View>
-            </View>
-            {liveMode ? (
               <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />
-            ) : (
-              <View style={styles.soonBadge}>
-                <Text style={styles.soonBadgeText}>{t('settings.soonBadge')}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
+            </TouchableOpacity>
+          ) : null}
 
           <TouchableOpacity
             style={[styles.menuItem, styles.lastMenuItem]}

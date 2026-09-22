@@ -32,7 +32,11 @@ function signPayload(rawBody: string, secret: string, timestamp: number): string
 }
 
 function assertConfigured(): { secret: string; baseUrl: string } {
-  const secret = process.env.QRIS_API_SECRET;
+  // HARDENING C-4: the dashboard talks ONLY to /internal/*, so it must sign
+  // with the SEPARATE internal secret — never the APK-embedded QRIS_API_SECRET.
+  // Falls back to QRIS_API_SECRET only while the dedicated secret hasn't been
+  // rolled out yet (mirrors the qris-api side's fallback, see app.js).
+  const secret = process.env.QRIS_INTERNAL_SECRET || process.env.QRIS_API_SECRET;
   const baseUrl = process.env.QRIS_API_BASE_URL || QRIS_API_BASE_URL;
   if (!secret) {
     throw new Error(QRIS_API_ERRORS.NOT_CONFIGURED);
@@ -125,7 +129,7 @@ export async function qrisApiRequest<T = Record<string, unknown>>(
     if (res.status === 401) {
       // BAD_SIGNATURE / TIMESTAMP_SKEW / MISSING_SIGNATURE — the two sides
       // don't share the same secret (deploy/config bug, not user error).
-      throw new QrisApiError(QRIS_API_ERRORS.SIGNATURE_REJECTED, "Tanda tangan ditolak qris-api — periksa QRIS_API_SECRET di kedua sisi.", {
+      throw new QrisApiError(QRIS_API_ERRORS.SIGNATURE_REJECTED, "Tanda tangan ditolak qris-api — periksa QRIS_INTERNAL_SECRET di kedua sisi (admin & qris-api).", {
         status: res.status,
         serverMessage: typeof body.error === "string" ? body.error : null,
       });

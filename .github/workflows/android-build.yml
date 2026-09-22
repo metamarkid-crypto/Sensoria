@@ -83,6 +83,42 @@ jobs:
       - name: 🏗️ Run Expo Prebuild (Generate Native Code)
         run: npx expo prebuild --platform android --clean
 
+      # ── SIGNATURE PARITY with the Play AAB pipeline ────────────────────────
+      # When the 4 keystore secrets are set, the APK is signed with the SAME
+      # release keystore as the Play AAB (android-aab.yml) — one signature
+      # across every channel. When they are absent, the pipeline keeps the
+      # legacy debug-signed fallback so this pipeline never breaks.
+      # NOTE: users switching from an old DEBUG-signed APK to a RELEASE-signed
+      # one must uninstall first (Android rejects signature mismatches).
+      - name: 🔑 Sign release with production keystore (when secrets present)
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEYSTORE_ALIAS: ${{ secrets.ANDROID_KEYSTORE_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ] || [ -z "$ANDROID_KEYSTORE_PASSWORD" ] || [ -z "$ANDROID_KEYSTORE_ALIAS" ] || [ -z "$ANDROID_KEY_PASSWORD" ]; then
+            echo "⚠️ Secret keystore belum diset — APK tetap DEBUG-SIGNED (fallback lama)."
+            echo "   Set ANDROID_KEYSTORE_BASE64 / ANDROID_KEYSTORE_PASSWORD / ANDROID_KEYSTORE_ALIAS / ANDROID_KEY_PASSWORD"
+            echo "   agar signature APK = signature Play AAB. Panduan: docs/PLAYSTORE_RELEASE_GUIDE.md → Keystore."
+            exit 0
+          fi
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/app/upload-keystore.keystore
+          KEYTOOL=$(find "$JAVA_HOME_17_X64" -name keytool 2>/dev/null | head -1 || echo keytool)
+          "$KEYTOOL" -list -keystore android/app/upload-keystore.keystore \
+            -storepass "$ANDROID_KEYSTORE_PASSWORD" -alias "$ANDROID_KEYSTORE_ALIAS" > /dev/null 2>&1 \
+            || { echo "❌ Keystore/alias/password tidak cocok — cek 4 secret keystore."; exit 1; }
+          # echo-based writes (bukan heredoc ter-indentasi — terminator heredoc
+          # harus di kolom 0, indentasi YAML membuat file rusak/skrip telanjang).
+          {
+            echo "storeFile=upload-keystore.keystore"
+            echo "storePassword=$ANDROID_KEYSTORE_PASSWORD"
+            echo "keyAlias=$ANDROID_KEYSTORE_ALIAS"
+            echo "keyPassword=$ANDROID_KEY_PASSWORD"
+          } > android/keystore.properties
+          node scripts/patch-release-signing.js
+          echo "✅ APK akan ditandatangani release keystore (signature = Play AAB)"
+
       - name: 🔨 Build APK using Gradle
         run: |
           cd android
@@ -100,11 +136,20 @@ jobs:
         run: |
           VERSION=$(node -p "require('./package.json').version")
           TAG="apk-v${VERSION}-r${{ github.run_number }}"
+          # Dynamic signature note: testers MUST uninstall an old DEBUG-signed
+          # APK before installing a RELEASE-signed one (signature mismatch).
+          if [ -f android/keystore.properties ]; then
+            SIG_NOTE="✅ APK ini RELEASE-SIGNED — signature sama dengan build Play Store.\n⚠️ Jika sebelumnya memasang APK lama (debug-signed), UNINSTALL DULU sebelum install — Android menolak update lintas signature."
+          else
+            SIG_NOTE="ℹ️ APK ini masih DEBUG-SIGNED (keystore secrets belum diset di repo)."
+          fi
           gh release create "$TAG" \
             android/app/build/outputs/apk/release/app-release.apk \
             --title "Sensoria APK v${VERSION} (build #${{ github.run_number }})" \
             --latest \
             --notes "Automated release build from commit ${{ github.sha }}.
+
+          $SIG_NOTE
 
           Cara install: unduh app-release.apk → izinkan 'Install unknown apps' → install.
 

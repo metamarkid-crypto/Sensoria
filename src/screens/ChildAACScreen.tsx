@@ -69,7 +69,7 @@ export default function ChildAACScreen() {
     language, childProfile, pairingCode, deviceId, 
     setSpeechRate,
     cardSize, cardSpacing, speakOnTap,
-    premium
+    premium, webPaymentActive
   } = useAACStore();
   const { t } = useTranslation();
 
@@ -796,8 +796,10 @@ export default function ChildAACScreen() {
         </View>
       </View>
 
-      {/* Compassionate grace: subtle, non-blocking subscription nudge */}
-      {childInGrace ? (
+      {/* Compassionate grace: subtle, non-blocking nudge — and STEALTH-gated:
+          during App Review (web_payment_active=false) even the word
+          "langganan" must never surface on any screen, child included. */}
+      {childInGrace && webPaymentActive ? (
         <View style={styles.graceBanner}>
           <Text style={styles.graceBannerText}>{t('aac.graceBanner')}</Text>
         </View>

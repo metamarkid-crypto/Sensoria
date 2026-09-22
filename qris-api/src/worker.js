@@ -30,7 +30,7 @@
 
 const cron = require('node-cron');
 const { createStore } = require('./store');
-const { pollAndSettle } = require('./settle');
+const { pollAndSettle, reconcileStrandedSettlements } = require('./settle');
 
 const DEFAULT_CRON = '*/30 * * * * *'; // every 30 s
 const DEFAULT_EXPIRE_BATCH = 200;
@@ -48,7 +48,7 @@ function parseIntEnv(name, fallback) {
  * @returns {Promise<{expired: number, polled: number, settled: number}>}
  */
 async function runSweep(store, { log = console } = {}) {
-  const out = { expired: 0, polled: 0, settled: 0 };
+  const out = { expired: 0, polled: 0, settled: 0, reconciled: 0 };
 
   // ---- 1) expiry pass ------------------------------------------------------
   try {
@@ -85,8 +85,6 @@ async function runSweep(store, { log = console } = {}) {
       log.error('[worker] listActiveMerchants gagal:', err.code || err.message);
     }
   }
-  if (merchants.length === 0) return out;
-
   // ---- 3) poll + settle per merchant --------------------------------------
   for (const merchant of merchants) {
     if (merchant.status === 'disabled') continue;
@@ -101,6 +99,18 @@ async function runSweep(store, { log = console } = {}) {
       // reaching here is a programming/store error — log and keep going.
       log.error('[worker] poll gagal untuk merchant', merchant.merchant_id, err.code || err.message);
     }
+  }
+
+  // ---- 4) C-5: reconcile stranded settlements -----------------------------
+  // Orders whose journal was claimed but whose settle_transaction failed are
+  // invisible to the poll path (claimedRefs skip) — re-attempt the idempotent
+  // RPC here so a paid customer always gets their subscription. Runs even when
+  // no merchant had pending orders (the stranded set is independent of it).
+  try {
+    out.reconciled = await reconcileStrandedSettlements(store, { log });
+    if (out.reconciled > 0) log.log('[worker] reconciled', out.reconciled, 'stranded order(s)');
+  } catch (err) {
+    log.error('[worker] reconcile pass gagal:', err.code || err.message);
   }
 
   return out;
@@ -129,7 +139,7 @@ function createWorker(opts = {}) {
       const result = await runSweep(store, { log });
       log.log(
         `[worker] sweep selesai dalam ${Date.now() - started}ms: ` +
-          `expired=${result.expired} polled=${result.polled} settled=${result.settled}`,
+          `expired=${result.expired} polled=${result.polled} settled=${result.settled} reconciled=${result.reconciled}`,
       );
       return result;
     } finally {

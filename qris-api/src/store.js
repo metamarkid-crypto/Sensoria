@@ -94,6 +94,7 @@ function createStore(opts = {}) {
     claimJournal,
     settleOrder,
     markOrderPaid,
+    listStrandedSettlements,
     // -- checkout (routes) --------------------------------------------------
     getChildDevice,
     getPlan,
@@ -717,6 +718,32 @@ async function markOrderPaid(db, orderId, journalId, paidAt = new Date()) {
     .maybeSingle();
   if (error) throw dbErr('markOrderPaid', error);
   return data;
+}
+
+/**
+ * C-5 — STRANDED SETTLEMENT RECONCILIATION.
+ *
+ * A journal is CLAIMED first (matched_journal_id set) and only THEN settled
+ * (settle_transaction RPC). If the RPC throws (e.g. plan deactivated
+ * mid-flight — apply_plan_purchase raises), the order stays 'pending' with
+ * matched_journal_id set. On the next sweep settle.js skips it (claimedRefs
+ * filters it out), so it would NEVER be retried and would eventually expire
+ * as 'failed' — customer paid, no subscription delivered.
+ *
+ * This returns exactly those stranded rows so the worker can re-attempt the
+ * idempotent settle_transaction. Both the poll path and this path guard on
+ * the same 'pending' state, so a row is settled at most once.
+ */
+async function listStrandedSettlements(db, limit = 100) {
+  const { data, error } = await db
+    .from('qris_orders')
+    .select(ORDER_COLUMNS)
+    .eq('status', 'pending')
+    .not('matched_journal_id', 'is', null)
+    .order('created_at', { ascending: true })
+    .limit(limit);
+  if (error) throw dbErr('listStrandedSettlements', error);
+  return data || [];
 }
 
 module.exports = {
