@@ -103,19 +103,7 @@ jobs:
             echo "   agar signature APK = signature Play AAB. Panduan: docs/PLAYSTORE_RELEASE_GUIDE.md → Keystore."
             exit 0
           fi
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/app/upload-keystore.keystore
-          KEYTOOL=$(find "$JAVA_HOME_17_X64" -name keytool 2>/dev/null | head -1 || echo keytool)
-          "$KEYTOOL" -list -keystore android/app/upload-keystore.keystore \
-            -storepass "$ANDROID_KEYSTORE_PASSWORD" -alias "$ANDROID_KEYSTORE_ALIAS" > /dev/null 2>&1 \
-            || { echo "❌ Keystore/alias/password tidak cocok — cek 4 secret keystore."; exit 1; }
-          # echo-based writes (bukan heredoc ter-indentasi — terminator heredoc
-          # harus di kolom 0, indentasi YAML membuat file rusak/skrip telanjang).
-          {
-            echo "storeFile=upload-keystore.keystore"
-            echo "storePassword=$ANDROID_KEYSTORE_PASSWORD"
-            echo "keyAlias=$ANDROID_KEYSTORE_ALIAS"
-            echo "keyPassword=$ANDROID_KEY_PASSWORD"
-          } > android/keystore.properties
+          bash scripts/setup-keystore.sh
           node scripts/patch-release-signing.js
           echo "✅ APK akan ditandatangani release keystore (signature = Play AAB)"
 
