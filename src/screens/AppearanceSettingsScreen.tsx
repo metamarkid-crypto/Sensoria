@@ -19,7 +19,8 @@ export default function AppearanceSettingsScreen() {
     textSize, setTextSize, 
     cardSpacing, setCardSpacing,
     enableCategoryColors, setEnableCategoryColors,
-    highContrast, setHighContrast
+    highContrast, setHighContrast,
+    visualRepliesEnabled, setVisualRepliesEnabled
   } = useAACStore();
   const role = useAACStore((state) => state.role);
   const deviceId = useAACStore((state) => state.deviceId);
@@ -95,6 +96,13 @@ export default function AppearanceSettingsScreen() {
   const toggleHighContrast = (val: boolean) => {
     setHighContrast(val);
     debouncedSync({ highContrast: val });
+  };
+
+  // Balasan Visual: ikut jalur settings yang sama (cloud + outbox), sehingga
+  // parent dapat mengaturnya secara remote dan anak menerima via mirror.
+  const toggleVisualReplies = (val: boolean) => {
+    setVisualRepliesEnabled(val);
+    debouncedSync({ visualRepliesEnabled: val });
   };
 
   return (
@@ -175,6 +183,20 @@ export default function AppearanceSettingsScreen() {
           <Switch
             value={highContrast}
             onValueChange={toggleHighContrast}
+            trackColor={{ false: '#E2E8F0', true: '#2488FF' }}
+            thumbColor={'#FFFFFF'}
+          />
+        </View>
+
+        {/* Balasan Visual — pengganti suara untuk anak yang tidak bisa mendengar */}
+        <View style={[styles.toggleRow, { alignItems: 'flex-start' }]}>
+          <View style={{ flex: 1, paddingRight: 12 }}>
+            <Text style={styles.toggleLabel}>{t('appearance.visualReplies')}</Text>
+            <Text style={styles.toggleDescription}>{t('appearance.visualRepliesDesc')}</Text>
+          </View>
+          <Switch
+            value={visualRepliesEnabled}
+            onValueChange={toggleVisualReplies}
             trackColor={{ false: '#E2E8F0', true: '#2488FF' }}
             thumbColor={'#FFFFFF'}
           />
@@ -266,6 +288,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 16,
+  },
+  toggleDescription: {
+    fontSize: 12,
+    color: '#94A3B8',
+    marginTop: 4,
+    lineHeight: 17,
   },
   toggleLabel: {
     fontSize: 16,

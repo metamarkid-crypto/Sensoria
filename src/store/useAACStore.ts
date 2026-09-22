@@ -152,6 +152,13 @@ export interface AACState {
   cardSpacing: number;
   enableCategoryColors: boolean;
   highContrast: boolean;
+  /**
+   * Balasan Visual: balasan parent ditampilkan sebagai MODAL GAMBAR
+   * (oke/tidak/tunggu/default) alih-alih disuarakan — khusus anak yang
+   * tidak bisa mendengar. Diatur dari Tampilan; parent bisa mengaturnya
+   * secara remote karena ikut settings mirror `child_profiles.settings`.
+   */
+  visualRepliesEnabled: boolean;
 
   // Accessibility Settings
   holdDuration: number;
@@ -208,6 +215,7 @@ export interface AACState {
   setCardSpacing: (spacing: number) => void;
   setEnableCategoryColors: (status: boolean) => void;
   setHighContrast: (status: boolean) => void;
+  setVisualRepliesEnabled: (status: boolean) => void;
   setHoldDuration: (duration: number) => void;
   setIgnoreRepeat: (status: boolean) => void;
   setReleaseToSpeak: (status: boolean) => void;
@@ -279,6 +287,7 @@ export const useAACStore = create<AACState>()(
       cardSpacing: 10,
       enableCategoryColors: false,
       highContrast: false,
+      visualRepliesEnabled: false,
       holdDuration: 0,
       ignoreRepeat: false,
       releaseToSpeak: false,
@@ -312,6 +321,7 @@ export const useAACStore = create<AACState>()(
       setCardSpacing: (spacing) => set({ cardSpacing: spacing }),
       setEnableCategoryColors: (status) => set({ enableCategoryColors: status }),
       setHighContrast: (status) => set({ highContrast: status }),
+      setVisualRepliesEnabled: (status) => set({ visualRepliesEnabled: status }),
       setHoldDuration: (duration) => set({ holdDuration: duration }),
       setIgnoreRepeat: (status) => set({ ignoreRepeat: status }),
       setReleaseToSpeak: (status) => set({ releaseToSpeak: status }),

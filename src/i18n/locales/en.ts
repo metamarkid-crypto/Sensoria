@@ -134,6 +134,7 @@ export const en: Record<TranslationKey, string> = {
   'aac.toastLocationSentDesc': 'Latest location has been sent.',
   'aac.toastSent': 'Sent',
   'aac.toastSentDesc': 'Message sent to Parent',
+  'aac.toastQueuedOffline': 'Saved on device, will send when online',
   'aac.toastNotLinked': 'Not connected to a parent device yet.',
   'aac.toastAiTag': 'Auto Detection',
   'aac.toastAiTagFail': 'Auto detection failed. Please fill in manually',
@@ -202,6 +203,12 @@ export const en: Record<TranslationKey, string> = {
   'home.parentFallback': 'Parent',
   'home.quickOke': 'OK',
   'home.quickYa': 'Yes',
+  'home.quickWait': 'One moment',
+  'home.vocabRoutines': 'Vocabulary & Routines',
+  'home.comingSoonTitle': 'Coming Soon!',
+  'home.comingSoonDesc': '{feature} is in the works and will arrive in an upcoming update. Thank you for accompanying your little one!',
+  'home.comingSoonBadge': 'In development',
+  'home.comingSoonClose': 'Close',
   'home.quickNo': 'No',
   'home.toastReplied': 'Reply "{text}" has been sent.',
 
@@ -237,6 +244,8 @@ export const en: Record<TranslationKey, string> = {
   'appearance.cardSpacing': 'Card Spacing',
   'appearance.categoryColors': 'Category Card Colors',
   'appearance.highContrast': 'High Contrast',
+  'appearance.visualReplies': 'Visual Replies (Image Modal)',
+  'appearance.visualRepliesDesc': 'Parent replies appear as a large image — Okay, No, Wait a moment, or a message image — instead of sound. For children who cannot hear yet.',
 
   // ── Accessibility Settings ──────────────────────────────────────────────
   'accessibility.title': 'Accessibility',
@@ -342,6 +351,7 @@ export const en: Record<TranslationKey, string> = {
   'messages.add': 'Add',
   'messages.delete': 'Delete',
   'messages.familyFallback': 'Family',
+  'messages.parentRoleFallback': 'Parent',
   'messages.pendingSync': 'Waiting to sync',
 
   // ── Onboarding ───────────────────────────────────────────────────────

@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { View, StyleSheet, ActivityIndicator, Text, TouchableOpacity, ScrollView, Modal, TextInput, KeyboardAvoidingView, Platform, Image } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Text, TouchableOpacity, ScrollView, Modal, TextInput, KeyboardAvoidingView, Platform, Image, Pressable, ImageSourcePropType } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { useAACStore, AACWord, resolveWordText } from '../store/useAACStore';
 import { evaluateAccess } from '../services/db/entitlement';
-import { initDB, getAllWords, addCustomWord, updateWord, setWordFavorite } from '../services/db/sqlite';
+import { initDB, getAllWords, addCustomWord, updateWord, setWordFavorite, queuePendingMessage } from '../services/db/sqlite';
 import { tagImageWithBilingualNames, translateWordBilingual, isNoConfidenceTag } from '../services/ai/gemini';
 import { logger } from '../utils/logger';
 import Toast from 'react-native-toast-message';
@@ -20,6 +20,7 @@ import { useAccessibleAction } from '../hooks/useAccessibleAction';
 import { useTranslation, translate } from '../i18n';
 import SettingsScreen from './SettingsScreen';
 import { supabase, sendAACMessage, subscribeToAACMessages, syncCustomWordToCloud } from '../services/db/supabase';
+import { getVisualReplyImage, resolveVisualReply } from '../assets/replyAssets';
 import {
   ensureBackgroundTracking,
   stopBackgroundTracking,
@@ -100,6 +101,21 @@ export default function ChildAACScreen() {
   const [showPairing, setShowPairing] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [linkedParents, setLinkedParents] = useState<any[]>([]);
+  // Gerbang tombol kirim: terkunci sampai minimal satu parent terhubung —
+  // mencegah pesan tanpa penerima. DERIVED dari linkedParents (diisi fetch
+  // awal + realtime INSERT/DELETE) sehingga tidak mungkin desinkron.
+  const isParentLinked = linkedParents.length > 0;
+  // ── Balasan Visual (modal gambar balasan parent) ────────────────────
+  // Aktif saat setting visualRepliesEnabled menyala (anak tunarungu):
+  // suara TIDAK diputar; isi balasan parent direpresentasikan gambar besar.
+  const [visualReply, setVisualReply] = useState<{ text: string; image: ImageSourcePropType } | null>(null);
+  const visualReplyText = visualReply ? `“${visualReply.text}”` : '';
+  useEffect(() => {
+    if (!visualReply) return;
+    // Auto-tutup 6 detik — anak membaca gambar, bukan membaca cepat.
+    const timer = setTimeout(() => setVisualReply(null), 6000);
+    return () => clearTimeout(timer);
+  }, [visualReply]);
   const insets = useSafeAreaInsets();
   
   // Word Options State
@@ -187,8 +203,18 @@ export default function ChildAACScreen() {
         // switch and speak parent messages in the previous language.
         const currentLang = useAACStore.getState().language;
         const senderName = payload.senderName || 'Parent';
-        playTTS(payload.text, currentLang, senderName);
-        Toast.show({ type: 'info', text1: translate(currentLang, 'aac.toastParentMsg'), text2: payload.text, position: 'top', visibilityTime: 4000 });
+
+        if (useAACStore.getState().visualRepliesEnabled) {
+          // Balasan Visual: suara DIGANTI modal gambar (oke/tidak/tunggu/
+          // default) sesuai isi balasan — untuk anak yang tidak bisa mendengar.
+          setVisualReply({
+            text: payload.text,
+            image: getVisualReplyImage(resolveVisualReply(payload.text)),
+          });
+        } else {
+          playTTS(payload.text, currentLang, senderName);
+          Toast.show({ type: 'info', text1: translate(currentLang, 'aac.toastParentMsg'), text2: payload.text, position: 'top', visibilityTime: 4000 });
+        }
       }
         })
       : null;
@@ -269,6 +295,62 @@ export default function ChildAACScreen() {
     };
   }, []);
 
+  // ── Link status: gerbang tombol kirim ───────────────────────────────
+  // Fetch awal (offline → tetap terkunci, tanpa toast palsu) + realtime
+  // INSERT/DELETE pada family_links: tombol "Kirim" langsung hidup begitu
+  // parent terhubung dan terkunci lagi saat unlink — tanpa restart app.
+  useEffect(() => {
+    if (!deviceId) {
+      setLinkedParents([]);
+      return;
+    }
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from('family_links')
+          .select('parent_device_id')
+          .eq('child_device_id', deviceId);
+        if (!cancelled) setLinkedParents(data ?? []);
+      } catch {
+        if (!cancelled) setLinkedParents([]);
+      }
+    })();
+
+    const linksChannel = supabase
+      .channel('child-link-status')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'family_links', filter: `child_device_id=eq.${deviceId}` },
+        (payload: any) => {
+          setLinkedParents((prev) =>
+            prev.some((l) => l?.parent_device_id === payload.new?.parent_device_id)
+              ? prev
+              : [...prev, payload.new],
+          );
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'family_links', filter: `child_device_id=eq.${deviceId}` },
+        (payload: any) => {
+          // Postgres DELETE payload hanya membawa PK — cocokkan lewat kunci apa
+          // pun yang tersedia (parent_device_id atau id).
+          const oldKey = payload.old?.parent_device_id ?? payload.old?.id;
+          setLinkedParents((prev) =>
+            prev.filter((l) => (l?.parent_device_id ?? l?.id) !== oldKey),
+          );
+        }
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(linksChannel);
+    };
+  }, [deviceId]);
+
   const setupLocation = async () => {
     let { status } = await Location.requestForegroundPermissionsAsync();
     if (status === 'granted') {
@@ -309,6 +391,11 @@ export default function ChildAACScreen() {
 
   const handleSendToParent = async () => {
     if (currentSentence.length === 0) return;
+    if (!isParentLinked) {
+      // Belt-and-suspenders: tombol sudah disabled, ini melindungi jalur aksesibilitas.
+      Toast.show({ type: 'info', text1: t('common.failed'), text2: t('aac.toastNotLinked'), position: 'top' });
+      return;
+    }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     handleSpeakAll();
     
@@ -336,30 +423,54 @@ export default function ChildAACScreen() {
     if (pairingCode) {
       // Only send when a parent device is ACTUALLY connected — a child can hold
       // a pairing code long before any parent pairs, and those orphan messages
-      // would otherwise be written to Supabase with no recipient.
+      // would otherwise be written to Supabase with no recipient. When the
+      // check itself fails (offline), we do NOT block: connectivity is
+      // re-verified by the outbox flusher once the device is back online.
       let connected = false;
+      let checkFailed = false;
       if (deviceId) {
-        const { data: links } = await supabase
+        const { data: links, error: linkError } = await supabase
           .from('family_links')
           .select('id')
           .eq('child_device_id', deviceId)
           .limit(1);
-        connected = Array.isArray(links) && links.length > 0;
+        if (linkError) {
+          checkFailed = true;
+        } else {
+          connected = Array.isArray(links) && links.length > 0;
+        }
       }
 
-      if (!connected) {
+      if (!connected && !checkFailed) {
         Toast.show({ type: 'info', text1: t('common.failed'), text2: t('aac.toastNotLinked'), position: 'top' });
         return;
       }
 
-      await sendAACMessage(pairingCode, {
-        sender: 'Child',
+      const messagePayload = {
+        sender: 'Child' as const,
         senderName: childProfile?.nickname || t('aac.childFallback'),
         text: fullText,
         timestamp: Date.now(),
         location: loc ? { latitude: loc.coords.latitude, longitude: loc.coords.longitude } : null
-      });
-      Toast.show({ type: 'success', text1: t('aac.toastSent'), text2: t('aac.toastSentDesc'), position: 'top' });
+      };
+
+      const delivered = await sendAACMessage(pairingCode, messagePayload);
+      if (delivered) {
+        Toast.show({ type: 'success', text1: t('aac.toastSent'), text2: t('aac.toastSentDesc'), position: 'top' });
+      } else {
+        // Offline / cloud unreachable: never lose the message — park it in the
+        // local outbox; flushPendingMessages() delivers it once back online.
+        await queuePendingMessage({
+          channel_id: pairingCode,
+          sender_role: messagePayload.sender,
+          sender_name: messagePayload.senderName,
+          text_content: messagePayload.text,
+          timestamp: messagePayload.timestamp,
+          location_lat: messagePayload.location?.latitude ?? null,
+          location_lng: messagePayload.location?.longitude ?? null,
+        });
+        Toast.show({ type: 'info', text1: t('aac.toastSent'), text2: t('aac.toastQueuedOffline'), position: 'top' });
+      }
     } else {
       Toast.show({ type: 'error', text1: t('common.failed'), text2: t('aac.toastNotLinked'), position: 'top' });
     }
@@ -702,8 +813,12 @@ export default function ChildAACScreen() {
           <TouchableOpacity style={styles.actionBtnBlue} onPress={speakAllFiltered}>
             <Text style={styles.actionBtnText}>🔊 {t('aac.speak')}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtnOrange} onPress={sendToParentFiltered}>
-            <Text style={styles.actionBtnText}>🚀 {t('aac.send')}</Text>
+          <TouchableOpacity
+            style={[styles.actionBtnOrange, !isParentLinked && styles.actionBtnDisabled]}
+            onPress={sendToParentFiltered}
+            disabled={!isParentLinked}
+          >
+            <Text style={[styles.actionBtnText, !isParentLinked && { opacity: 0.6 }]}>🚀 {t('aac.send')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -862,6 +977,25 @@ export default function ChildAACScreen() {
           })}
         </ScrollView>
       </View>
+
+      {/* Balasan Visual: modal gambar pengganti suara. Tap di mana saja
+          untuk menutup (motor planning minimal), auto-tutup 6 dtk. */}
+      <Modal visible={visualReply !== null} transparent animationType="fade" onRequestClose={() => setVisualReply(null)}>
+        <Pressable style={vrStyles.overlay} onPress={() => setVisualReply(null)}>
+          <View style={vrStyles.modalCard}>
+            <View style={vrStyles.avatarRow}>
+              <Image source={require('../../assets/icon.png')} style={vrStyles.avatar} />
+              <Text style={vrStyles.senderName}>{childProfile?.nickname || t('aac.childFallback')}</Text>
+            </View>
+            {visualReply ? (
+              <Image source={visualReply.image} style={vrStyles.image} resizeMode="contain" />
+            ) : null}
+            {visualReplyText ? (
+              <Text style={vrStyles.caption} numberOfLines={2}>{visualReplyText}</Text>
+            ) : null}
+          </View>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -968,6 +1102,7 @@ const styles = StyleSheet.create({
   actionBtnRed: { backgroundColor: '#FF6B6B', paddingVertical: 10, paddingHorizontal: 16, borderRadius: 12, flex: 1, marginHorizontal: 4, alignItems: 'center' },
   actionBtnBlue: { backgroundColor: '#00B5B8', paddingVertical: 10, paddingHorizontal: 16, borderRadius: 12, flex: 1, marginHorizontal: 4, alignItems: 'center' },
   actionBtnOrange: { backgroundColor: '#FF9800', paddingVertical: 10, paddingHorizontal: 16, borderRadius: 12, flex: 1, marginHorizontal: 4, alignItems: 'center' },
+  actionBtnDisabled: { backgroundColor: '#B0BEC5', elevation: 0 },
   actionBtnText: { color: '#FFF', fontWeight: 'bold', fontSize: 14 },
   
   categoryBar: {
@@ -1038,4 +1173,54 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: '#00B5B8', borderColor: '#00B5B8' },
   chipText: { fontSize: 13, fontWeight: '600', color: '#475569' },
   chipTextActive: { color: '#FFF', fontWeight: '800' }
+});
+
+// ── Styles modal Balasan Visual (dipisah agar anchor styles utama aman) ─────
+const vrStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.92)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 28,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 32,
+    padding: 20,
+    alignItems: 'center',
+  },
+  avatarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    marginBottom: 14,
+  },
+  avatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#E0F2FE',
+    marginRight: 10,
+  },
+  senderName: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#11427B',
+  },
+  image: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: 24,
+    backgroundColor: '#F1F5F9',
+  },
+  caption: {
+    marginTop: 14,
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1E293B',
+    textAlign: 'center',
+  },
 });

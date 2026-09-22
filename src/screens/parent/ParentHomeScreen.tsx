@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Modal } from 'react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { supabase, sendAACMessage } from '../../services/db/supabase';
+import { queuePendingMessage } from '../../services/db/sqlite';
 import { getMessagesCache, appendMessageToCache } from '../../services/db/sqlite';
 import { useAACStore } from '../../store/useAACStore';
 import { formatDate, formatTime, toTimestampMs } from '../../utils/format';
@@ -126,12 +127,40 @@ const EMPTY_ACTIVITY: ActivityStats = {
   chartLabels: ['00', '04', '08', '12', '16', '20', '24'],
 };
 
+// ── Coming Soon modal (fitur yang sedang dikembangkan) ──────────────────────
+// Elegan dan informatif: pengguna paham fiturnya nyata dan sedang disiapkan,
+// bukan tombol mati.
+function ComingSoonModal({ visible, onClose, title }: { visible: boolean; onClose: () => void; title: string }) {
+  const { t } = useTranslation();
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalCard}>
+          <View style={styles.modalIconBox}>
+            <FontAwesome5 name="toolbox" size={28} color="#16A34A" />
+          </View>
+          <Text style={styles.modalTitle}>{t('home.comingSoonTitle')}</Text>
+          <Text style={styles.modalDesc}>{t('home.comingSoonDesc', { feature: title })}</Text>
+          <View style={styles.modalBadge}>
+            <FontAwesome5 name="hammer" size={11} color="#A16207" />
+            <Text style={styles.modalBadgeText}>{t('home.comingSoonBadge')}</Text>
+          </View>
+          <TouchableOpacity style={styles.modalCloseBtn} onPress={onClose} activeOpacity={0.85}>
+            <Text style={styles.modalCloseText}>{t('home.comingSoonClose')}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 export default function ParentHomeScreen() {
   const navigation = useNavigation<any>();
   const { t } = useTranslation();
   const { pairingCode, language, deviceId, childProfile, localParentName } = useAACStore();
   
   const [recentMessage, setRecentMessage] = useState<any>(null);
+  const [comingSoonVisible, setComingSoonVisible] = useState(false);
   
   const { childStatus } = useAACStore();
   const currentAddress = childStatus.lastAddress || t('home.locationUnavailable');
@@ -339,13 +368,28 @@ export default function ParentHomeScreen() {
   const handleQuickReply = async (text: string) => {
     if (!pairingCode) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    await sendAACMessage(pairingCode, {
-      sender: 'Parent',
+    const payload = {
+      sender: 'Parent' as const,
       senderName: localParentName || t('home.parentFallback'),
       text: text,
       timestamp: Date.now()
-    });
-    Toast.show({ type: 'success', text1: t('aac.toastSent'), text2: t('home.toastReplied', { text }), position: 'top' });
+    };
+    const delivered = await sendAACMessage(pairingCode, payload);
+    if (delivered) {
+      Toast.show({ type: 'success', text1: t('aac.toastSent'), text2: t('home.toastReplied', { text }), position: 'top' });
+    } else {
+      // Offline: park in the outbox — the message must never vanish silently.
+      await queuePendingMessage({
+        channel_id: pairingCode,
+        sender_role: payload.sender,
+        sender_name: payload.senderName,
+        text_content: payload.text,
+        timestamp: payload.timestamp,
+        location_lat: null,
+        location_lng: null,
+      });
+      Toast.show({ type: 'info', text1: t('aac.toastSent'), text2: t('aac.toastQueuedOffline'), position: 'top' });
+    }
   };
 
   const handleReplayTTS = () => {
@@ -414,21 +458,25 @@ export default function ParentHomeScreen() {
 
         {recentMessage ? (
           <>
-            <View style={styles.speechBubble}>
-              <Text style={styles.messageText}>{recentMessage.text_content}</Text>
-              
-              {/* Child Avatar & Nickname Header inside bubble */}
-              <View style={styles.audioRow}>
-                <View style={styles.waveform}>
-                  <Image 
-                    source={childProfile?.gender === 'Boy' ? require('../../../assets/icon.png') : require('../../../assets/icon.png')} 
-                    style={{ width: 24, height: 24, borderRadius: 12, marginRight: 8, backgroundColor: '#E0F2FE' }} 
-                  />
-                  <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#3B82F6' }}>
+            {/* Notif style (lock-screen): avatar + nama + waktu di header ringkas,
+                teks pesan di bawahnya — lebih pendek dan modern. */}
+            <View style={styles.notifCard}>
+              <View style={styles.notifHeader}>
+                <Image
+                  source={require('../../../assets/icon.png')}
+                  style={styles.notifAvatar}
+                />
+                <View style={styles.notifHeaderText}>
+                  <Text style={styles.notifName} numberOfLines={1}>
                     {childProfile?.nickname || t('aac.childFallback')}
                   </Text>
+                  <Text style={styles.notifSubtitle} numberOfLines={1}>{t('aac.childFallback')}</Text>
                 </View>
+                <Text style={styles.notifTime}>{formatTime(recentMessage.timestamp)}</Text>
               </View>
+              <Text style={styles.notifMessage} numberOfLines={3}>
+                {recentMessage.text_content}
+              </Text>
             </View>
 
             <View style={styles.quickReplyRow}>
@@ -437,9 +485,9 @@ export default function ParentHomeScreen() {
                   <Text style={styles.btnText}>{t('home.quickOke')}</Text>
                 </LinearGradient>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.flexBtn} onPress={() => quickReplyFiltered(t('home.quickYa'))} activeOpacity={0.8}>
+              <TouchableOpacity style={[styles.flexBtn, { flex: 1.6 }]} onPress={() => quickReplyFiltered(t('home.quickWait'))} activeOpacity={0.8}>
                 <LinearGradient colors={['#34D399', '#10B981']} style={styles.btnGradient}>
-                  <Text style={styles.btnText}>{t('home.quickYa')}</Text>
+                  <Text style={styles.btnText}>{t('home.quickWait')}</Text>
                 </LinearGradient>
               </TouchableOpacity>
               <TouchableOpacity style={styles.flexBtn} onPress={() => quickReplyFiltered(t('home.quickNo'))} activeOpacity={0.8}>
@@ -477,23 +525,12 @@ export default function ParentHomeScreen() {
 
       {/* WIDGET C: Aksi Cepat */}
       <View style={[styles.card, { marginTop: 8 }]}>
-        <Text style={[styles.widgetTitle, { marginBottom: 16 }]}>{t('home.quickActions')}</Text>
+        <View style={[styles.sectionTitleRow, { marginBottom: 16 }]}>
+          <FontAwesome5 name="bolt" size={16} color="#FACC15" />
+          <Text style={styles.widgetTitle}>{t('home.quickActions')}</Text>
+        </View>
         <View style={styles.grid}>
           
-          <TouchableOpacity style={styles.gridItem}>
-            <View style={[styles.gridIconBox, { backgroundColor: '#DCFCE7' }]}>
-              <FontAwesome5 name="puzzle-piece" size={20} color="#16A34A" />
-            </View>
-            <Text style={[styles.gridText, { color: '#16A34A' }]} numberOfLines={1}>{t('home.vocabulary')}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.gridItem}>
-            <View style={[styles.gridIconBox, { backgroundColor: '#FFEDD5' }]}>
-              <FontAwesome5 name="sun" size={20} color="#EA580C" />
-            </View>
-            <Text style={[styles.gridText, { color: '#EA580C' }]} numberOfLines={1}>{t('home.routines')}</Text>
-          </TouchableOpacity>
-
           <TouchableOpacity style={styles.gridItem} onPress={() => navigation.navigate('VoiceSettings')}>
             <View style={[styles.gridIconBox, { backgroundColor: '#F3E8FF' }]}>
               <FontAwesome5 name="volume-up" size={20} color="#9333EA" />
@@ -508,14 +545,23 @@ export default function ParentHomeScreen() {
             <Text style={[styles.gridText, { color: '#4F46E5' }]} numberOfLines={1}>{t('home.appearance')}</Text>
           </TouchableOpacity>
 
+          <TouchableOpacity style={styles.gridItem} onPress={() => setComingSoonVisible(true)}>
+            <View style={[styles.gridIconBox, { backgroundColor: '#DCFCE7' }]}>
+              <FontAwesome5 name="puzzle-piece" size={20} color="#16A34A" />
+            </View>
+            <Text style={[styles.gridText, { color: '#16A34A' }]} numberOfLines={1}>{t('home.vocabRoutines')}</Text>
+          </TouchableOpacity>
+
         </View>
       </View>
 
       {/* NEW WIDGET: Comprehensive Activity */}
       <View style={[styles.card, { padding: 0, overflow: 'hidden' }]}>
-        <View style={{ padding: 16 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <Text style={styles.widgetTitle}>{t('home.activity')}</Text>
+        <View style={{ padding: 16 }}>            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <View style={styles.sectionTitleRow}>
+              <FontAwesome5 name="chart-line" size={16} color="#00B5B8" />
+              <Text style={styles.widgetTitle}>{t('home.activity')}</Text>
+            </View>
             <FontAwesome5 name="ellipsis-h" size={16} color="#94A3B8" />
           </View>
 
@@ -627,6 +673,11 @@ export default function ParentHomeScreen() {
         </View>
       </View>
 
+        <ComingSoonModal
+          visible={comingSoonVisible}
+          onClose={() => setComingSoonVisible(false)}
+          title={t('home.vocabRoutines')}
+        />
         </ScrollView>
       </View>
     </View>
@@ -722,51 +773,58 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#11427B',
   },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   messageTime: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#94A3B8',
   },
-  speechBubble: {
-    backgroundColor: '#F0F9FF',
+  notifCard: {
+    backgroundColor: '#F8FAFC',
     borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-  },
-  messageText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1E293B',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 12,
     marginBottom: 12,
   },
-  audioRow: {
+  notifHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    marginBottom: 8,
   },
-  waveform: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: 3,
-  },
-  waveBar: {
-    width: 3,
-    backgroundColor: '#3B82F6',
-    borderRadius: 2,
-    opacity: 0.6,
-  },
-  playButton: {
+  notifAvatar: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#3B82F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 2,
-    shadowColor: '#3B82F6',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
+    backgroundColor: '#E0F2FE',
+    marginRight: 10,
+  },
+  notifHeaderText: {
+    flex: 1,
+  },
+  notifName: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#1E293B',
+  },
+  notifSubtitle: {
+    fontSize: 12,
+    color: '#94A3B8',
+    marginTop: 1,
+  },
+  notifTime: {
+    fontSize: 12,
+    color: '#94A3B8',
+    marginLeft: 8,
+  },
+  notifMessage: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#1E293B',
+    lineHeight: 24,
   },
   quickReplyRow: {
     flexDirection: 'row',
@@ -792,6 +850,69 @@ const styles = StyleSheet.create({
   },
   viewAllText: {
     color: '#3B82F6',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  modalCard: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 24,
+    alignItems: 'center',
+  },
+  modalIconBox: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#DCFCE7',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#11427B',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  modalDesc: {
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  modalBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF9C3',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginBottom: 20,
+    gap: 6,
+  },
+  modalBadgeText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#A16207',
+  },
+  modalCloseBtn: {
+    backgroundColor: '#11427B',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+  },
+  modalCloseText: {
+    color: '#FFFFFF',
     fontWeight: 'bold',
     fontSize: 14,
   },

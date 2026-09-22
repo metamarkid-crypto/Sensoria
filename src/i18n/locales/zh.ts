@@ -134,6 +134,7 @@ export const zh: Record<TranslationKey, string> = {
   'aac.toastLocationSentDesc': '最新位置已发送。',
   'aac.toastSent': '已发送',
   'aac.toastSentDesc': '消息已发送给家长',
+  'aac.toastQueuedOffline': '已保存在设备，联网后自动发送',
   'aac.toastNotLinked': '尚未连接到家长设备。',
   'aac.toastAiTag': '自动检测',
   'aac.toastAiTagFail': '自动检测失败。请手动填写',
@@ -202,6 +203,12 @@ export const zh: Record<TranslationKey, string> = {
   'home.parentFallback': '家长',
   'home.quickOke': '好的',
   'home.quickYa': '是',
+  'home.quickWait': '稍等',
+  'home.vocabRoutines': '词汇与日常',
+  'home.comingSoonTitle': '即将推出！',
+  'home.comingSoonDesc': '「{feature}」正在准备中，将在后续更新中推出。感谢您的耐心等待！',
+  'home.comingSoonBadge': '开发中',
+  'home.comingSoonClose': '关闭',
   'home.quickNo': '不',
   'home.toastReplied': '回复“{text}”已发送。',
 
@@ -237,6 +244,8 @@ export const zh: Record<TranslationKey, string> = {
   'appearance.cardSpacing': '卡片间距',
   'appearance.categoryColors': '卡片分类颜色',
   'appearance.highContrast': '高对比度',
+  'appearance.visualReplies': '视觉回复（图片弹窗）',
+  'appearance.visualRepliesDesc': '父母的回复以大图显示——好的、不行、稍等或消息图片——而不是声音。适合尚无法听到声音的孩子。',
 
   // ── Accessibility Settings ──────────────────────────────────────────────
   'accessibility.title': '无障碍',
@@ -342,6 +351,7 @@ export const zh: Record<TranslationKey, string> = {
   'messages.add': '添加',
   'messages.delete': '删除',
   'messages.familyFallback': '家人',
+  'messages.parentRoleFallback': '家长',
   'messages.pendingSync': '等待同步',
 
   // ── Onboarding ───────────────────────────────────────────────────────

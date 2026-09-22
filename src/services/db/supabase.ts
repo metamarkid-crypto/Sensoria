@@ -61,22 +61,29 @@ export const sendAACMessage = async (channelId: string, payload: any): Promise<b
     return false;
   }
   
-  // Eksekusi Insert ke tabel messages agar tersimpan permanen
-  const { error } = await supabase.from('messages').insert({
-    channel_id: channelId,
-    sender_role: payload.sender,
-    sender_name: payload.senderName || payload.sender,
-    text_content: payload.text,
-    timestamp: payload.timestamp,
-    location_lat: payload.location?.latitude || null,
-    location_lng: payload.location?.longitude || null,
-  });
+  // Eksekusi Insert ke tabel messages agar tersimpan permanen.
+  // Never throws: any transport-level rejection (old fetch semantics, dead
+  // socket) resolves to `false` so callers reliably reach the outbox queue.
+  try {
+    const { error } = await supabase.from('messages').insert({
+      channel_id: channelId,
+      sender_role: payload.sender,
+      sender_name: payload.senderName || payload.sender,
+      text_content: payload.text,
+      timestamp: payload.timestamp,
+      location_lat: payload.location?.latitude || null,
+      location_lng: payload.location?.longitude || null,
+    });
 
-  if (error) {
-    console.error('Gagal menyimpan pesan ke database:', error);
+    if (error) {
+      console.error('Gagal menyimpan pesan ke database:', error);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error('Pengiriman pesan gagal (transport):', e);
     return false;
   }
-  return true;
 };
 
 // ── OUTBOX FLUSHER (offline-first messaging) ────────────────────────────────

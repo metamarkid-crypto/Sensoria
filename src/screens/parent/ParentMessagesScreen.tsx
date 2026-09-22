@@ -21,10 +21,15 @@ import { useTranslation } from '../../i18n';
 export default function ParentMessagesScreen() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  const { pairingCode, customQuickReplies, addCustomQuickReply, removeCustomQuickReply, localParentName, childProfile } = useAACStore();
+  const { pairingCode, customQuickReplies, addCustomQuickReply, removeCustomQuickReply, localParentName, childProfile, deviceId } = useAACStore();
   
   const [messages, setMessages] = useState<any[]>([]);
   const [inputText, setInputText] = useState('');
+
+  // Label peran canonical (ibu/ayah/dll) dari family_links — fallback nama
+  // pengirim untuk pesan lama yang tersimpan tanpa sender_name atau dengan
+  // default legacy, agar bubble SELALU berlabel peran asli, bukan generik.
+  const [roleLabel, setRoleLabel] = useState<string | null>(null);
   
   // Custom Reply Modal State
   const [isModalVisible, setModalVisible] = useState(false);
@@ -108,6 +113,26 @@ export default function ParentMessagesScreen() {
       supabase.removeChannel(msgSub);
     };
   }, [pairingCode, mergeCached]);
+
+  // Tarik parent_label canonical dari family_links (sumber kebenaran peran
+  // yang dipilih saat pairing). Offline = fallback lokal tetap ada.
+  useEffect(() => {
+    if (!deviceId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from('family_links')
+          .select('parent_label')
+          .eq('parent_device_id', deviceId)
+          .limit(1);
+        if (!cancelled) setRoleLabel(data?.[0]?.parent_label ?? null);
+      } catch {
+        /* offline: biarkan fallback lokal */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [deviceId]);
 
   const handleSend = async (text: string) => {
     if (!text.trim() || !pairingCode) return;
@@ -230,7 +255,11 @@ export default function ParentMessagesScreen() {
           {/* Sender Name Tag for Parents */}
           {!isChild && (
             <Text style={[styles.senderNameTag, isCurrentUser ? styles.nameTagSelf : styles.nameTagOther]}>
-              {item.senderName || t('messages.familyFallback')}
+              {/* Nama asli pengirim; default legacy ('Orang Tua'/'Parent')
+                  di-upgrade ke peran canonical ibu/ayah/dll saat diketahui. */}
+              {item.senderName && item.senderName !== 'Orang Tua' && item.senderName !== 'Parent'
+                ? item.senderName
+                : (roleLabel || localParentName || item.senderName || t('messages.parentRoleFallback'))}
             </Text>
           )}
           

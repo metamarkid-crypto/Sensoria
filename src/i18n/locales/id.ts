@@ -138,6 +138,7 @@ export const id = {
   'aac.toastLocationSentDesc': 'Kiriman lokasi terbaru telah dikirim.',
   'aac.toastSent': 'Terkirim',
   'aac.toastSentDesc': 'Pesan terkirim ke Orang Tua',
+  'aac.toastQueuedOffline': 'Tersimpan di perangkat, akan terkirim saat online',
   'aac.toastNotLinked': 'Belum tersambung ke perangkat orang tua.',
   'aac.toastAiTag': 'Deteksi Otomatis',
   'aac.toastAiTagFail': 'Gagal deteksi otomatis. Silakan isi manual',
@@ -206,6 +207,12 @@ export const id = {
   'home.parentFallback': 'Orang Tua',
   'home.quickOke': 'Oke',
   'home.quickYa': 'Ya',
+  'home.quickWait': 'Tunggu sebentar',
+  'home.vocabRoutines': 'Kosakata & Rutinitas',
+  'home.comingSoonTitle': 'Segera Hadir!',
+  'home.comingSoonDesc': '{feature} sedang kami siapkan dan akan tersedia di pembaruan berikutnya. Tetap semangat menemani si kecil ya!',
+  'home.comingSoonBadge': 'Sedang dikembangkan',
+  'home.comingSoonClose': 'Tutup',
   'home.quickNo': 'Tidak',
   'home.toastReplied': 'Balasan "{text}" telah dikirim.',
 
@@ -241,6 +248,8 @@ export const id = {
   'appearance.cardSpacing': 'Jarak Kartu',
   'appearance.categoryColors': 'Warna Kategori Kartu',
   'appearance.highContrast': 'Kontras Tinggi',
+  'appearance.visualReplies': 'Balasan Visual (Modal Gambar)',
+  'appearance.visualRepliesDesc': 'Balasan ibu/ayah tampil sebagai gambar besar — Oke, Tidak, Tunggu sebentar, atau gambar pesan — bukan suara. Untuk anak yang belum bisa mendengar.',
 
   // ── Accessibility Settings ──────────────────────────────────────────────
   'accessibility.title': 'Aksesibilitas',
@@ -346,6 +355,7 @@ export const id = {
   'messages.add': 'Tambah',
   'messages.delete': 'Hapus',
   'messages.familyFallback': 'Keluarga',
+  'messages.parentRoleFallback': 'Orang Tua',
   'messages.pendingSync': 'Menunggu sinkron',
 
   // ── Onboarding ───────────────────────────────────────────────────────

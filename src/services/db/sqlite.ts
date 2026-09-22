@@ -382,6 +382,9 @@ export const getMessagesCache = async (channelId: string, limit = 200): Promise<
 };
 
 /** Queue a message whose cloud insert failed (offline / transport error). */
+/** Monotonic disambiguator: two sends in the same millisecond must not collide on the synthetic PK. */
+let pendingSeq = 0;
+
 export const queuePendingMessage = async (row: {
   channel_id: string; sender_role: string; sender_name: string | null;
   text_content: string; timestamp: number; location_lat: number | null; location_lng: number | null;
@@ -389,7 +392,8 @@ export const queuePendingMessage = async (row: {
   await ensureDB();
   if (!db) return;
   // Negative id keeps the FlatList key unique and marks the row as local-only.
-  const localId = -Math.floor(Math.min(row.timestamp, Date.now())) || -Date.now();
+  // (timestamp*1000 + seq) stays far below Number.MAX_SAFE_INTEGER.
+  const localId = -(Math.min(row.timestamp, Date.now()) * 1000 + (pendingSeq++ % 1000)) || -Date.now();
   try {
     await db.runAsync(
       `INSERT INTO messages_cache
