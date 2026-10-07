@@ -1,5 +1,5 @@
 /**
- * Global trilingual i18n core.
+ * Global quad-lingual i18n core (id / en / zh / ms-MY).
  *
  * One source of truth for `language`: it lives in useAACStore (Zustand +
  * AsyncStorage persistence, see useAACStore.ts), so the language survives
@@ -16,16 +16,18 @@ import type { AppLanguage } from '../store/useAACStore';
 import { id, type TranslationKey } from './locales/id';
 import { en } from './locales/en';
 import { zh } from './locales/zh';
+import { ms } from './locales/ms';
 
 type LocaleDict = Record<TranslationKey, string>;
 
-const locales: Record<AppLanguage, LocaleDict> = { id, en, zh };
+const locales: Record<AppLanguage, LocaleDict> = { id, en, zh, ms };
 
 /** Shared selector metadata — used by every language entry point. */
 export const LANGUAGES: ReadonlyArray<{ code: AppLanguage; label: string; flag: string }> = [
   { code: 'id', label: 'Indonesia', flag: '🇮🇩' },
   { code: 'en', label: 'English', flag: '🇬🇧' },
   { code: 'zh', label: 'Mandarin (中文)', flag: '🇨🇳' },
+  { code: 'ms', label: 'Melayu', flag: '🇲🇾' },
 ];
 
 export type TranslationParams = Record<string, string | number>;

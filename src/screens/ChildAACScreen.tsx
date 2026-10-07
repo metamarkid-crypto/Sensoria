@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { View, StyleSheet, ActivityIndicator, Text, TouchableOpacity, ScrollView, Modal, TextInput, KeyboardAvoidingView, Platform, Image, Pressable, ImageSourcePropType } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Text, TouchableOpacity, ScrollView, Modal, TextInput, KeyboardAvoidingView, Platform, Image, Pressable, ImageSourcePropType, useWindowDimensions } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
@@ -117,6 +117,13 @@ export default function ChildAACScreen() {
     return () => clearTimeout(timer);
   }, [visualReply]);
   const insets = useSafeAreaInsets();
+
+  // Ukuran gambar Balasan Visual dihitung dari dimensi layar AGAR TIDAK
+  // meluber keluar modal di layar pendek/landscape (tablet anak sering
+  // dipakai landscape): batas = lebar layar − 96, tinggi layar − 240
+  // (memberi ruang avatar + caption + padding overlay), maksimum 360.
+  const { width: winWidth, height: winHeight } = useWindowDimensions();
+  const vrImageSize = Math.max(120, Math.min(winWidth - 96, winHeight - 240, 360));
   
   // Word Options State
   const [selectedWord, setSelectedWord] = useState<AACWord | null>(null);
@@ -126,10 +133,10 @@ export default function ChildAACScreen() {
   // the SAME resolver cards and TTS use, so what you see/edit is what speaks.
   const [editNameLabel, setEditNameLabel] = useState('');
 
-  // ── AI Auto-Tag confirmation draft (frictionless trilingual) ────────
+  // ── AI Auto-Tag confirmation draft (frictionless quad-lingual) ─────
   // The AI result is NEVER auto-saved: it only pre-fills this editable
   // draft. The user sees and edits ONE input — their active app language —
-  // while the other two languages are stored silently and auto-filled in
+  // while the other three languages are stored silently and auto-filled in
   // background. Any failure (network / timeout / no-confidence) opens the
   // same form blank — the human always has the final word.
   const [showAutoTagConfirm, setShowAutoTagConfirm] = useState(false);
@@ -137,19 +144,24 @@ export default function ChildAACScreen() {
   const [pendingId, setPendingId] = useState('');
   const [pendingEn, setPendingEn] = useState('');
   const [pendingZh, setPendingZh] = useState('');
+  const [pendingMs, setPendingMs] = useState('');
   const [pendingCategory, setPendingCategory] = useState<string>('noun');
 
   // The single visible input binds to the ACTIVE app language.
   const activeLang = language;
   const pendingLabel =
-    activeLang === 'id' ? pendingId : activeLang === 'en' ? pendingEn : pendingZh;
+    activeLang === 'id' ? pendingId : activeLang === 'en' ? pendingEn : activeLang === 'zh' ? pendingZh : pendingMs;
   const setPendingLabel = (text: string) => {
     if (activeLang === 'id') setPendingId(text);
     else if (activeLang === 'en') setPendingEn(text);
-    else setPendingZh(text);
+    else if (activeLang === 'zh') setPendingZh(text);
+    else setPendingMs(text);
   };
-  const activeLanguageLabel = activeLang === 'id' ? t('aac.langNameId') : activeLang === 'en' ? t('aac.langNameEn') : t('aac.langNameZh');
-  const activeLanguagePlaceholder = activeLang === 'id' ? 'Bola' : activeLang === 'en' ? 'Ball' : '球';
+  const activeLanguageLabel =
+    activeLang === 'id' ? t('aac.langNameId') :
+    activeLang === 'en' ? t('aac.langNameEn') :
+    activeLang === 'zh' ? t('aac.langNameZh') : t('aac.langNameMs');
+  const activeLanguagePlaceholder = activeLang === 'id' ? 'Bola' : activeLang === 'en' ? 'Ball' : activeLang === 'zh' ? '球' : 'Bola';
   // What the AI proposed for the ACTIVE language (null = manual fallback).
   // Used to detect "user corrected the AI word" → siblings need re-translation.
   const aiOriginalRef = useRef<string | null>(null);
@@ -488,7 +500,7 @@ export default function ChildAACScreen() {
       const imageUri = result.assets[0].uri;
       setIsProcessingAI(true);
 
-      let aiPrefill: { id: string; en: string; zh: string; category: string } | null = null;
+      let aiPrefill: { id: string; en: string; zh: string; ms: string; category: string } | null = null;
       try {
         const tags = await withTimeout(tagImageWithBilingualNames(imageUri), AI_TAG_TIMEOUT_MS);
         // gemini.ts answers with a generic placeholder whenever it cannot
@@ -496,7 +508,7 @@ export default function ChildAACScreen() {
         // user always lands on the editable manual form instead of a junk
         // card name.
         if (!isNoConfidenceTag(tags)) {
-          aiPrefill = { id: tags.id, en: tags.en, zh: tags.zh, category: tags.category };
+          aiPrefill = { id: tags.id, en: tags.en, zh: tags.zh, ms: tags.ms, category: tags.category };
         }
       } catch (e) {
         logger.logError(e, { action: 'AI auto-tag failed — manual fallback', role: 'Child' });
@@ -505,18 +517,22 @@ export default function ChildAACScreen() {
       }
 
       if (aiPrefill) {
-        // Trilingual stored silently; the UI only shows ONE editable input
+        // Quad-lingual stored silently; the UI only shows ONE editable input
         // bound to the user's active language.
         setPendingId(aiPrefill.id);
         setPendingEn(aiPrefill.en);
         setPendingZh(aiPrefill.zh);
+        setPendingMs(aiPrefill.ms);
         setPendingCategory(aiPrefill.category);
         aiOriginalRef.current =
-          activeLang === 'id' ? aiPrefill.id : activeLang === 'en' ? aiPrefill.en : aiPrefill.zh;
+          activeLang === 'id' ? aiPrefill.id :
+          activeLang === 'en' ? aiPrefill.en :
+          activeLang === 'zh' ? aiPrefill.zh : aiPrefill.ms;
       } else {
         setPendingId('');
         setPendingEn('');
         setPendingZh('');
+        setPendingMs('');
         setPendingCategory('noun');
         aiOriginalRef.current = null;
         Toast.show({
@@ -540,18 +556,20 @@ export default function ChildAACScreen() {
     }
 
     // One-input rule: the user edits ONLY the label in their active language.
-    // The other two keep their silent AI prediction, or — when there is none
+    // The other three keep their silent AI prediction, or — when there is none
     // (manual fallback) — start as the SAME typed word (never empty), and are
     // auto-translated in background without blocking the UI.
     const label = pendingLabel.trim();
     const nameId = activeLang === 'id' ? label : (pendingId || label);
     const nameEn = activeLang === 'en' ? label : (pendingEn || label);
     const nameZh = activeLang === 'zh' ? label : (pendingZh || label);
+    const nameMs = activeLang === 'ms' ? label : (pendingMs || label);
     const newWord: AACWord = {
       id: Date.now().toString(),
       word_id: nameId,
       word_en: nameEn,
       word_zh: nameZh,
+      word_ms: nameMs,
       imageUrl: pendingImageUri,
       categoryId: pendingCategory,
       isCustom: true
@@ -573,20 +591,21 @@ export default function ChildAACScreen() {
     // Translate when the save did NOT originate from a trusted AI prefill
     // (manual fallback), or when the user corrected the AI's word — in both
     // cases the silent siblings are placeholders/stale. The human's typed
-    // label is never overwritten: only the OTHER two languages are patched.
+    // label is never overwritten: only the OTHER three languages are patched.
     const needsTranslation =
       aiOriginalRef.current === null || label !== aiOriginalRef.current;
     if (needsTranslation) {
       void translateWordBilingual(label, activeLang)
-        .then((trilingual) => {
+        .then((quad) => {
           const patch: Partial<AACWord> = {};
-          if (activeLang !== 'id') patch.word_id = trilingual.id;
-          if (activeLang !== 'en') patch.word_en = trilingual.en;
-          if (activeLang !== 'zh') patch.word_zh = trilingual.zh;
+          if (activeLang !== 'id') patch.word_id = quad.id;
+          if (activeLang !== 'en') patch.word_en = quad.en;
+          if (activeLang !== 'zh') patch.word_zh = quad.zh;
+          if (activeLang !== 'ms') patch.word_ms = quad.ms;
           return updateWord(newWord.id, patch).then(() => loadDatabase());
         })
         .catch((e: any) => {
-          logger.logError(e, { action: 'background trilingual fill failed', role: 'Child' });
+          logger.logError(e, { action: 'background quad-lingual fill failed', role: 'Child' });
         });
     }
   };
@@ -669,7 +688,8 @@ export default function ChildAACScreen() {
     const patch: Partial<AACWord> = {};
     if (activeLang === 'id') patch.word_id = label;
     else if (activeLang === 'en') patch.word_en = label;
-    else patch.word_zh = label;
+    else if (activeLang === 'zh') patch.word_zh = label;
+    else patch.word_ms = label;
 
     // The old label's cached AI voice is stale after a rename — evict it.
     await clearAudioCache(previousLabel, activeLang, 'Child');
@@ -680,27 +700,29 @@ export default function ChildAACScreen() {
     setShowEditName(false);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-    // Keep the trilingual dataset sealed: when the label actually changed,
-    // refresh the OTHER two languages in the background so word_en and
-    // word_zh stay in sync in SQLite. Fire-and-forget — never blocks the UI;
-    // failures are logged, the renamed card is already saved and usable.
+    // Keep the quad-lingual dataset sealed: when the label actually changed,
+    // refresh the OTHER three languages in the background so word_en, word_zh
+    // and word_ms stay in sync in SQLite. Fire-and-forget — never blocks the
+    // UI; failures are logged, the renamed card is already saved and usable.
     if (label !== previousLabel) {
       void translateWordBilingual(label, activeLang)
-        .then(async (trilingual) => {
+        .then(async (quad) => {
           // Evict the pre-edit sibling caches so the next playback fetches
           // a voice for the NEW name instead of playing the stale one.
           if (activeLang !== 'id' && selectedWord.word_id) await clearAudioCache(selectedWord.word_id, 'id', 'Child');
           if (activeLang !== 'en' && selectedWord.word_en) await clearAudioCache(selectedWord.word_en, 'en', 'Child');
           if (activeLang !== 'zh' && selectedWord.word_zh) await clearAudioCache(selectedWord.word_zh, 'zh', 'Child');
+          if (activeLang !== 'ms' && selectedWord.word_ms) await clearAudioCache(selectedWord.word_ms, 'ms', 'Child');
 
           const siblingPatch: Partial<AACWord> = {};
-          if (activeLang !== 'id') siblingPatch.word_id = trilingual.id;
-          if (activeLang !== 'en') siblingPatch.word_en = trilingual.en;
-          if (activeLang !== 'zh') siblingPatch.word_zh = trilingual.zh;
+          if (activeLang !== 'id') siblingPatch.word_id = quad.id;
+          if (activeLang !== 'en') siblingPatch.word_en = quad.en;
+          if (activeLang !== 'zh') siblingPatch.word_zh = quad.zh;
+          if (activeLang !== 'ms') siblingPatch.word_ms = quad.ms;
           return updateWord(selectedWord.id, siblingPatch).then(() => loadDatabase());
         })
         .catch((e: any) => {
-          logger.logError(e, { action: 'background trilingual rename failed', role: 'Child' });
+          logger.logError(e, { action: 'background quad-lingual rename failed', role: 'Child' });
         });
     }
   };
@@ -990,7 +1012,7 @@ export default function ChildAACScreen() {
               <Text style={vrStyles.senderName}>{childProfile?.nickname || t('aac.childFallback')}</Text>
             </View>
             {visualReply ? (
-              <Image source={visualReply.image} style={vrStyles.image} resizeMode="contain" />
+              <Image source={visualReply.image} style={[vrStyles.image, { width: vrImageSize, height: vrImageSize }]} resizeMode="contain" />
             ) : null}
             {visualReplyText ? (
               <Text style={vrStyles.caption} numberOfLines={2}>{visualReplyText}</Text>
@@ -1212,9 +1234,10 @@ const vrStyles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#11427B',
   },
+  // Ukuran (width/height) di-set dinamis dari useWindowDimensions agar
+  // gambar selalu muat di dalam modalCard pada orientasi & ukuran layar apa
+  // pun — bukan lagi width:'100%' yang bisa meluber di landscape.
   image: {
-    width: '100%',
-    aspectRatio: 1,
     borderRadius: 24,
     backgroundColor: '#F1F5F9',
   },

@@ -11,7 +11,8 @@ import type { SubscriptionStatus } from '../services/db/types';
 import type { AccessPhase, EntitlementRole } from '../services/db/entitlement';
 
 export type UserRole = 'None' | 'Child' | 'Parent';
-export type AppLanguage = 'id' | 'en' | 'zh';
+/** Supported UI + AAC languages: Indonesia, English, Mandarin, Bahasa Melayu. */
+export type AppLanguage = 'id' | 'en' | 'zh' | 'ms';
 export type ChildProfile = { 
   device_id?: string;
   fullName?: string; 
@@ -24,8 +25,9 @@ export type ChildProfile = {
 export interface AACWord {
   id: string;
   word_id: string; // Indonesian
-  word_en?: string; // English (optional — legacy rows / trilingual fill)
+  word_en?: string; // English (optional — legacy rows / multilingual fill)
   word_zh: string; // Mandarin
+  word_ms?: string; // Bahasa Melayu (optional — legacy rows / multilingual fill)
   imageUrl?: string;
   categoryId: string;
   /**
@@ -51,13 +53,15 @@ export interface AboutContent {
  *   id → word_id
  *   en → word_en (fallback to word_id when null — legacy rows)
  *   zh → word_zh (fallback to word_id when null)
+ *   ms → word_ms (fallback to word_id when null — legacy rows)
  */
 export const resolveWordText = (
-  word: Pick<AACWord, 'word_id' | 'word_en' | 'word_zh'>,
+  word: Pick<AACWord, 'word_id' | 'word_en' | 'word_zh' | 'word_ms'>,
   language: AppLanguage
 ): string => {
   if (language === 'en') return word.word_en || word.word_id;
   if (language === 'zh') return word.word_zh || word.word_id;
+  if (language === 'ms') return word.word_ms || word.word_id;
   return word.word_id;
 };
 

@@ -10,11 +10,12 @@ const CACHE_DIR = FileSystem.cacheDirectory + 'fish_audio/';
 const MAX_CACHE_SIZE_MB = parseInt(process.env.EXPO_PUBLIC_MAX_AUDIO_CACHE_MB || '50', 10);
 
 // Explicit TTS locale targets for the offline System TTS fallback tier.
-// id → id-ID, en → en-US, zh → zh-CN.
-const TTS_LOCALES: Record<'id' | 'en' | 'zh', string> = {
+// id → id-ID, en → en-US, zh → zh-CN, ms → ms-MY.
+const TTS_LOCALES: Record<'id' | 'en' | 'zh' | 'ms', string> = {
   id: 'id-ID',
   en: 'en-US',
   zh: 'zh-CN',
+  ms: 'ms-MY',
 };
 
 // UI voice presets (VoiceSettingsScreen) → custom-trained Fish Audio reference IDs.
@@ -84,7 +85,7 @@ const resolveAudioProfile = (role: string): string => {
 // Returns null when no local asset exists → caller must fall back to TTS.
 const resolveLocalAudio = (
   text: string,
-  language: 'id' | 'en' | 'zh',
+  language: 'id' | 'en' | 'zh' | 'ms',
   role: string
 ): any | null => {
   const profile = resolveAudioProfile(role);
@@ -152,7 +153,7 @@ const ensureCacheLimit = async () => {
   }
 };
 
-export const clearAudioCache = async (text: string, language: 'id' | 'en' | 'zh', role: string) => {
+export const clearAudioCache = async (text: string, language: 'id' | 'en' | 'zh' | 'ms', role: string) => {
   const store = useAACStore.getState();
   const { voiceId } = resolveVoice(role);
   
@@ -167,7 +168,7 @@ export const clearAudioCache = async (text: string, language: 'id' | 'en' | 'zh'
   }
 };
 
-export const playTTS = async (text: string, language: 'id' | 'en' | 'zh', role: string) => {
+export const playTTS = async (text: string, language: 'id' | 'en' | 'zh' | 'ms', role: string) => {
   const store = useAACStore.getState();
   const { speechRate } = store;
 
@@ -282,7 +283,7 @@ export const playTTS = async (text: string, language: 'id' | 'en' | 'zh', role: 
 
   // 3. FALLBACK: Auditory Verbal Therapy (Offline System TTS)
   // Manipulasi Pitch & Rate — language code is EXPLICITLY passed:
-  // id → id-ID, en → en-US, zh → zh-CN.
+  // id → id-ID, en → en-US, zh → zh-CN, ms → ms-MY.
   let pitch = 1.0;
   if (role === 'Child') {
     pitch = isMale ? 1.4 : 1.7;

@@ -8,8 +8,8 @@ interface Props {
 }
 
 /**
- * Shared trilingual picker for the settings rows. Renders the same options as
- * the Role Selection globe modal, with a light haptic on selection.
+ * Shared quad-lingual picker for the settings rows. Renders the same options
+ * as the Role Selection globe modal, with a light haptic on selection.
  */
 export default function LanguagePickerModal({ visible, onClose }: Props) {
   const { language, setLanguage, t } = useTranslation();

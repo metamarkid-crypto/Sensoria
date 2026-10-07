@@ -68,7 +68,7 @@ export default function ParentSettingsListScreen() {
 
   // Current language label for the row subtitle (e.g. "Indonesia").
   const languageLabel =
-    language === 'id' ? t('aac.langNameId') : language === 'en' ? t('aac.langNameEn') : t('aac.langNameZh');
+    language === 'id' ? t('aac.langNameId') : language === 'en' ? t('aac.langNameEn') : language === 'zh' ? t('aac.langNameZh') : t('aac.langNameMs');
 
   // Hierarchy: billing sits LOW in the list — directly above "Tentang Sensoria
   // AAC" and slightly separated from the functional settings — so an

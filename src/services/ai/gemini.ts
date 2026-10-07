@@ -111,7 +111,7 @@ export type ImageTagCategory =
   | 'clothing'
   | 'color';
 
-export type ImageTagResult = { id: string; en: string; zh: string; category: ImageTagCategory };
+export type ImageTagResult = { id: string; en: string; zh: string; ms: string; category: ImageTagCategory };
 
 const VALID_TAG_CATEGORIES: readonly string[] = [
   'pronoun',
@@ -132,13 +132,13 @@ const VALID_TAG_CATEGORIES: readonly string[] = [
 
 /**
  * Returned when the model answer cannot be trusted (parse failure / missing
- * fields). Callers MUST treat this exact pair as "no confidence" and fall
+ * fields). Callers MUST treat this exact tuple as "no confidence" and fall
  * back to the manual form instead of saving it as a real card name.
  */
-const NO_CONFIDENCE_TAG: ImageTagResult = { id: 'Benda', en: 'Thing', zh: '东西', category: 'noun' };
+const NO_CONFIDENCE_TAG: ImageTagResult = { id: 'Benda', en: 'Thing', zh: '东西', ms: 'Barang', category: 'noun' };
 
 const isNoConfidenceTag = (t: ImageTagResult): boolean =>
-  t.id === 'Benda' && t.en === 'Thing' && t.zh === '东西';
+  t.id === 'Benda' && t.en === 'Thing' && t.zh === '东西' && t.ms === 'Barang';
 
 export const tagImageWithBilingualNames = async (imageUri: string): Promise<ImageTagResult> => {
   const base64Data = await FileSystem.readAsStringAsync(imageUri, {
@@ -159,7 +159,7 @@ export const tagImageWithBilingualNames = async (imageUri: string): Promise<Imag
               },
             },
             {
-              text: 'Identify the main object in this image with a single, simple word suitable for a child. Give the word in Indonesian, English, and Mandarin, and classify it into exactly one AAC category. Return ONLY a JSON object in this exact format, with no markdown formatting or backticks: {"id": "word in indonesian", "en": "word in english", "zh": "word in mandarin", "category": "pronoun|verb|noun|emotion|social|body|number|people|food|place|time|animal|clothing|color"}',
+              text: 'Identify the main object in this image with a single, simple word suitable for a child. Give the word in Indonesian, English, Mandarin, and Bahasa Melayu (Malay — use proper Malaysian vocabulary, not Indonesian), and classify it into exactly one AAC category. Return ONLY a JSON object in this exact format, with no markdown formatting or backticks: {"id": "word in indonesian", "en": "word in english", "zh": "word in mandarin", "ms": "word in malay", "category": "pronoun|verb|noun|emotion|social|body|number|people|food|place|time|animal|clothing|color"}',
             },
           ],
         },
@@ -173,6 +173,7 @@ export const tagImageWithBilingualNames = async (imageUri: string): Promise<Imag
           id: result.id,
           en: result.en || result.id,
           zh: result.zh,
+          ms: result.ms || result.id,
           category: VALID_TAG_CATEGORIES.includes(result.category)
             ? (result.category as ImageTagCategory)
             : 'noun',
@@ -192,15 +193,15 @@ export const tagImageWithBilingualNames = async (imageUri: string): Promise<Imag
 export { isNoConfidenceTag };
 
 /**
- * Background one-shot translation used by the frictionless trilingual flow:
- * after a manual fallback save (all three labels = the user's typed word),
- * this fills the two missing languages. Fire-and-forget — NEVER awaited by
+ * Background one-shot translation used by the frictionless quad-lingual flow:
+ * after a manual fallback save (all four labels = the user's typed word),
+ * this fills the three missing languages. Fire-and-forget — NEVER awaited by
  * the UI path. `from` is the language the user actually typed.
  */
 export const translateWordBilingual = async (
   word: string,
-  from: 'id' | 'en' | 'zh'
-): Promise<{ id: string; en: string; zh: string }> => {
+  from: 'id' | 'en' | 'zh' | 'ms'
+): Promise<{ id: string; en: string; zh: string; ms: string }> => {
   return executeWithFallback(async (ai) => {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
@@ -209,7 +210,7 @@ export const translateWordBilingual = async (
           role: 'user',
           parts: [
             {
-              text: `Translate the word "${word}" (it is written in ${from === 'id' ? 'Indonesian' : from === 'en' ? 'English' : 'Mandarin'}) into the other two languages. Use a single, simple, child-friendly word for each. Return ONLY a JSON object in this exact format, with no markdown formatting or backticks: {"id": "indonesian", "en": "english", "zh": "mandarin"}`,
+              text: `Translate the word "${word}" (it is written in ${from === 'id' ? 'Indonesian' : from === 'en' ? 'English' : from === 'zh' ? 'Mandarin' : 'Bahasa Melayu / Malay'}) into the other three languages. Use a single, simple, child-friendly word for each, and use proper Malaysian vocabulary for the Malay translation (not Indonesian). Return ONLY a JSON object in this exact format, with no markdown formatting or backticks: {"id": "indonesian", "en": "english", "zh": "mandarin", "ms": "malay"}`,
             },
           ],
         },
@@ -218,8 +219,8 @@ export const translateWordBilingual = async (
 
     try {
       const result = JSON.parse(response.text || '{}');
-      if (result.id && result.en && result.zh) {
-        return { id: result.id, en: result.en, zh: result.zh };
+      if (result.id && result.en && result.zh && result.ms) {
+        return { id: result.id, en: result.en, zh: result.zh, ms: result.ms };
       }
       throw new Error('Translation response missing fields');
     } catch (error) {

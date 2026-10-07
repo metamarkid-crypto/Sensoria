@@ -101,6 +101,15 @@ export const initDB = async () => {
         console.warn('word_en migration skipped:', e);
       }
     }
+    // Quad-lingual: Bahasa Melayu label column (optional — legacy rows stay
+    // valid; seeded rows get word_ms backfilled from the JSON seed below).
+    try {
+      await dbo.execAsync('ALTER TABLE aac_words ADD COLUMN word_ms TEXT;');
+    } catch (e) {
+      if (!String(e).includes('duplicate column name')) {
+        console.warn('word_ms migration skipped:', e);
+      }
+    }
     await migrateLegacyFavorites();
 
     // Migration: BACKFILL word_en for seeded rows (installs created before
@@ -125,6 +134,28 @@ export const initDB = async () => {
       }
     } catch (e) {
       console.warn('word_en backfill skipped:', e);
+    }
+
+    // Migration: BACKFILL word_ms for seeded rows (mirrors the word_en
+    // backfill — installs created before the dataset became quad-lingual get
+    // their Malay label pushed without touching custom cards or AI-filled
+    // labels; a non-empty existing word_ms is never overwritten).
+    try {
+      const missingMs = await dbo.getAllAsync<{ count: number }>(
+        "SELECT COUNT(*) as count FROM aac_words WHERE isCustom = 0 AND (word_ms IS NULL OR word_ms = '')"
+      );
+      if (missingMs && missingMs[0].count > 0) {
+        const seedDataMs: AACWord[] = require('../../../assets/data/arasaac.json');
+        for (const word of seedDataMs) {
+          if (!word.word_ms) continue;
+          await dbo.runAsync(
+            "UPDATE aac_words SET word_ms = ? WHERE id = ? AND isCustom = 0 AND (word_ms IS NULL OR word_ms = '')",
+            [word.word_ms, word.id]
+          );
+        }
+      }
+    } catch (e) {
+      console.warn('word_ms backfill skipped:', e);
     }
 
     // Migration: sync the FULL dictionary (all categories). NON-DESTRUCTIVE:
@@ -173,12 +204,13 @@ const syncDefaultWords = async (seedData: AACWord[]) => {
 
   try {
     const statement = await db.prepareAsync(
-      `INSERT INTO aac_words (id, word_id, word_en, word_zh, imageUrl, categoryId, isCustom)
-       VALUES ($id, $word_id, $word_en, $word_zh, $img, $cat, 0)
+      `INSERT INTO aac_words (id, word_id, word_en, word_zh, word_ms, imageUrl, categoryId, isCustom)
+       VALUES ($id, $word_id, $word_en, $word_zh, $word_ms, $img, $cat, 0)
        ON CONFLICT(id) DO UPDATE SET
          word_id = excluded.word_id,
          word_en = excluded.word_en,
          word_zh = excluded.word_zh,
+         word_ms = excluded.word_ms,
          imageUrl = excluded.imageUrl,
          categoryId = excluded.categoryId`
     );
@@ -188,6 +220,7 @@ const syncDefaultWords = async (seedData: AACWord[]) => {
         $word_id: word.word_id,
         $word_en: word.word_en || null,
         $word_zh: word.word_zh,
+        $word_ms: word.word_ms || null,
         $img: word.imageUrl || null,
         $cat: word.categoryId,
       });
@@ -234,6 +267,7 @@ export const getAllWords = async (): Promise<AACWord[]> => {
     word_id: r.word_id,
     word_en: r.word_en ?? undefined,
     word_zh: r.word_zh,
+    word_ms: r.word_ms ?? undefined,
     imageUrl: r.imageUrl,
     categoryId: r.categoryId,
     isFavorite: r.is_favorite === 1,
@@ -244,8 +278,8 @@ export const getAllWords = async (): Promise<AACWord[]> => {
 export const addCustomWord = async (word: AACWord) => {
   if (!db) return;
   await db.runAsync(
-    'INSERT INTO aac_words (id, word_id, word_en, word_zh, imageUrl, categoryId, isCustom) VALUES (?, ?, ?, ?, ?, ?, 1)',
-    [word.id, word.word_id, word.word_en ?? null, word.word_zh, word.imageUrl || null, word.categoryId]
+    'INSERT INTO aac_words (id, word_id, word_en, word_zh, word_ms, imageUrl, categoryId, isCustom) VALUES (?, ?, ?, ?, ?, ?, ?, 1)',
+    [word.id, word.word_id, word.word_en ?? null, word.word_zh, word.word_ms ?? null, word.imageUrl || null, word.categoryId]
   );
 };
 
@@ -265,6 +299,10 @@ export const updateWord = async (id: string, updates: Partial<AACWord>) => {
   if (updates.word_zh !== undefined) {
     setClauses.push('word_zh = ?');
     values.push(updates.word_zh);
+  }
+  if (updates.word_ms !== undefined) {
+    setClauses.push('word_ms = ?');
+    values.push(updates.word_ms);
   }
   if (updates.imageUrl !== undefined) {
     setClauses.push('imageUrl = ?');

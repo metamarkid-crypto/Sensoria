@@ -4,6 +4,7 @@
     "word_id": "Saya",
     "word_en": "I",
     "word_zh": "我",
+    "word_ms": "Saya",
     "imageUrl": "https://static.arasaac.org/pictograms/6632/6632_300.png",
     "categoryId": "pronoun"
   },
@@ -12,6 +13,7 @@
     "word_id": "Kamu",
     "word_en": "You",
     "word_zh": "你",
+    "word_ms": "Awak",
     "imageUrl": "https://static.arasaac.org/pictograms/6625/6625_300.png",
     "categoryId": "pronoun"
   },
@@ -20,6 +22,7 @@
     "word_id": "Mau",
     "word_en": "Want",
     "word_zh": "想要",
+    "word_ms": "Nak",
     "imageUrl": "https://static.arasaac.org/pictograms/5441/5441_300.png",
     "categoryId": "verb"
   },
@@ -28,6 +31,7 @@
     "word_id": "Suka",
     "word_en": "Like",
     "word_zh": "喜欢",
+    "word_ms": "Suka",
     "imageUrl": "https://static.arasaac.org/pictograms/37826/37826_300.png",
     "categoryId": "verb"
   },
@@ -36,6 +40,7 @@
     "word_id": "Makan",
     "word_en": "Eat",
     "word_zh": "吃",
+    "word_ms": "Makan",
     "imageUrl": "https://static.arasaac.org/pictograms/6456/6456_300.png",
     "categoryId": "verb"
   },
@@ -44,6 +49,7 @@
     "word_id": "Minum",
     "word_en": "Drink",
     "word_zh": "喝",
+    "word_ms": "Minum",
     "imageUrl": "https://static.arasaac.org/pictograms/6061/6061_300.png",
     "categoryId": "verb"
   },
@@ -52,6 +58,7 @@
     "word_id": "Tolong",
     "word_en": "Help",
     "word_zh": "帮忙",
+    "word_ms": "Tolong",
     "imageUrl": "https://static.arasaac.org/pictograms/32648/32648_300.png",
     "categoryId": "verb"
   },
@@ -60,6 +67,7 @@
     "word_id": "Tolong",
     "word_en": "Please",
     "word_zh": "请",
+    "word_ms": "Tolong",
     "imageUrl": "https://static.arasaac.org/pictograms/8195/8195_300.png",
     "categoryId": "social"
   },
@@ -68,6 +76,7 @@
     "word_id": "Berhenti",
     "word_en": "Stop",
     "word_zh": "停",
+    "word_ms": "Berhenti",
     "imageUrl": "https://static.arasaac.org/pictograms/7196/7196_300.png",
     "categoryId": "verb"
   },
@@ -76,6 +85,7 @@
     "word_id": "Selesai",
     "word_en": "Done",
     "word_zh": "完成",
+    "word_ms": "Selesai",
     "imageUrl": "https://static.arasaac.org/pictograms/10367/10367_300.png",
     "categoryId": "social"
   },
@@ -84,6 +94,7 @@
     "word_id": "Lagi",
     "word_en": "More",
     "word_zh": "更多",
+    "word_ms": "Lagi",
     "imageUrl": "https://static.arasaac.org/pictograms/5508/5508_300.png",
     "categoryId": "social"
   },
@@ -92,6 +103,7 @@
     "word_id": "Ya",
     "word_en": "Yes",
     "word_zh": "是",
+    "word_ms": "Ya",
     "imageUrl": "https://static.arasaac.org/pictograms/5584/5584_300.png",
     "categoryId": "social"
   },
@@ -100,6 +112,7 @@
     "word_id": "Tidak",
     "word_en": "No",
     "word_zh": "不是",
+    "word_ms": "Tidak",
     "imageUrl": "https://static.arasaac.org/pictograms/5526/5526_300.png",
     "categoryId": "social"
   },
@@ -108,6 +121,7 @@
     "word_id": "Toilet",
     "word_en": "Toilet",
     "word_zh": "厕所",
+    "word_ms": "Tandas",
     "imageUrl": "https://static.arasaac.org/pictograms/5921/5921_300.png",
     "categoryId": "noun"
   },
@@ -116,6 +130,7 @@
     "word_id": "Main",
     "word_en": "Play",
     "word_zh": "玩",
+    "word_ms": "Main",
     "imageUrl": "https://static.arasaac.org/pictograms/23392/23392_300.png",
     "categoryId": "verb"
   },
@@ -124,6 +139,7 @@
     "word_id": "Tidur",
     "word_en": "Sleep",
     "word_zh": "睡觉",
+    "word_ms": "Tidur",
     "imageUrl": "https://static.arasaac.org/pictograms/6479/6479_300.png",
     "categoryId": "verb"
   },
@@ -132,6 +148,7 @@
     "word_id": "Sakit",
     "word_en": "Sick",
     "word_zh": "生病",
+    "word_ms": "Sakit",
     "imageUrl": "https://static.arasaac.org/pictograms/7040/7040_300.png",
     "categoryId": "emotion"
   },
@@ -140,6 +157,7 @@
     "word_id": "Bagus",
     "word_en": "Good",
     "word_zh": "好",
+    "word_ms": "Bagus",
     "imageUrl": "https://static.arasaac.org/pictograms/4581/4581_300.png",
     "categoryId": "emotion"
   },
@@ -148,6 +166,7 @@
     "word_id": "Dia (L)",
     "word_en": "He",
     "word_zh": "他",
+    "word_ms": "Dia",
     "imageUrl": "https://static.arasaac.org/pictograms/6480/6480_300.png",
     "categoryId": "pronoun"
   },
@@ -156,6 +175,7 @@
     "word_id": "Dia (P)",
     "word_en": "She",
     "word_zh": "她",
+    "word_ms": "Dia",
     "imageUrl": "https://static.arasaac.org/pictograms/7028/7028_300.png",
     "categoryId": "pronoun"
   },
@@ -164,6 +184,7 @@
     "word_id": "Kami",
     "word_en": "We",
     "word_zh": "我们",
+    "word_ms": "Kami",
     "imageUrl": "https://static.arasaac.org/pictograms/7185/7185_300.png",
     "categoryId": "pronoun"
   },
@@ -172,6 +193,7 @@
     "word_id": "Mereka",
     "word_en": "They",
     "word_zh": "他们",
+    "word_ms": "Mereka",
     "imageUrl": "https://static.arasaac.org/pictograms/7032/7032_300.png",
     "categoryId": "pronoun"
   },
@@ -180,6 +202,7 @@
     "word_id": "Ibu",
     "word_en": "Mom",
     "word_zh": "妈妈",
+    "word_ms": "Ibu",
     "imageUrl": "https://static.arasaac.org/pictograms/2458/2458_300.png",
     "categoryId": "noun"
   },
@@ -188,6 +211,7 @@
     "word_id": "Ayah",
     "word_en": "Dad",
     "word_zh": "爸爸",
+    "word_ms": "Ayah",
     "imageUrl": "https://static.arasaac.org/pictograms/31146/31146_300.png",
     "categoryId": "noun"
   },
@@ -196,6 +220,7 @@
     "word_id": "Keluarga",
     "word_en": "Family",
     "word_zh": "家人",
+    "word_ms": "Keluarga",
     "imageUrl": "https://static.arasaac.org/pictograms/38351/38351_300.png",
     "categoryId": "noun"
   },
@@ -204,6 +229,7 @@
     "word_id": "Rumah",
     "word_en": "House",
     "word_zh": "家",
+    "word_ms": "Rumah",
     "imageUrl": "https://static.arasaac.org/pictograms/6964/6964_300.png",
     "categoryId": "noun"
   },
@@ -212,6 +238,7 @@
     "word_id": "Sekolah",
     "word_en": "School",
     "word_zh": "学校",
+    "word_ms": "Sekolah",
     "imageUrl": "https://static.arasaac.org/pictograms/32446/32446_300.png",
     "categoryId": "noun"
   },
@@ -220,6 +247,7 @@
     "word_id": "Mobil",
     "word_en": "Car",
     "word_zh": "汽车",
+    "word_ms": "Kereta",
     "imageUrl": "https://static.arasaac.org/pictograms/2339/2339_300.png",
     "categoryId": "noun"
   },
@@ -228,6 +256,7 @@
     "word_id": "Air",
     "word_en": "Water",
     "word_zh": "水",
+    "word_ms": "Air",
     "imageUrl": "https://static.arasaac.org/pictograms/32464/32464_300.png",
     "categoryId": "noun"
   },
@@ -236,6 +265,7 @@
     "word_id": "Makanan",
     "word_en": "Food",
     "word_zh": "食物",
+    "word_ms": "Makanan",
     "imageUrl": "https://static.arasaac.org/pictograms/4610/4610_300.png",
     "categoryId": "noun"
   },
@@ -244,6 +274,7 @@
     "word_id": "Buku",
     "word_en": "Book",
     "word_zh": "书",
+    "word_ms": "Buku",
     "imageUrl": "https://static.arasaac.org/pictograms/25191/25191_300.png",
     "categoryId": "noun"
   },
@@ -252,6 +283,7 @@
     "word_id": "Mainan",
     "word_en": "Toy",
     "word_zh": "玩具",
+    "word_ms": "Mainan",
     "imageUrl": "https://static.arasaac.org/pictograms/9813/9813_300.png",
     "categoryId": "noun"
   },
@@ -260,6 +292,7 @@
     "word_id": "Kasur",
     "word_en": "Bed",
     "word_zh": "床",
+    "word_ms": "Katil",
     "imageUrl": "https://static.arasaac.org/pictograms/25900/25900_300.png",
     "categoryId": "noun"
   },
@@ -268,6 +301,7 @@
     "word_id": "Pergi",
     "word_en": "Go",
     "word_zh": "去",
+    "word_ms": "Pergi",
     "imageUrl": "https://static.arasaac.org/pictograms/8142/8142_300.png",
     "categoryId": "verb"
   },
@@ -276,6 +310,7 @@
     "word_id": "Lihat",
     "word_en": "See",
     "word_zh": "看",
+    "word_ms": "Lihat",
     "imageUrl": "https://static.arasaac.org/pictograms/6564/6564_300.png",
     "categoryId": "verb"
   },
@@ -284,6 +319,7 @@
     "word_id": "Dengar",
     "word_en": "Listen",
     "word_zh": "听",
+    "word_ms": "Dengar",
     "imageUrl": "https://static.arasaac.org/pictograms/6572/6572_300.png",
     "categoryId": "verb"
   },
@@ -292,6 +328,7 @@
     "word_id": "Bicara",
     "word_en": "Talk",
     "word_zh": "说",
+    "word_ms": "Bercakap",
     "imageUrl": "https://static.arasaac.org/pictograms/6517/6517_300.png",
     "categoryId": "verb"
   },
@@ -300,6 +337,7 @@
     "word_id": "Kasih",
     "word_en": "Give",
     "word_zh": "给",
+    "word_ms": "Beri",
     "imageUrl": "https://static.arasaac.org/pictograms/28431/28431_300.png",
     "categoryId": "verb"
   },
@@ -308,6 +346,7 @@
     "word_id": "Buka",
     "word_en": "Open",
     "word_zh": "打开",
+    "word_ms": "Buka",
     "imageUrl": "https://static.arasaac.org/pictograms/24825/24825_300.png",
     "categoryId": "verb"
   },
@@ -316,6 +355,7 @@
     "word_id": "Tutup",
     "word_en": "Close",
     "word_zh": "关上",
+    "word_ms": "Tutup",
     "imageUrl": "https://static.arasaac.org/pictograms/30383/30383_300.png",
     "categoryId": "verb"
   },
@@ -324,6 +364,7 @@
     "word_id": "Mandi",
     "word_en": "Bath",
     "word_zh": "洗澡",
+    "word_ms": "Mandi",
     "imageUrl": "https://static.arasaac.org/pictograms/2272/2272_300.png",
     "categoryId": "verb"
   },
@@ -332,6 +373,7 @@
     "word_id": "Jelek",
     "word_en": "Bad",
     "word_zh": "坏",
+    "word_ms": "Buruk",
     "imageUrl": "https://static.arasaac.org/pictograms/5504/5504_300.png",
     "categoryId": "emotion"
   },
@@ -340,6 +382,7 @@
     "word_id": "Senang",
     "word_en": "Happy",
     "word_zh": "开心",
+    "word_ms": "Gembira",
     "imageUrl": "https://static.arasaac.org/pictograms/35533/35533_300.png",
     "categoryId": "emotion"
   },
@@ -348,6 +391,7 @@
     "word_id": "Sedih",
     "word_en": "Sad",
     "word_zh": "伤心",
+    "word_ms": "Sedih",
     "imageUrl": "https://static.arasaac.org/pictograms/35545/35545_300.png",
     "categoryId": "emotion"
   },
@@ -356,6 +400,7 @@
     "word_id": "Marah",
     "word_en": "Angry",
     "word_zh": "生气",
+    "word_ms": "Marah",
     "imageUrl": "https://static.arasaac.org/pictograms/35539/35539_300.png",
     "categoryId": "emotion"
   },
@@ -364,6 +409,7 @@
     "word_id": "Panas",
     "word_en": "Hot",
     "word_zh": "热",
+    "word_ms": "Panas",
     "imageUrl": "https://static.arasaac.org/pictograms/2300/2300_300.png",
     "categoryId": "emotion"
   },
@@ -372,6 +418,7 @@
     "word_id": "Dingin",
     "word_en": "Cold",
     "word_zh": "冷",
+    "word_ms": "Sejuk",
     "imageUrl": "https://static.arasaac.org/pictograms/4652/4652_300.png",
     "categoryId": "emotion"
   },
@@ -380,6 +427,7 @@
     "word_id": "Besar",
     "word_en": "Big",
     "word_zh": "大",
+    "word_ms": "Besar",
     "imageUrl": "https://static.arasaac.org/pictograms/4658/4658_300.png",
     "categoryId": "emotion"
   },
@@ -388,6 +436,7 @@
     "word_id": "Kecil",
     "word_en": "Small",
     "word_zh": "小",
+    "word_ms": "Kecil",
     "imageUrl": "https://static.arasaac.org/pictograms/4716/4716_300.png",
     "categoryId": "emotion"
   },
@@ -396,6 +445,7 @@
     "word_id": "Lapar",
     "word_en": "Hungry",
     "word_zh": "饿",
+    "word_ms": "Lapar",
     "imageUrl": "https://static.arasaac.org/pictograms/4962/4962_300.png",
     "categoryId": "emotion"
   },
@@ -404,6 +454,7 @@
     "word_id": "Haus",
     "word_en": "Thirsty",
     "word_zh": "渴",
+    "word_ms": "Dahaga",
     "imageUrl": "https://static.arasaac.org/pictograms/4963/4963_300.png",
     "categoryId": "emotion"
   },
@@ -412,6 +463,7 @@
     "word_id": "Capek",
     "word_en": "Tired",
     "word_zh": "累",
+    "word_ms": "Penat",
     "imageUrl": "https://static.arasaac.org/pictograms/35537/35537_300.png",
     "categoryId": "emotion"
   },
@@ -420,6 +472,7 @@
     "word_id": "Terima Kasih",
     "word_en": "Thank You",
     "word_zh": "谢谢",
+    "word_ms": "Terima Kasih",
     "imageUrl": "https://static.arasaac.org/pictograms/8129/8129_300.png",
     "categoryId": "social"
   },
@@ -428,6 +481,7 @@
     "word_id": "Maaf",
     "word_en": "Sorry",
     "word_zh": "对不起",
+    "word_ms": "Maaf",
     "imageUrl": "https://static.arasaac.org/pictograms/11625/11625_300.png",
     "categoryId": "social"
   },
@@ -436,6 +490,7 @@
     "word_id": "Halo",
     "word_en": "Hello",
     "word_zh": "你好",
+    "word_ms": "Hai",
     "imageUrl": "https://static.arasaac.org/pictograms/6522/6522_300.png",
     "categoryId": "social"
   },
@@ -444,6 +499,7 @@
     "word_id": "Dadah",
     "word_en": "Bye",
     "word_zh": "再见",
+    "word_ms": "Selamat Tinggal",
     "imageUrl": "https://static.arasaac.org/pictograms/6028/6028_300.png",
     "categoryId": "social"
   },
@@ -452,6 +508,7 @@
     "word_id": "Tunggu",
     "word_en": "Wait",
     "word_zh": "等",
+    "word_ms": "Tunggu",
     "imageUrl": "https://static.arasaac.org/pictograms/36914/36914_300.png",
     "categoryId": "social"
   },
@@ -460,6 +517,7 @@
     "word_id": "Kepala",
     "word_en": "Head",
     "word_zh": "头",
+    "word_ms": "Kepala",
     "imageUrl": "https://static.arasaac.org/pictograms/2673/2673_300.png",
     "categoryId": "body"
   },
@@ -468,6 +526,7 @@
     "word_id": "Mata",
     "word_en": "Eye",
     "word_zh": "眼睛",
+    "word_ms": "Mata",
     "imageUrl": "https://static.arasaac.org/pictograms/6573/6573_300.png",
     "categoryId": "body"
   },
@@ -476,6 +535,7 @@
     "word_id": "Hidung",
     "word_en": "Nose",
     "word_zh": "鼻子",
+    "word_ms": "Hidung",
     "imageUrl": "https://static.arasaac.org/pictograms/2887/2887_300.png",
     "categoryId": "body"
   },
@@ -484,6 +544,7 @@
     "word_id": "Mulut",
     "word_en": "Mouth",
     "word_zh": "嘴",
+    "word_ms": "Mulut",
     "imageUrl": "https://static.arasaac.org/pictograms/2663/2663_300.png",
     "categoryId": "body"
   },
@@ -492,6 +553,7 @@
     "word_id": "Telinga",
     "word_en": "Ear",
     "word_zh": "耳朵",
+    "word_ms": "Telinga",
     "imageUrl": "https://static.arasaac.org/pictograms/2871/2871_300.png",
     "categoryId": "body"
   },
@@ -500,6 +562,7 @@
     "word_id": "Tangan",
     "word_en": "Hand",
     "word_zh": "手",
+    "word_ms": "Tangan",
     "imageUrl": "https://static.arasaac.org/pictograms/28431/28431_300.png",
     "categoryId": "body"
   },
@@ -508,6 +571,7 @@
     "word_id": "Kaki",
     "word_en": "Foot",
     "word_zh": "脚",
+    "word_ms": "Kaki",
     "imageUrl": "https://static.arasaac.org/pictograms/25327/25327_300.png",
     "categoryId": "body"
   },
@@ -516,6 +580,7 @@
     "word_id": "Perut",
     "word_en": "Stomach",
     "word_zh": "肚子",
+    "word_ms": "Perut",
     "imageUrl": "https://static.arasaac.org/pictograms/2786/2786_300.png",
     "categoryId": "body"
   },
@@ -524,6 +589,7 @@
     "word_id": "Gigi",
     "word_en": "Tooth",
     "word_zh": "牙齿",
+    "word_ms": "Gigi",
     "imageUrl": "https://static.arasaac.org/pictograms/10267/10267_300.png",
     "categoryId": "body"
   },
@@ -532,6 +598,7 @@
     "word_id": "Rambut",
     "word_en": "Hair",
     "word_zh": "头发",
+    "word_ms": "Rambut",
     "imageUrl": "https://static.arasaac.org/pictograms/2851/2851_300.png",
     "categoryId": "body"
   },
@@ -540,6 +607,7 @@
     "word_id": "Jari",
     "word_en": "Finger",
     "word_zh": "手指",
+    "word_ms": "Jari",
     "imageUrl": "https://static.arasaac.org/pictograms/3298/3298_300.png",
     "categoryId": "body"
   },
@@ -548,6 +616,7 @@
     "word_id": "Lidah",
     "word_en": "Tongue",
     "word_zh": "舌头",
+    "word_ms": "Lidah",
     "imageUrl": "https://static.arasaac.org/pictograms/2944/2944_300.png",
     "categoryId": "body"
   },
@@ -556,6 +625,7 @@
     "word_id": "Leher",
     "word_en": "Neck",
     "word_zh": "脖子",
+    "word_ms": "Leher",
     "imageUrl": "https://static.arasaac.org/pictograms/2727/2727_300.png",
     "categoryId": "body"
   },
@@ -564,6 +634,7 @@
     "word_id": "Bahu",
     "word_en": "Shoulder",
     "word_zh": "肩膀",
+    "word_ms": "Bahu",
     "imageUrl": "https://static.arasaac.org/pictograms/2977/2977_300.png",
     "categoryId": "body"
   },
@@ -572,6 +643,7 @@
     "word_id": "Lutut",
     "word_en": "Knee",
     "word_zh": "膝盖",
+    "word_ms": "Lutut",
     "imageUrl": "https://static.arasaac.org/pictograms/2810/2810_300.png",
     "categoryId": "body"
   },
@@ -580,6 +652,7 @@
     "word_id": "Dada",
     "word_en": "Chest",
     "word_zh": "胸",
+    "word_ms": "Dada",
     "imageUrl": "https://static.arasaac.org/pictograms/2853/2853_300.png",
     "categoryId": "body"
   },
@@ -588,6 +661,7 @@
     "word_id": "Punggung",
     "word_en": "Back",
     "word_zh": "背",
+    "word_ms": "Belakang",
     "imageUrl": "https://static.arasaac.org/pictograms/2748/2748_300.png",
     "categoryId": "body"
   },
@@ -596,6 +670,7 @@
     "word_id": "Pipi",
     "word_en": "Cheek",
     "word_zh": "脸颊",
+    "word_ms": "Pipi",
     "imageUrl": "https://static.arasaac.org/pictograms/2919/2919_300.png",
     "categoryId": "body"
   },
@@ -604,6 +679,7 @@
     "word_id": "Kuku",
     "word_en": "Nail",
     "word_zh": "指甲",
+    "word_ms": "Kuku",
     "imageUrl": "https://static.arasaac.org/pictograms/2705/2705_300.png",
     "categoryId": "body"
   },
@@ -612,6 +688,7 @@
     "word_id": "Tulang",
     "word_en": "Bone",
     "word_zh": "骨头",
+    "word_ms": "Tulang",
     "imageUrl": "https://static.arasaac.org/pictograms/2972/2972_300.png",
     "categoryId": "body"
   },
@@ -620,6 +697,7 @@
     "word_id": "Nol",
     "word_en": "Zero",
     "word_zh": "零",
+    "word_ms": "Sifar",
     "imageUrl": "https://static.arasaac.org/pictograms/2626/2626_300.png",
     "categoryId": "number"
   },
@@ -628,6 +706,7 @@
     "word_id": "Satu",
     "word_en": "One",
     "word_zh": "一",
+    "word_ms": "Satu",
     "imageUrl": "https://static.arasaac.org/pictograms/2627/2627_300.png",
     "categoryId": "number"
   },
@@ -636,6 +715,7 @@
     "word_id": "Dua",
     "word_en": "Two",
     "word_zh": "二",
+    "word_ms": "Dua",
     "imageUrl": "https://static.arasaac.org/pictograms/2628/2628_300.png",
     "categoryId": "number"
   },
@@ -644,6 +724,7 @@
     "word_id": "Tiga",
     "word_en": "Three",
     "word_zh": "三",
+    "word_ms": "Tiga",
     "imageUrl": "https://static.arasaac.org/pictograms/2629/2629_300.png",
     "categoryId": "number"
   },
@@ -652,6 +733,7 @@
     "word_id": "Empat",
     "word_en": "Four",
     "word_zh": "四",
+    "word_ms": "Empat",
     "imageUrl": "https://static.arasaac.org/pictograms/2630/2630_300.png",
     "categoryId": "number"
   },
@@ -660,6 +742,7 @@
     "word_id": "Lima",
     "word_en": "Five",
     "word_zh": "五",
+    "word_ms": "Lima",
     "imageUrl": "https://static.arasaac.org/pictograms/39311/39311_300.png",
     "categoryId": "number"
   },
@@ -668,6 +751,7 @@
     "word_id": "Enam",
     "word_en": "Six",
     "word_zh": "六",
+    "word_ms": "Enam",
     "imageUrl": "https://static.arasaac.org/pictograms/2632/2632_300.png",
     "categoryId": "number"
   },
@@ -676,6 +760,7 @@
     "word_id": "Tujuh",
     "word_en": "Seven",
     "word_zh": "七",
+    "word_ms": "Tujuh",
     "imageUrl": "https://static.arasaac.org/pictograms/2633/2633_300.png",
     "categoryId": "number"
   },
@@ -684,6 +769,7 @@
     "word_id": "Delapan",
     "word_en": "Eight",
     "word_zh": "八",
+    "word_ms": "Lapan",
     "imageUrl": "https://static.arasaac.org/pictograms/2634/2634_300.png",
     "categoryId": "number"
   },
@@ -692,6 +778,7 @@
     "word_id": "Sembilan",
     "word_en": "Nine",
     "word_zh": "九",
+    "word_ms": "Sembilan",
     "imageUrl": "https://static.arasaac.org/pictograms/2635/2635_300.png",
     "categoryId": "number"
   },
@@ -700,6 +787,7 @@
     "word_id": "Sepuluh",
     "word_en": "Ten",
     "word_zh": "十",
+    "word_ms": "Sepuluh",
     "imageUrl": "https://static.arasaac.org/pictograms/7025/7025_300.png",
     "categoryId": "number"
   },
@@ -708,6 +796,7 @@
     "word_id": "Dokter",
     "word_en": "Doctor",
     "word_zh": "医生",
+    "word_ms": "Doktor",
     "imageUrl": "https://static.arasaac.org/pictograms/6561/6561_300.png",
     "categoryId": "people"
   },
@@ -716,6 +805,7 @@
     "word_id": "Guru",
     "word_en": "Teacher",
     "word_zh": "老师",
+    "word_ms": "Guru",
     "imageUrl": "https://static.arasaac.org/pictograms/6556/6556_300.png",
     "categoryId": "people"
   },
@@ -724,6 +814,7 @@
     "word_id": "Polisi",
     "word_en": "Police",
     "word_zh": "警察",
+    "word_ms": "Polis",
     "imageUrl": "https://static.arasaac.org/pictograms/37367/37367_300.png",
     "categoryId": "people"
   },
@@ -732,6 +823,7 @@
     "word_id": "Perawat",
     "word_en": "Nurse",
     "word_zh": "护士",
+    "word_ms": "Jururawat",
     "imageUrl": "https://static.arasaac.org/pictograms/6050/6050_300.png",
     "categoryId": "people"
   },
@@ -740,6 +832,7 @@
     "word_id": "Koki",
     "word_en": "Chef",
     "word_zh": "厨师",
+    "word_ms": "Koki",
     "imageUrl": "https://static.arasaac.org/pictograms/30526/30526_300.png",
     "categoryId": "people"
   },
@@ -748,6 +841,7 @@
     "word_id": "Petani",
     "word_en": "Farmer",
     "word_zh": "农民",
+    "word_ms": "Petani",
     "imageUrl": "https://static.arasaac.org/pictograms/2982/2982_300.png",
     "categoryId": "people"
   },
@@ -756,6 +850,7 @@
     "word_id": "Supir",
     "word_en": "Driver",
     "word_zh": "司机",
+    "word_ms": "Pemandu",
     "imageUrl": "https://static.arasaac.org/pictograms/3019/3019_300.png",
     "categoryId": "people"
   },
@@ -764,6 +859,7 @@
     "word_id": "Pilot",
     "word_en": "Pilot",
     "word_zh": "飞行员",
+    "word_ms": "Juruterbang",
     "imageUrl": "https://static.arasaac.org/pictograms/3370/3370_300.png",
     "categoryId": "people"
   },
@@ -772,6 +868,7 @@
     "word_id": "Pemadam Kebakaran",
     "word_en": "Firefighter",
     "word_zh": "消防员",
+    "word_ms": "Bomba",
     "imageUrl": "https://static.arasaac.org/pictograms/6066/6066_300.png",
     "categoryId": "people"
   },
@@ -780,6 +877,7 @@
     "word_id": "Tentara",
     "word_en": "Soldier",
     "word_zh": "士兵",
+    "word_ms": "Tentera",
     "imageUrl": "https://static.arasaac.org/pictograms/2797/2797_300.png",
     "categoryId": "people"
   },
@@ -788,6 +886,7 @@
     "word_id": "Nelayan",
     "word_en": "Fisherman",
     "word_zh": "渔民",
+    "word_ms": "Nelayan",
     "imageUrl": "https://static.arasaac.org/pictograms/3366/3366_300.png",
     "categoryId": "people"
   },
@@ -796,6 +895,7 @@
     "word_id": "Penjual",
     "word_en": "Seller",
     "word_zh": "售货员",
+    "word_ms": "Penjual",
     "imageUrl": "https://static.arasaac.org/pictograms/20121/20121_300.png",
     "categoryId": "people"
   },
@@ -804,6 +904,7 @@
     "word_id": "Tukang Kayu",
     "word_en": "Carpenter",
     "word_zh": "木匠",
+    "word_ms": "Tukang Kayu",
     "imageUrl": "https://static.arasaac.org/pictograms/2687/2687_300.png",
     "categoryId": "people"
   },
@@ -812,6 +913,7 @@
     "word_id": "Penjahit",
     "word_en": "Tailor",
     "word_zh": "裁缝",
+    "word_ms": "Penjahit",
     "imageUrl": "https://static.arasaac.org/pictograms/22100/22100_300.png",
     "categoryId": "people"
   },
@@ -820,6 +922,7 @@
     "word_id": "Dokter Gigi",
     "word_en": "Dentist",
     "word_zh": "牙医",
+    "word_ms": "Doktor Gigi",
     "imageUrl": "https://static.arasaac.org/pictograms/2733/2733_300.png",
     "categoryId": "people"
   },
@@ -828,6 +931,7 @@
     "word_id": "Astronot",
     "word_en": "Astronaut",
     "word_zh": "宇航员",
+    "word_ms": "Astronot",
     "imageUrl": "https://static.arasaac.org/pictograms/4569/4569_300.png",
     "categoryId": "people"
   },
@@ -836,6 +940,7 @@
     "word_id": "Masinis",
     "word_en": "Train driver",
     "word_zh": "火车司机",
+    "word_ms": "Pemandu Kereta Api",
     "imageUrl": "https://static.arasaac.org/pictograms/32916/32916_300.png",
     "categoryId": "people"
   },
@@ -844,6 +949,7 @@
     "word_id": "Pemusik",
     "word_en": "Musician",
     "word_zh": "音乐家",
+    "word_ms": "Pemuzik",
     "imageUrl": "https://static.arasaac.org/pictograms/2890/2890_300.png",
     "categoryId": "people"
   },
@@ -852,6 +958,7 @@
     "word_id": "Pelukis",
     "word_en": "Painter",
     "word_zh": "画家",
+    "word_ms": "Pelukis",
     "imageUrl": "https://static.arasaac.org/pictograms/2835/2835_300.png",
     "categoryId": "people"
   },
@@ -860,6 +967,7 @@
     "word_id": "Atlet",
     "word_en": "Athlete",
     "word_zh": "运动员",
+    "word_ms": "Atlet",
     "imageUrl": "https://static.arasaac.org/pictograms/3179/3179_300.png",
     "categoryId": "people"
   },
@@ -868,6 +976,7 @@
     "word_id": "Nasi",
     "word_en": "Rice",
     "word_zh": "米饭",
+    "word_ms": "Nasi",
     "imageUrl": "https://static.arasaac.org/pictograms/6911/6911_300.png",
     "categoryId": "food"
   },
@@ -876,6 +985,7 @@
     "word_id": "Roti",
     "word_en": "Bread",
     "word_zh": "面包",
+    "word_ms": "Roti",
     "imageUrl": "https://static.arasaac.org/pictograms/2494/2494_300.png",
     "categoryId": "food"
   },
@@ -884,6 +994,7 @@
     "word_id": "Telur",
     "word_en": "Egg",
     "word_zh": "鸡蛋",
+    "word_ms": "Telur",
     "imageUrl": "https://static.arasaac.org/pictograms/2427/2427_300.png",
     "categoryId": "food"
   },
@@ -892,6 +1003,7 @@
     "word_id": "Susu",
     "word_en": "Milk",
     "word_zh": "牛奶",
+    "word_ms": "Susu",
     "imageUrl": "https://static.arasaac.org/pictograms/2445/2445_300.png",
     "categoryId": "food"
   },
@@ -900,6 +1012,7 @@
     "word_id": "Buah",
     "word_en": "Fruit",
     "word_zh": "水果",
+    "word_ms": "Buah",
     "imageUrl": "https://static.arasaac.org/pictograms/28339/28339_300.png",
     "categoryId": "food"
   },
@@ -908,6 +1021,7 @@
     "word_id": "Apel",
     "word_en": "Apple",
     "word_zh": "苹果",
+    "word_ms": "Epal",
     "imageUrl": "https://static.arasaac.org/pictograms/2462/2462_300.png",
     "categoryId": "food"
   },
@@ -916,6 +1030,7 @@
     "word_id": "Pisang",
     "word_en": "Banana",
     "word_zh": "香蕉",
+    "word_ms": "Pisang",
     "imageUrl": "https://static.arasaac.org/pictograms/2530/2530_300.png",
     "categoryId": "food"
   },
@@ -924,6 +1039,7 @@
     "word_id": "Jeruk",
     "word_en": "Orange",
     "word_zh": "橙子",
+    "word_ms": "Oren",
     "imageUrl": "https://static.arasaac.org/pictograms/2888/2888_300.png",
     "categoryId": "food"
   },
@@ -932,6 +1048,7 @@
     "word_id": "Sayur",
     "word_en": "Vegetable",
     "word_zh": "蔬菜",
+    "word_ms": "Sayur",
     "imageUrl": "https://static.arasaac.org/pictograms/29131/29131_300.png",
     "categoryId": "food"
   },
@@ -940,6 +1057,7 @@
     "word_id": "Daging",
     "word_en": "Meat",
     "word_zh": "肉",
+    "word_ms": "Daging",
     "imageUrl": "https://static.arasaac.org/pictograms/2316/2316_300.png",
     "categoryId": "food"
   },
@@ -948,6 +1066,7 @@
     "word_id": "Ayam",
     "word_en": "Chicken",
     "word_zh": "鸡肉",
+    "word_ms": "Ayam",
     "imageUrl": "https://static.arasaac.org/pictograms/4952/4952_300.png",
     "categoryId": "food"
   },
@@ -956,6 +1075,7 @@
     "word_id": "Ikan",
     "word_en": "Fish",
     "word_zh": "鱼",
+    "word_ms": "Ikan",
     "imageUrl": "https://static.arasaac.org/pictograms/2520/2520_300.png",
     "categoryId": "food"
   },
@@ -964,6 +1084,7 @@
     "word_id": "Kue",
     "word_en": "Cake",
     "word_zh": "蛋糕",
+    "word_ms": "Kek",
     "imageUrl": "https://static.arasaac.org/pictograms/2502/2502_300.png",
     "categoryId": "food"
   },
@@ -972,6 +1093,7 @@
     "word_id": "Biskuit",
     "word_en": "Biscuit",
     "word_zh": "饼干",
+    "word_ms": "Biskut",
     "imageUrl": "https://static.arasaac.org/pictograms/8312/8312_300.png",
     "categoryId": "food"
   },
@@ -980,6 +1102,7 @@
     "word_id": "Permen",
     "word_en": "Candy",
     "word_zh": "糖果",
+    "word_ms": "Gula-Gula",
     "imageUrl": "https://static.arasaac.org/pictograms/2686/2686_300.png",
     "categoryId": "food"
   },
@@ -988,6 +1111,7 @@
     "word_id": "Es Krim",
     "word_en": "Ice cream",
     "word_zh": "冰淇淋",
+    "word_ms": "Ais Krim",
     "imageUrl": "https://static.arasaac.org/pictograms/3348/3348_300.png",
     "categoryId": "food"
   },
@@ -996,6 +1120,7 @@
     "word_id": "Jus",
     "word_en": "Juice",
     "word_zh": "果汁",
+    "word_ms": "Jus",
     "imageUrl": "https://static.arasaac.org/pictograms/11461/11461_300.png",
     "categoryId": "food"
   },
@@ -1004,6 +1129,7 @@
     "word_id": "Sup",
     "word_en": "Soup",
     "word_zh": "汤",
+    "word_ms": "Sup",
     "imageUrl": "https://static.arasaac.org/pictograms/2573/2573_300.png",
     "categoryId": "food"
   },
@@ -1012,6 +1138,7 @@
     "word_id": "Keju",
     "word_en": "Cheese",
     "word_zh": "奶酪",
+    "word_ms": "Keju",
     "imageUrl": "https://static.arasaac.org/pictograms/2541/2541_300.png",
     "categoryId": "food"
   },
@@ -1020,6 +1147,7 @@
     "word_id": "Mie",
     "word_en": "Noodles",
     "word_zh": "面条",
+    "word_ms": "Mi",
     "imageUrl": "https://static.arasaac.org/pictograms/8584/8584_300.png",
     "categoryId": "food"
   },
@@ -1028,6 +1156,7 @@
     "word_id": "Taman",
     "word_en": "Park",
     "word_zh": "公园",
+    "word_ms": "Taman",
     "imageUrl": "https://static.arasaac.org/pictograms/5379/5379_300.png",
     "categoryId": "place"
   },
@@ -1036,6 +1165,7 @@
     "word_id": "Pasar",
     "word_en": "Market",
     "word_zh": "市场",
+    "word_ms": "Pasar",
     "imageUrl": "https://static.arasaac.org/pictograms/32942/32942_300.png",
     "categoryId": "place"
   },
@@ -1044,6 +1174,7 @@
     "word_id": "Masjid",
     "word_en": "Mosque",
     "word_zh": "清真寺",
+    "word_ms": "Masjid",
     "imageUrl": "https://static.arasaac.org/pictograms/24177/24177_300.png",
     "categoryId": "place"
   },
@@ -1052,6 +1183,7 @@
     "word_id": "Gereja",
     "word_en": "Church",
     "word_zh": "教堂",
+    "word_ms": "Gereja",
     "imageUrl": "https://static.arasaac.org/pictograms/3118/3118_300.png",
     "categoryId": "place"
   },
@@ -1060,6 +1192,7 @@
     "word_id": "Rumah Sakit",
     "word_en": "Hospital",
     "word_zh": "医院",
+    "word_ms": "Hospital",
     "imageUrl": "https://static.arasaac.org/pictograms/36210/36210_300.png",
     "categoryId": "place"
   },
@@ -1068,6 +1201,7 @@
     "word_id": "Toko",
     "word_en": "Shop",
     "word_zh": "商店",
+    "word_ms": "Kedai",
     "imageUrl": "https://static.arasaac.org/pictograms/35695/35695_300.png",
     "categoryId": "place"
   },
@@ -1076,6 +1210,7 @@
     "word_id": "Dapur",
     "word_en": "Kitchen",
     "word_zh": "厨房",
+    "word_ms": "Dapur",
     "imageUrl": "https://static.arasaac.org/pictograms/10752/10752_300.png",
     "categoryId": "place"
   },
@@ -1084,6 +1219,7 @@
     "word_id": "Kamar",
     "word_en": "Room",
     "word_zh": "房间",
+    "word_ms": "Bilik",
     "imageUrl": "https://static.arasaac.org/pictograms/32234/32234_300.png",
     "categoryId": "place"
   },
@@ -1092,6 +1228,7 @@
     "word_id": "Kelas",
     "word_en": "Classroom",
     "word_zh": "教室",
+    "word_ms": "Kelas",
     "imageUrl": "https://static.arasaac.org/pictograms/9815/9815_300.png",
     "categoryId": "place"
   },
@@ -1100,6 +1237,7 @@
     "word_id": "Jalan",
     "word_en": "Road",
     "word_zh": "马路",
+    "word_ms": "Jalan",
     "imageUrl": "https://static.arasaac.org/pictograms/2302/2302_300.png",
     "categoryId": "place"
   },
@@ -1108,6 +1246,7 @@
     "word_id": "Kota",
     "word_en": "City",
     "word_zh": "城市",
+    "word_ms": "Bandar",
     "imageUrl": "https://static.arasaac.org/pictograms/2704/2704_300.png",
     "categoryId": "place"
   },
@@ -1116,6 +1255,7 @@
     "word_id": "Desa",
     "word_en": "Village",
     "word_zh": "村庄",
+    "word_ms": "Kampung",
     "imageUrl": "https://static.arasaac.org/pictograms/2823/2823_300.png",
     "categoryId": "place"
   },
@@ -1124,6 +1264,7 @@
     "word_id": "Pantai",
     "word_en": "Beach",
     "word_zh": "海滩",
+    "word_ms": "Pantai",
     "imageUrl": "https://static.arasaac.org/pictograms/30518/30518_300.png",
     "categoryId": "place"
   },
@@ -1132,6 +1273,7 @@
     "word_id": "Gunung",
     "word_en": "Mountain",
     "word_zh": "山",
+    "word_ms": "Gunung",
     "imageUrl": "https://static.arasaac.org/pictograms/2909/2909_300.png",
     "categoryId": "place"
   },
@@ -1140,6 +1282,7 @@
     "word_id": "Restoran",
     "word_en": "Restaurant",
     "word_zh": "餐厅",
+    "word_ms": "Restoran",
     "imageUrl": "https://static.arasaac.org/pictograms/32408/32408_300.png",
     "categoryId": "place"
   },
@@ -1148,6 +1291,7 @@
     "word_id": "Apotek",
     "word_en": "Pharmacy",
     "word_zh": "药店",
+    "word_ms": "Farmasi",
     "imageUrl": "https://static.arasaac.org/pictograms/37368/37368_300.png",
     "categoryId": "place"
   },
@@ -1156,6 +1300,7 @@
     "word_id": "Bank",
     "word_en": "Bank",
     "word_zh": "银行",
+    "word_ms": "Bank",
     "imageUrl": "https://static.arasaac.org/pictograms/3062/3062_300.png",
     "categoryId": "place"
   },
@@ -1164,6 +1309,7 @@
     "word_id": "Stasiun",
     "word_en": "Station",
     "word_zh": "车站",
+    "word_ms": "Stesen",
     "imageUrl": "https://static.arasaac.org/pictograms/29905/29905_300.png",
     "categoryId": "place"
   },
@@ -1172,6 +1318,7 @@
     "word_id": "Bandara",
     "word_en": "Airport",
     "word_zh": "机场",
+    "word_ms": "Lapangan Terbang",
     "imageUrl": "https://static.arasaac.org/pictograms/6031/6031_300.png",
     "categoryId": "place"
   },
@@ -1180,6 +1327,7 @@
     "word_id": "Perpustakaan",
     "word_en": "Library",
     "word_zh": "图书馆",
+    "word_ms": "Perpustakaan",
     "imageUrl": "https://static.arasaac.org/pictograms/6063/6063_300.png",
     "categoryId": "place"
   },
@@ -1188,6 +1336,7 @@
     "word_id": "Pagi",
     "word_en": "Morning",
     "word_zh": "早上",
+    "word_ms": "Pagi",
     "imageUrl": "https://static.arasaac.org/pictograms/25704/25704_300.png",
     "categoryId": "time"
   },
@@ -1196,6 +1345,7 @@
     "word_id": "Siang",
     "word_en": "Noon",
     "word_zh": "中午",
+    "word_ms": "Tengah Hari",
     "imageUrl": "https://static.arasaac.org/pictograms/32708/32708_300.png",
     "categoryId": "time"
   },
@@ -1204,6 +1354,7 @@
     "word_id": "Sore",
     "word_en": "Afternoon",
     "word_zh": "下午",
+    "word_ms": "Petang",
     "imageUrl": "https://static.arasaac.org/pictograms/7268/7268_300.png",
     "categoryId": "time"
   },
@@ -1212,6 +1363,7 @@
     "word_id": "Malam",
     "word_en": "Night",
     "word_zh": "晚上",
+    "word_ms": "Malam",
     "imageUrl": "https://static.arasaac.org/pictograms/26997/26997_300.png",
     "categoryId": "time"
   },
@@ -1220,6 +1372,7 @@
     "word_id": "Hari",
     "word_en": "Day",
     "word_zh": "天",
+    "word_ms": "Hari",
     "imageUrl": "https://static.arasaac.org/pictograms/37731/37731_300.png",
     "categoryId": "time"
   },
@@ -1228,6 +1381,7 @@
     "word_id": "Minggu",
     "word_en": "Week",
     "word_zh": "星期",
+    "word_ms": "Minggu",
     "imageUrl": "https://static.arasaac.org/pictograms/37732/37732_300.png",
     "categoryId": "time"
   },
@@ -1236,6 +1390,7 @@
     "word_id": "Bulan",
     "word_en": "Month",
     "word_zh": "月",
+    "word_ms": "Bulan",
     "imageUrl": "https://static.arasaac.org/pictograms/37724/37724_300.png",
     "categoryId": "time"
   },
@@ -1244,6 +1399,7 @@
     "word_id": "Tahun",
     "word_en": "Year",
     "word_zh": "年",
+    "word_ms": "Tahun",
     "imageUrl": "https://static.arasaac.org/pictograms/6903/6903_300.png",
     "categoryId": "time"
   },
@@ -1252,6 +1408,7 @@
     "word_id": "Sekarang",
     "word_en": "Now",
     "word_zh": "现在",
+    "word_ms": "Sekarang",
     "imageUrl": "https://static.arasaac.org/pictograms/32747/32747_300.png",
     "categoryId": "time"
   },
@@ -1260,6 +1417,7 @@
     "word_id": "Nanti",
     "word_en": "Later",
     "word_zh": "一会儿",
+    "word_ms": "Nanti",
     "imageUrl": "https://static.arasaac.org/pictograms/32749/32749_300.png",
     "categoryId": "time"
   },
@@ -1268,6 +1426,7 @@
     "word_id": "Kemarin",
     "word_en": "Yesterday",
     "word_zh": "昨天",
+    "word_ms": "Semalam",
     "imageUrl": "https://static.arasaac.org/pictograms/38279/38279_300.png",
     "categoryId": "time"
   },
@@ -1276,6 +1435,7 @@
     "word_id": "Besok",
     "word_en": "Tomorrow",
     "word_zh": "明天",
+    "word_ms": "Esok",
     "imageUrl": "https://static.arasaac.org/pictograms/38278/38278_300.png",
     "categoryId": "time"
   },
@@ -1284,6 +1444,7 @@
     "word_id": "Hari Ini",
     "word_en": "Today",
     "word_zh": "今天",
+    "word_ms": "Hari Ini",
     "imageUrl": "https://static.arasaac.org/pictograms/7131/7131_300.png",
     "categoryId": "time"
   },
@@ -1292,6 +1453,7 @@
     "word_id": "Jam",
     "word_en": "Clock",
     "word_zh": "钟",
+    "word_ms": "Jam",
     "imageUrl": "https://static.arasaac.org/pictograms/5561/5561_300.png",
     "categoryId": "time"
   },
@@ -1300,6 +1462,7 @@
     "word_id": "Kapan",
     "word_en": "When",
     "word_zh": "什么时候",
+    "word_ms": "Bila",
     "imageUrl": "https://static.arasaac.org/pictograms/32874/32874_300.png",
     "categoryId": "time"
   },
@@ -1308,6 +1471,7 @@
     "word_id": "Kucing",
     "word_en": "Cat",
     "word_zh": "猫",
+    "word_ms": "Kucing",
     "imageUrl": "https://static.arasaac.org/pictograms/7114/7114_300.png",
     "categoryId": "animal"
   },
@@ -1316,6 +1480,7 @@
     "word_id": "Anjing",
     "word_en": "Dog",
     "word_zh": "狗",
+    "word_ms": "Anjing",
     "imageUrl": "https://static.arasaac.org/pictograms/7202/7202_300.png",
     "categoryId": "animal"
   },
@@ -1324,6 +1489,7 @@
     "word_id": "Burung",
     "word_en": "Bird",
     "word_zh": "鸟",
+    "word_ms": "Burung",
     "imageUrl": "https://static.arasaac.org/pictograms/2490/2490_300.png",
     "categoryId": "animal"
   },
@@ -1332,6 +1498,7 @@
     "word_id": "Sapi",
     "word_en": "Cow",
     "word_zh": "牛",
+    "word_ms": "Lembu",
     "imageUrl": "https://static.arasaac.org/pictograms/2609/2609_300.png",
     "categoryId": "animal"
   },
@@ -1340,6 +1507,7 @@
     "word_id": "Kambing",
     "word_en": "Goat",
     "word_zh": "山羊",
+    "word_ms": "Kambing",
     "imageUrl": "https://static.arasaac.org/pictograms/25887/25887_300.png",
     "categoryId": "animal"
   },
@@ -1348,6 +1516,7 @@
     "word_id": "Bebek",
     "word_en": "Duck",
     "word_zh": "鸭子",
+    "word_ms": "Itik",
     "imageUrl": "https://static.arasaac.org/pictograms/28479/28479_300.png",
     "categoryId": "animal"
   },
@@ -1356,6 +1525,7 @@
     "word_id": "Kuda",
     "word_en": "Horse",
     "word_zh": "马",
+    "word_ms": "Kuda",
     "imageUrl": "https://static.arasaac.org/pictograms/2294/2294_300.png",
     "categoryId": "animal"
   },
@@ -1364,6 +1534,7 @@
     "word_id": "Kelinci",
     "word_en": "Rabbit",
     "word_zh": "兔子",
+    "word_ms": "Arnab",
     "imageUrl": "https://static.arasaac.org/pictograms/2351/2351_300.png",
     "categoryId": "animal"
   },
@@ -1372,6 +1543,7 @@
     "word_id": "Monyet",
     "word_en": "Monkey",
     "word_zh": "猴子",
+    "word_ms": "Monyet",
     "imageUrl": "https://static.arasaac.org/pictograms/2477/2477_300.png",
     "categoryId": "animal"
   },
@@ -1380,6 +1552,7 @@
     "word_id": "Gajah",
     "word_en": "Elephant",
     "word_zh": "大象",
+    "word_ms": "Gajah",
     "imageUrl": "https://static.arasaac.org/pictograms/2372/2372_300.png",
     "categoryId": "animal"
   },
@@ -1388,6 +1561,7 @@
     "word_id": "Harimau",
     "word_en": "Tiger",
     "word_zh": "老虎",
+    "word_ms": "Harimau",
     "imageUrl": "https://static.arasaac.org/pictograms/2590/2590_300.png",
     "categoryId": "animal"
   },
@@ -1396,6 +1570,7 @@
     "word_id": "Ular",
     "word_en": "Snake",
     "word_zh": "蛇",
+    "word_ms": "Ular",
     "imageUrl": "https://static.arasaac.org/pictograms/2568/2568_300.png",
     "categoryId": "animal"
   },
@@ -1404,6 +1579,7 @@
     "word_id": "Kupu-kupu",
     "word_en": "Butterfly",
     "word_zh": "蝴蝶",
+    "word_ms": "Rama-Rama",
     "imageUrl": "https://static.arasaac.org/pictograms/26200/26200_300.png",
     "categoryId": "animal"
   },
@@ -1412,6 +1588,7 @@
     "word_id": "Ayam Jantan",
     "word_en": "Rooster",
     "word_zh": "公鸡",
+    "word_ms": "Ayam Jantan",
     "imageUrl": "https://static.arasaac.org/pictograms/2404/2404_300.png",
     "categoryId": "animal"
   },
@@ -1420,6 +1597,7 @@
     "word_id": "Kura-kura",
     "word_en": "Turtle",
     "word_zh": "乌龟",
+    "word_ms": "Kura-Kura",
     "imageUrl": "https://static.arasaac.org/pictograms/10241/10241_300.png",
     "categoryId": "animal"
   },
@@ -1428,6 +1606,7 @@
     "word_id": "Baju",
     "word_en": "Shirt",
     "word_zh": "上衣",
+    "word_ms": "Baju",
     "imageUrl": "https://static.arasaac.org/pictograms/13640/13640_300.png",
     "categoryId": "clothing"
   },
@@ -1436,6 +1615,7 @@
     "word_id": "Celana",
     "word_en": "Pants",
     "word_zh": "裤子",
+    "word_ms": "Seluar",
     "imageUrl": "https://static.arasaac.org/pictograms/7193/7193_300.png",
     "categoryId": "clothing"
   },
@@ -1444,6 +1624,7 @@
     "word_id": "Sepatu",
     "word_en": "Shoes",
     "word_zh": "鞋",
+    "word_ms": "Kasut",
     "imageUrl": "https://static.arasaac.org/pictograms/2775/2775_300.png",
     "categoryId": "clothing"
   },
@@ -1452,6 +1633,7 @@
     "word_id": "Kaos Kaki",
     "word_en": "Socks",
     "word_zh": "袜子",
+    "word_ms": "Stokin",
     "imageUrl": "https://static.arasaac.org/pictograms/2298/2298_300.png",
     "categoryId": "clothing"
   },
@@ -1460,6 +1642,7 @@
     "word_id": "Topi",
     "word_en": "Hat",
     "word_zh": "帽子",
+    "word_ms": "Topi",
     "imageUrl": "https://static.arasaac.org/pictograms/2572/2572_300.png",
     "categoryId": "clothing"
   },
@@ -1468,6 +1651,7 @@
     "word_id": "Jaket",
     "word_en": "Jacket",
     "word_zh": "夹克",
+    "word_ms": "Jaket",
     "imageUrl": "https://static.arasaac.org/pictograms/4872/4872_300.png",
     "categoryId": "clothing"
   },
@@ -1476,6 +1660,7 @@
     "word_id": "Rok",
     "word_en": "Skirt",
     "word_zh": "裙子",
+    "word_ms": "Rok",
     "imageUrl": "https://static.arasaac.org/pictograms/2391/2391_300.png",
     "categoryId": "clothing"
   },
@@ -1484,6 +1669,7 @@
     "word_id": "Kemeja",
     "word_en": "Shirt",
     "word_zh": "衬衫",
+    "word_ms": "Kemeja",
     "imageUrl": "https://static.arasaac.org/pictograms/13640/13640_300.png",
     "categoryId": "clothing"
   },
@@ -1492,6 +1678,7 @@
     "word_id": "Sandal",
     "word_en": "Sandals",
     "word_zh": "凉鞋",
+    "word_ms": "Sandal",
     "imageUrl": "https://static.arasaac.org/pictograms/2556/2556_300.png",
     "categoryId": "clothing"
   },
@@ -1500,6 +1687,7 @@
     "word_id": "Sarung Tangan",
     "word_en": "Gloves",
     "word_zh": "手套",
+    "word_ms": "Sarung Tangan",
     "imageUrl": "https://static.arasaac.org/pictograms/2415/2415_300.png",
     "categoryId": "clothing"
   },
@@ -1508,6 +1696,7 @@
     "word_id": "Syal",
     "word_en": "Scarf",
     "word_zh": "围巾",
+    "word_ms": "Syal",
     "imageUrl": "https://static.arasaac.org/pictograms/2290/2290_300.png",
     "categoryId": "clothing"
   },
@@ -1516,6 +1705,7 @@
     "word_id": "Kacamata",
     "word_en": "Glasses",
     "word_zh": "眼镜",
+    "word_ms": "Cermin Mata",
     "imageUrl": "https://static.arasaac.org/pictograms/3329/3329_300.png",
     "categoryId": "clothing"
   },
@@ -1524,6 +1714,7 @@
     "word_id": "Tas",
     "word_en": "Bag",
     "word_zh": "包",
+    "word_ms": "Beg",
     "imageUrl": "https://static.arasaac.org/pictograms/23849/23849_300.png",
     "categoryId": "clothing"
   },
@@ -1532,6 +1723,7 @@
     "word_id": "Jam Tangan",
     "word_en": "Watch",
     "word_zh": "手表",
+    "word_ms": "Jam Tangan",
     "imageUrl": "https://static.arasaac.org/pictograms/2549/2549_300.png",
     "categoryId": "clothing"
   },
@@ -1540,6 +1732,7 @@
     "word_id": "Celana Pendek",
     "word_en": "Shorts",
     "word_zh": "短裤",
+    "word_ms": "Seluar Pendek",
     "imageUrl": "https://static.arasaac.org/pictograms/10142/10142_300.png",
     "categoryId": "clothing"
   },
@@ -1548,6 +1741,7 @@
     "word_id": "Merah",
     "word_en": "Red",
     "word_zh": "红色",
+    "word_ms": "Merah",
     "imageUrl": "https://static.arasaac.org/pictograms/2808/2808_300.png",
     "categoryId": "color"
   },
@@ -1556,6 +1750,7 @@
     "word_id": "Biru",
     "word_en": "Blue",
     "word_zh": "蓝色",
+    "word_ms": "Biru",
     "imageUrl": "https://static.arasaac.org/pictograms/4869/4869_300.png",
     "categoryId": "color"
   },
@@ -1564,6 +1759,7 @@
     "word_id": "Kuning",
     "word_en": "Yellow",
     "word_zh": "黄色",
+    "word_ms": "Kuning",
     "imageUrl": "https://static.arasaac.org/pictograms/2648/2648_300.png",
     "categoryId": "color"
   },
@@ -1572,6 +1768,7 @@
     "word_id": "Hijau",
     "word_en": "Green",
     "word_zh": "绿色",
+    "word_ms": "Hijau",
     "imageUrl": "https://static.arasaac.org/pictograms/4887/4887_300.png",
     "categoryId": "color"
   },
@@ -1580,6 +1777,7 @@
     "word_id": "Hitam",
     "word_en": "Black",
     "word_zh": "黑色",
+    "word_ms": "Hitam",
     "imageUrl": "https://static.arasaac.org/pictograms/2886/2886_300.png",
     "categoryId": "color"
   },
@@ -1588,6 +1786,7 @@
     "word_id": "Putih",
     "word_en": "White",
     "word_zh": "白色",
+    "word_ms": "Putih",
     "imageUrl": "https://static.arasaac.org/pictograms/8043/8043_300.png",
     "categoryId": "color"
   },
@@ -1596,6 +1795,7 @@
     "word_id": "Coklat",
     "word_en": "Brown",
     "word_zh": "棕色",
+    "word_ms": "Coklat",
     "imageUrl": "https://static.arasaac.org/pictograms/2923/2923_300.png",
     "categoryId": "color"
   },
@@ -1604,6 +1804,7 @@
     "word_id": "Ungu",
     "word_en": "Purple",
     "word_zh": "紫色",
+    "word_ms": "Ungu",
     "imageUrl": "https://static.arasaac.org/pictograms/2907/2907_300.png",
     "categoryId": "color"
   },
@@ -1612,6 +1813,7 @@
     "word_id": "Oranye",
     "word_en": "Orange",
     "word_zh": "橙色",
+    "word_ms": "Oren",
     "imageUrl": "https://static.arasaac.org/pictograms/2888/2888_300.png",
     "categoryId": "color"
   },
@@ -1620,6 +1822,7 @@
     "word_id": "Pink",
     "word_en": "Pink",
     "word_zh": "粉色",
+    "word_ms": "Pink",
     "imageUrl": "https://static.arasaac.org/pictograms/2807/2807_300.png",
     "categoryId": "color"
   },
@@ -1628,6 +1831,7 @@
     "word_id": "Abu-abu",
     "word_en": "Gray",
     "word_zh": "灰色",
+    "word_ms": "Kelabu",
     "imageUrl": "https://static.arasaac.org/pictograms/3340/3340_300.png",
     "categoryId": "color"
   },
@@ -1636,6 +1840,7 @@
     "word_id": "Duduk",
     "word_en": "Sit",
     "word_zh": "坐",
+    "word_ms": "Duduk",
     "imageUrl": "https://static.arasaac.org/pictograms/6611/6611_300.png",
     "categoryId": "verb"
   },
@@ -1644,6 +1849,7 @@
     "word_id": "Berdiri",
     "word_en": "Stand",
     "word_zh": "站",
+    "word_ms": "Berdiri",
     "imageUrl": "https://static.arasaac.org/pictograms/13370/13370_300.png",
     "categoryId": "verb"
   },
@@ -1652,6 +1858,7 @@
     "word_id": "Lari",
     "word_en": "Run",
     "word_zh": "跑",
+    "word_ms": "Lari",
     "imageUrl": "https://static.arasaac.org/pictograms/6465/6465_300.png",
     "categoryId": "verb"
   },
@@ -1660,6 +1867,7 @@
     "word_id": "Jalan",
     "word_en": "Walk",
     "word_zh": "走路",
+    "word_ms": "Berjalan",
     "imageUrl": "https://static.arasaac.org/pictograms/29951/29951_300.png",
     "categoryId": "verb"
   },
@@ -1668,6 +1876,7 @@
     "word_id": "Lompat",
     "word_en": "Jump",
     "word_zh": "跳",
+    "word_ms": "Lompat",
     "imageUrl": "https://static.arasaac.org/pictograms/39052/39052_300.png",
     "categoryId": "verb"
   },
@@ -1676,6 +1885,7 @@
     "word_id": "Menangis",
     "word_en": "Cry",
     "word_zh": "哭",
+    "word_ms": "Menangis",
     "imageUrl": "https://static.arasaac.org/pictograms/7147/7147_300.png",
     "categoryId": "verb"
   },
@@ -1684,6 +1894,7 @@
     "word_id": "Tertawa",
     "word_en": "Laugh",
     "word_zh": "笑",
+    "word_ms": "Ketawa",
     "imageUrl": "https://static.arasaac.org/pictograms/13354/13354_300.png",
     "categoryId": "verb"
   },
@@ -1692,6 +1903,7 @@
     "word_id": "Menulis",
     "word_en": "Write",
     "word_zh": "写",
+    "word_ms": "Menulis",
     "imageUrl": "https://static.arasaac.org/pictograms/2380/2380_300.png",
     "categoryId": "verb"
   },
@@ -1700,6 +1912,7 @@
     "word_id": "Membaca",
     "word_en": "Read",
     "word_zh": "读",
+    "word_ms": "Membaca",
     "imageUrl": "https://static.arasaac.org/pictograms/7141/7141_300.png",
     "categoryId": "verb"
   },
@@ -1708,6 +1921,7 @@
     "word_id": "Menyanyi",
     "word_en": "Sing",
     "word_zh": "唱歌",
+    "word_ms": "Menyanyi",
     "imageUrl": "https://static.arasaac.org/pictograms/6960/6960_300.png",
     "categoryId": "verb"
   },
@@ -1716,6 +1930,7 @@
     "word_id": "Menari",
     "word_en": "Dance",
     "word_zh": "跳舞",
+    "word_ms": "Menari",
     "imageUrl": "https://static.arasaac.org/pictograms/35747/35747_300.png",
     "categoryId": "verb"
   },
@@ -1724,6 +1939,7 @@
     "word_id": "Takut",
     "word_en": "Scared",
     "word_zh": "害怕",
+    "word_ms": "Takut",
     "imageUrl": "https://static.arasaac.org/pictograms/35535/35535_300.png",
     "categoryId": "emotion"
   },
@@ -1732,6 +1948,7 @@
     "word_id": "Kaget",
     "word_en": "Surprised",
     "word_zh": "惊讶",
+    "word_ms": "Terkejut",
     "imageUrl": "https://static.arasaac.org/pictograms/35529/35529_300.png",
     "categoryId": "emotion"
   },
@@ -1740,6 +1957,7 @@
     "word_id": "Malu",
     "word_en": "Shy",
     "word_zh": "害羞",
+    "word_ms": "Malu",
     "imageUrl": "https://static.arasaac.org/pictograms/8707/8707_300.png",
     "categoryId": "emotion"
   },
@@ -1748,6 +1966,7 @@
     "word_id": "Bosan",
     "word_en": "Bored",
     "word_zh": "无聊",
+    "word_ms": "Bosan",
     "imageUrl": "https://static.arasaac.org/pictograms/35531/35531_300.png",
     "categoryId": "emotion"
   },
@@ -1756,6 +1975,7 @@
     "word_id": "Tenang",
     "word_en": "Calm",
     "word_zh": "平静",
+    "word_ms": "Tenang",
     "imageUrl": "https://static.arasaac.org/pictograms/31310/31310_300.png",
     "categoryId": "emotion"
   },
@@ -1764,6 +1984,7 @@
     "word_id": "Cepat",
     "word_en": "Fast",
     "word_zh": "快",
+    "word_ms": "Cepat",
     "imageUrl": "https://static.arasaac.org/pictograms/5306/5306_300.png",
     "categoryId": "emotion"
   },
@@ -1772,6 +1993,7 @@
     "word_id": "Lambat",
     "word_en": "Slow",
     "word_zh": "慢",
+    "word_ms": "Lambat",
     "imageUrl": "https://static.arasaac.org/pictograms/4676/4676_300.png",
     "categoryId": "emotion"
   },
@@ -1780,6 +2002,7 @@
     "word_id": "Tinggi",
     "word_en": "Tall",
     "word_zh": "高",
+    "word_ms": "Tinggi",
     "imageUrl": "https://static.arasaac.org/pictograms/25782/25782_300.png",
     "categoryId": "emotion"
   },
@@ -1788,6 +2011,7 @@
     "word_id": "Pendek",
     "word_en": "Short",
     "word_zh": "矮",
+    "word_ms": "Pendek",
     "imageUrl": "https://static.arasaac.org/pictograms/26002/26002_300.png",
     "categoryId": "emotion"
   },
@@ -1796,6 +2020,7 @@
     "word_id": "Baru",
     "word_en": "New",
     "word_zh": "新",
+    "word_ms": "Baru",
     "imageUrl": "https://static.arasaac.org/pictograms/11316/11316_300.png",
     "categoryId": "emotion"
   },
@@ -1804,6 +2029,7 @@
     "word_id": "Meja",
     "word_en": "Table",
     "word_zh": "桌子",
+    "word_ms": "Meja",
     "imageUrl": "https://static.arasaac.org/pictograms/3129/3129_300.png",
     "categoryId": "noun"
   },
@@ -1812,6 +2038,7 @@
     "word_id": "Kursi",
     "word_en": "Chair",
     "word_zh": "椅子",
+    "word_ms": "Kerusi",
     "imageUrl": "https://static.arasaac.org/pictograms/3155/3155_300.png",
     "categoryId": "noun"
   },
@@ -1820,6 +2047,7 @@
     "word_id": "Pintu",
     "word_en": "Door",
     "word_zh": "门",
+    "word_ms": "Pintu",
     "imageUrl": "https://static.arasaac.org/pictograms/3244/3244_300.png",
     "categoryId": "noun"
   },
@@ -1828,6 +2056,7 @@
     "word_id": "Jendela",
     "word_en": "Window",
     "word_zh": "窗户",
+    "word_ms": "Tingkap",
     "imageUrl": "https://static.arasaac.org/pictograms/2611/2611_300.png",
     "categoryId": "noun"
   },
@@ -1836,6 +2065,7 @@
     "word_id": "Lampu",
     "word_en": "Lamp",
     "word_zh": "灯",
+    "word_ms": "Lampu",
     "imageUrl": "https://static.arasaac.org/pictograms/4936/4936_300.png",
     "categoryId": "noun"
   },
@@ -1844,6 +2074,7 @@
     "word_id": "Televisi",
     "word_en": "TV",
     "word_zh": "电视",
+    "word_ms": "Televisyen",
     "imageUrl": "https://static.arasaac.org/pictograms/25498/25498_300.png",
     "categoryId": "noun"
   },
@@ -1852,6 +2083,7 @@
     "word_id": "Telepon",
     "word_en": "Phone",
     "word_zh": "电话",
+    "word_ms": "Telefon",
     "imageUrl": "https://static.arasaac.org/pictograms/26479/26479_300.png",
     "categoryId": "noun"
   },
@@ -1860,6 +2092,7 @@
     "word_id": "Kunci",
     "word_en": "Key",
     "word_zh": "钥匙",
+    "word_ms": "Kunci",
     "imageUrl": "https://static.arasaac.org/pictograms/8153/8153_300.png",
     "categoryId": "noun"
   },
@@ -1868,6 +2101,7 @@
     "word_id": "Gelas",
     "word_en": "Cup",
     "word_zh": "杯子",
+    "word_ms": "Gelas",
     "imageUrl": "https://static.arasaac.org/pictograms/2582/2582_300.png",
     "categoryId": "noun"
   },
@@ -1876,6 +2110,7 @@
     "word_id": "Piring",
     "word_en": "Plate",
     "word_zh": "盘子",
+    "word_ms": "Piring",
     "imageUrl": "https://static.arasaac.org/pictograms/16857/16857_300.png",
     "categoryId": "noun"
   },
@@ -1884,6 +2119,7 @@
     "word_id": "Selamat",
     "word_en": "Well done",
     "word_zh": "真棒",
+    "word_ms": "Syabas",
     "imageUrl": "https://static.arasaac.org/pictograms/35875/35875_300.png",
     "categoryId": "social"
   },
@@ -1892,6 +2128,7 @@
     "word_id": "Hati-hati",
     "word_en": "Careful",
     "word_zh": "小心",
+    "word_ms": "Berhati-Hati",
     "imageUrl": "https://static.arasaac.org/pictograms/25618/25618_300.png",
     "categoryId": "social"
   },
@@ -1900,6 +2137,7 @@
     "word_id": "Boleh",
     "word_en": "May",
     "word_zh": "可以",
+    "word_ms": "Boleh",
     "imageUrl": "https://static.arasaac.org/pictograms/6559/6559_300.png",
     "categoryId": "social"
   },
@@ -1908,6 +2146,7 @@
     "word_id": "Jangan",
     "word_en": "Don't",
     "word_zh": "不要",
+    "word_ms": "Jangan",
     "imageUrl": "https://static.arasaac.org/pictograms/37827/37827_300.png",
     "categoryId": "social"
   },
@@ -1916,6 +2155,7 @@
     "word_id": "Bantu",
     "word_en": "Help me",
     "word_zh": "帮助",
+    "word_ms": "Bantu",
     "imageUrl": "https://static.arasaac.org/pictograms/32648/32648_300.png",
     "categoryId": "social"
   },
@@ -1924,6 +2164,7 @@
     "word_id": "Ini",
     "word_en": "This",
     "word_zh": "这个",
+    "word_ms": "Ini",
     "imageUrl": "https://static.arasaac.org/pictograms/7095/7095_300.png",
     "categoryId": "pronoun"
   },
@@ -1932,6 +2173,7 @@
     "word_id": "Itu",
     "word_en": "That",
     "word_zh": "那个",
+    "word_ms": "Itu",
     "imageUrl": "https://static.arasaac.org/pictograms/6906/6906_300.png",
     "categoryId": "pronoun"
   },
@@ -1940,6 +2182,7 @@
     "word_id": "Sendiri",
     "word_en": "Myself",
     "word_zh": "自己",
+    "word_ms": "Sendiri",
     "imageUrl": "https://static.arasaac.org/pictograms/30642/30642_300.png",
     "categoryId": "pronoun"
   },
@@ -1948,6 +2191,7 @@
     "word_id": "Semua",
     "word_en": "All",
     "word_zh": "全部",
+    "word_ms": "Semua",
     "imageUrl": "https://static.arasaac.org/pictograms/5596/5596_300.png",
     "categoryId": "pronoun"
   }

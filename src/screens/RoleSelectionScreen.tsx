@@ -169,7 +169,7 @@ export default function RoleSelectionScreen() {
 
   const [showLanguageModal, setShowLanguageModal] = useState(false);
 
-  const handleLanguageSelect = (lang: 'id' | 'en' | 'zh') => {
+  const handleLanguageSelect = (lang: 'id' | 'en' | 'zh' | 'ms') => {
     setLanguage(lang);
     setShowLanguageModal(false);
   };

@@ -121,6 +121,7 @@ export const zh: Record<TranslationKey, string> = {
   'aac.langNameId': '印尼语',
   'aac.langNameEn': '英语',
   'aac.langNameZh': '中文',
+  'aac.langNameMs': '马来语',
   'aac.placeholder': '例如：{word}',
   'aac.greeting': '你好，{name}！',
   'aac.headerGreeting': '你好，{name}！',
@@ -189,6 +190,17 @@ export const zh: Record<TranslationKey, string> = {
   'paywall.toastNotVerified': '尚未验证',
   'paywall.toastNotVerifiedDesc': '如果支付已完成，请稍候并再次检查。',
   'paywall.toastAccountNotReady': '账户尚未完成设置。',
+
+  // ── Paywall: browser checkout (multi-provider) ────────────────────────────
+  'paywall.preparing': '正在准备支付页面…',
+  'paywall.browserCta': '通过浏览器订阅',
+  'paywall.browserSubtitle': '在打开的浏览器页面中选择套餐并支付（QRIS、DuitNow、FPX）。',
+  'paywall.browserWaiting': '等待支付…',
+  'paywall.browserWaitingDesc': '请在已打开的浏览器中完成支付。支付成功后，高级版将自动解锁。',
+  'paywall.browserCheckStatus': '我已支付 — 检查状态',
+  'paywall.browserReopen': '重新打开支付页面',
+  'paywall.toastBrowserFailedTitle': '浏览器不可用',
+  'paywall.toastBrowserFailed': '无法打开支付页面。请确认设备已安装浏览器。',
 
   // ── Parent Strict Lock ────────────────────────────────────────────────────
   'lock.offlineTitle': '连接已断开',

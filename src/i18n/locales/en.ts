@@ -121,6 +121,7 @@ export const en: Record<TranslationKey, string> = {
   'aac.langNameId': 'Indonesian',
   'aac.langNameEn': 'English',
   'aac.langNameZh': 'Mandarin',
+  'aac.langNameMs': 'Malay',
   'aac.placeholder': 'Example: {word}',
   'aac.greeting': 'Hello {name}!',
   'aac.headerGreeting': 'Hi, {name}!',
@@ -189,6 +190,17 @@ export const en: Record<TranslationKey, string> = {
   'paywall.toastNotVerified': 'Not Verified',
   'paywall.toastNotVerifiedDesc': 'If the payment is complete, wait a moment and check again.',
   'paywall.toastAccountNotReady': 'Account setup is not complete yet.',
+
+  // ── Paywall: browser checkout (multi-provider) ────────────────────────────
+  'paywall.preparing': 'Preparing the payment page…',
+  'paywall.browserCta': 'Subscribe via Browser',
+  'paywall.browserSubtitle': 'Choose a plan & pay (QRIS, DuitNow, FPX) in the browser window that opens.',
+  'paywall.browserWaiting': 'Waiting for Payment…',
+  'paywall.browserWaitingDesc': 'Complete the payment in the opened browser. Premium unlocks automatically once it settles.',
+  'paywall.browserCheckStatus': "I've Paid — Check Status",
+  'paywall.browserReopen': 'Reopen Payment Page',
+  'paywall.toastBrowserFailedTitle': 'Browser Unavailable',
+  'paywall.toastBrowserFailed': 'Could not open the payment page. Make sure a browser is installed.',
 
   // ── Parent Strict Lock ────────────────────────────────────────────────────
   'lock.offlineTitle': 'Connection Lost',

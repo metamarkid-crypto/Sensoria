@@ -125,6 +125,7 @@ export const id = {
   'aac.langNameId': 'Indonesia',
   'aac.langNameEn': 'English',
   'aac.langNameZh': 'Mandarin',
+  'aac.langNameMs': 'Melayu',
   'aac.placeholder': 'Contoh: {word}',
   'aac.greeting': 'Halo {name}!',
   'aac.headerGreeting': 'Hai, {name}!',
@@ -193,6 +194,17 @@ export const id = {
   'paywall.toastNotVerified': 'Belum Terverifikasi',
   'paywall.toastNotVerifiedDesc': 'Jika pembayaran sudah selesai, tunggu sebentar lalu periksa lagi.',
   'paywall.toastAccountNotReady': 'Akun belum selesai disiapkan.',
+
+  // ── Paywall: browser checkout (multi-provider) ────────────────────────────
+  'paywall.preparing': 'Menyiapkan halaman pembayaran…',
+  'paywall.browserCta': 'Langganan lewat Browser',
+  'paywall.browserSubtitle': 'Pilih paket & bayar (QRIS, DuitNow, FPX) di halaman browser yang terbuka.',
+  'paywall.browserWaiting': 'Menunggu Pembayaran…',
+  'paywall.browserWaitingDesc': 'Selesaikan pembayaran di browser yang terbuka. Status premium akan diperbarui otomatis setelah pembayaran berhasil.',
+  'paywall.browserCheckStatus': 'Saya Sudah Bayar — Periksa Status',
+  'paywall.browserReopen': 'Buka Lagi Halaman Pembayaran',
+  'paywall.toastBrowserFailedTitle': 'Browser Tidak Tersedia',
+  'paywall.toastBrowserFailed': 'Tidak dapat membuka halaman pembayaran. Pastikan ada aplikasi browser di perangkat.',
 
   // ── Parent Strict Lock ────────────────────────────────────────────────────
   'lock.offlineTitle': 'Koneksi Terputus',

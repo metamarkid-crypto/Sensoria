@@ -59,3 +59,14 @@ dev-server.log
 # binaries (adb.exe & co), runtime logs, and raw request dumps. The production
 # payment service lives in qris-api/ instead.
 go-merchant/
+
+# One-off QA artifacts from the ARASAAC pictogram audits — regenerable via
+# scripts/check-arasaac-urls.js, scripts/verify-arasaac-ids.js and
+# scripts/download-umum-500.js (~5.7 MB of throwaway output).
+scripts/*-report.json
+scripts/*-review.html
+scripts/arasaac-visual-check.html
+
+# Backup copies of generated data (e.g. arasaac.json.bak.orig — the tracked
+# original is always recoverable from git history).
+*.orig

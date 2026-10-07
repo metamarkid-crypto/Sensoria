@@ -245,6 +245,7 @@ export const syncCustomWordToCloud = async (
     word_id: word.word_id,
     word_en: word.word_en ?? null,
     word_zh: word.word_zh,
+    word_ms: word.word_ms ?? null,
     image_url: word.imageUrl ?? null,
     category_id: word.categoryId,
     is_favorite: word.isFavorite ? 1 : 0,

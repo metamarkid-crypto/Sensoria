@@ -43,7 +43,7 @@ export default function SettingsScreen() {
 
   // Current language label for the row subtitle.
   const languageLabel =
-    language === 'id' ? t('aac.langNameId') : language === 'en' ? t('aac.langNameEn') : t('aac.langNameZh');
+    language === 'id' ? t('aac.langNameId') : language === 'en' ? t('aac.langNameEn') : language === 'zh' ? t('aac.langNameZh') : t('aac.langNameMs');
 
   const MENU_ITEMS = [
     { id: 'profile', titleKey: 'settings.profile' as const, icon: 'person', type: 'Ionicons', action: () => navigation.navigate('UserProfile') },
