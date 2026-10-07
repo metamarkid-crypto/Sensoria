@@ -47,6 +47,7 @@
       "expo-sqlite",
       "expo-audio",
       "expo-secure-store",
+      "expo-web-browser",
       [
         "expo-location",
         {

@@ -24,6 +24,7 @@ const express = require('express');
 const QRCode = require('qrcode');
 const { staticToDynamic } = require('../emv');
 const { instantVerify } = require('../settle');
+const { createCheckoutToken } = require('../checkoutToken');
 
 const router = express.Router();
 
@@ -188,7 +189,57 @@ function toStatusBody(order) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// POST /api/checkout-session — browser-checkout session mint
+// ---------------------------------------------------------------------------
+
+/**
+ * Mint a short-lived, signed checkout TOKEN for the BROWSER payment page.
+ *
+ * Flow (multi-provider, MY-ready):
+ *   app (HMAC) → POST {device_id, lang} → {url, token, expires_at}
+ *   app        → WebBrowser.openBrowserAsync(url)  [Chrome Custom Tabs]
+ *   browser    → GET /pay/:token → plans (server-priced) → provider pay
+ *
+ * The token binds the session to ONE child device uuid and expires — a
+ * shared/leaked link dies with the session. Lang only personalizes the page.
+ */
+async function checkoutSession(req, res, next) {
+  try {
+    const { device_id: deviceId, lang } = req.body || {};
+    const store = req.app.get('store');
+
+    if (!deviceId || !UUID_RE.test(String(deviceId))) {
+      return res.status(400).json({ error: 'BAD_REQUEST', message: 'device_id wajib diisi (uuid).' });
+    }
+
+    const device = await store.getChildDevice(store.db, deviceId);
+    if (!device) {
+      return res.status(404).json({ error: 'DEVICE_NOT_FOUND', message: 'Perangkat tidak ditemukan.' });
+    }
+    if (device.role !== 'Child') {
+      return res.status(403).json({ error: 'NOT_A_CHILD_DEVICE', message: 'Pembayaran hanya untuk perangkat anak.' });
+    }
+
+    // Same per-device abuse brake as the QRIS checkout.
+    const recent = await store.countRecentOrdersForDevice(store.db, deviceId);
+    if (recent >= MAX_OPEN_ORDERS) {
+      return res.status(429).json({ error: 'TOO_MANY_ORDERS', message: 'Terlalu banyak transaksi berjalan. Selesaikan atau tunggu sebelumnya.' });
+    }
+
+    const { token, expiresAt } = createCheckoutToken(deviceId, typeof lang === 'string' ? lang : 'id');
+    return res.status(201).json({
+      token,
+      url: `/pay/${token}`,
+      expires_at: expiresAt,
+    });
+  } catch (err) {
+    return next(err);
+  }
+}
+
 router.post('/qris-checkout', qrisCheckout);
 router.post('/qris-status', qrisStatus);
+router.post('/checkout-session', checkoutSession);
 
 module.exports = { router, qrisCheckout, qrisStatus, toStatusBody };

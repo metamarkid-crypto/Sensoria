@@ -28,6 +28,7 @@ const { createStore } = require('./src/store');
 const { hmacVerify } = require('./src/hmac');
 const mobileRoutes = require('./src/routes/mobile');
 const internalRoutes = require('./src/routes/internal');
+const webRoutes = require('./src/routes/web');
 
 /**
  * Build the full app. `opts.store` injects a store (tests); otherwise the
@@ -66,6 +67,15 @@ function buildApp(opts = {}) {
   const ipRateLimit = makeIpRateLimit();
   app.use('/api/qris-checkout', ipRateLimit);
   app.use('/api/qris-status', ipRateLimit);
+  app.use('/api/checkout-session', ipRateLimit);
+  app.use('/api/webhook/toyyibpay', ipRateLimit);
+
+  // -- browser checkout (NO HMAC: the page can never hold the APK secret) -----
+  // GET /pay/:token (signed session token) + POST /api/webhook/toyyibpay
+  // (gateway callback, MD5-verified inside the route). Mounted BEFORE the
+  // global /api HMAC gate — the webhook and page come from browsers/gateways,
+  // not the signed mobile client.
+  app.use('/', webRoutes.router);
 
   // -- raw body → HMAC → routes ------------------------------------------------
   // Mobile mount: signed with QRIS_API_SECRET (the APK-embedded secret). This
@@ -261,6 +271,25 @@ if (require.main === module) {
     const worker = createWorker();
     worker.start();
     console.log('[qris-api] worker attached to HTTP process');
+  }
+
+  // Multi-provider hook: poll toyyibPay (MY) bills whose callback has not
+  // arrived — every 30 s over the same node-cron tick as the QRIS worker.
+  if (!/^(1|true|yes)$/i.test(process.env.TP_POLL_DISABLED || '')) {
+    const nodeCron = require('node-cron');
+    const providers = require('./src/providers');
+    const store = app.get('store');
+    nodeCron.schedule(process.env.TP_POLL_CRON || '*/30 * * * * *', async () => {
+      try {
+        const orders = await store.listPendingProviderOrders(store.db, 'toyyibpay');
+        for (const order of orders) {
+          await providers.pollToyyibPayOrder(store, store.db, order);
+        }
+      } catch (err) {
+        console.error('[qris-api] toyyibPay poll gagal:', err.message);
+      }
+    });
+    console.log('[qris-api] toyyibPay poller attached (MY orders)');
   }
 }
 

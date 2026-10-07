@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -6,39 +6,46 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   ScrollView,
-  Image,
+  AppState,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { FontAwesome5 } from '@expo/vector-icons';
+import * as WebBrowser from 'expo-web-browser';
 import Toast from 'react-native-toast-message';
 import { useAACStore } from '../store/useAACStore';
-import {
-  createQrisCheckout,
-  checkQrisStatus,
-  fetchActivePlans,
-} from '../services/db/paywall';
+import { createCheckoutSession } from '../services/db/paywall';
 import { computeRenewalPreview } from '../services/db/entitlement';
 import { useAccessibleAction } from '../hooks/useAccessibleAction';
 import { useTranslation } from '../i18n';
-import type { SubscriptionPlanRow } from '../services/db/types';
 
 /**
- * PaywallScreen — Stealth QRIS Subscription UI (Master Blueprint).
+ * PaywallScreen — Browser Checkout (multi-provider, Master Blueprint).
  *
  * Rendered as a full-screen modal from the Root Stack when a gated feature is
  * hit while `isPremium === false` (or the trial has expired).
  *
  * Two operating modes, driven by `app_settings.web_payment_active`:
  *   • false (App Review) → generic "coming soon" breakdown, NO pricing/payment.
- *   • true  (Live)       → Combo plans (1/6/12 bln) from `plans`, then a native
- *                          QRIS checkout: POST to our backend → render QR →
- *                          manual "Saya Sudah Membayar" → refreshEntitlement().
+ *   • true  (Live)       → one CTA opens the SYSTEM BROWSER on our backend's
+ *                          checkout page (/pay/<token>). The PAGE — not the
+ *                          app — lists the Combo plans (1/6/12 bln) and the
+ *                          payment providers per region (QRIS for Indonesia,
+ *                          DuitNow QR / FPX / card via toyyibPay for Malaysia).
  *
- * No payment-gateway SDKs are involved anywhere.
+ * WHY a browser (not in-app QR): one backend page serves BOTH countries and
+ * every provider it lists stays outside the binary — no payment-gateway SDKs,
+ * no app update to change a price or add a channel. The checkout session is a
+ * short-lived signed token binding the purchase to THIS child's uuid, so
+ * entitlements stay consistent no matter which linked parent's device opens
+ * the link.
+ *
+ * After the browser closes (or the app regains focus) we re-read
+ * `refreshEntitlement()` — the subscriptions table is the single source of
+ * truth; a "Saya Sudah Bayar" nudge re-checks on demand.
  */
 
-type FlowStage = 'idle' | 'requesting' | 'qr' | 'verifying';
+type FlowStage = 'idle' | 'requesting' | 'waiting' | 'verifying';
 
 const MONTHS_ID = [
   'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
@@ -52,10 +59,6 @@ const PERKS = [
   { icon: 'shield-alt', textKey: 'paywall.perk4' },
 ] as const;
 
-/** Rp 1.234.567 — Indonesian thousands separator, no Intl dependency. */
-const formatRupiah = (value: number) =>
-  `Rp${Math.round(value).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')}`;
-
 const formatDate = (iso: string | null): string => {
   if (!iso) return '';
   const d = new Date(iso);
@@ -65,43 +68,45 @@ const formatDate = (iso: string | null): string => {
 
 export default function PaywallScreen() {
   const navigation = useNavigation<any>();
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const deviceId = useAACStore((s) => s.deviceId);
   const premium = useAACStore((s) => s.premium);
   const refreshEntitlement = useAACStore((s) => s.refreshEntitlement);
 
-  // --- Data load (kill-switch + active plans) ---
-  // The kill-switch is SHARED store state, refreshed by the app lifecycle on
-  // boot and every foreground resume (see App.tsx / useAACStore) — this screen
-  // no longer holds its own copy, so Home banner / Settings row / Paywall can
-  // never disagree. Fails safe: unknown state ⇒ review mode, never pricing.
+  // --- Data (kill-switch is SHARED store state, refreshed on boot/foreground;
+  //     fails safe: unknown state ⇒ review mode, never pricing) ---
   const [booting, setBooting] = useState(true);
   const webPaymentActive = useAACStore((s) => s.webPaymentActive);
   const webPaymentLoaded = useAACStore((s) => s.webPaymentLoaded);
-  const [plans, setPlans] = useState<SubscriptionPlanRow[]>([]);
 
-  // --- Checkout flow ---
+  // --- Browser checkout flow ---
   const [stage, setStage] = useState<FlowStage>('idle');
-  const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlanRow | null>(null);
-  const [qrImageUri, setQrImageUri] = useState<string | null>(null);
-  const [orderId, setOrderId] = useState<string | null>(null);
-  const [qrExpiresAt, setQrExpiresAt] = useState<string | null>(null);
-  const [verifyPending, setVerifyPending] = useState(false);
+  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
 
   // Renewal mode: a premium user pressing the Upgrade/Perpanjang CTA on the
-  // success view reopens the plan list (normally that view has no exit into
-  // plans — it renders whenever isPremium && stage === 'idle').
+  // success view re-enters the checkout flow (normally that view has no exit
+  // into it — it renders whenever isPremium && stage === 'idle').
   const [renewalMode, setRenewalMode] = useState(false);
+
+  // Re-check entitlement when the app comes back to the foreground while a
+  // checkout session is out in the browser (user paid → premium flips on).
+  const appStateSub = useRef<{ remove: () => void } | null>(null);
+  useEffect(() => {
+    if (stage !== 'waiting') {
+      appStateSub.current?.remove();
+      appStateSub.current = null;
+      return;
+    }
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void handleCheckStatus(false);
+    });
+    appStateSub.current = sub;
+    return () => sub.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage]);
 
   const load = useCallback(async () => {
     if (!webPaymentLoaded) return; // kill-switch not resolved yet
-    setBooting(true);
-    if (webPaymentActive) {
-      const activePlans = await fetchActivePlans();
-      setPlans(activePlans);
-    } else {
-      setPlans([]);
-    }
     setBooting(false);
   }, [webPaymentActive, webPaymentLoaded]);
 
@@ -111,27 +116,58 @@ export default function PaywallScreen() {
 
   const goBack = () => navigation.goBack();
 
-  const handleSelectPlan = async (plan: SubscriptionPlanRow) => {
+  /**
+   * Open the SYSTEM BROWSER on the backend checkout page.
+   *
+   * Session = POST /api/checkout-session (HMAC) → { url: /pay/<token> } where
+   * the token is a short-lived signature binding the checkout to THIS child's
+   * uuid + the app language. Plan & provider selection happen ON THE PAGE —
+   * the app never lists prices again.
+   */
+  const handleOpenBrowser = async () => {
     if (!deviceId) {
       Toast.show({ type: 'error', text1: t('common.failed'), text2: t('paywall.toastAccountNotReady'), position: 'top' });
       return;
     }
-    setSelectedPlan(plan);
     setStage('requesting');
-    setVerifyPending(false);
     try {
-      const result = await createQrisCheckout(deviceId, plan.id);
-      setQrImageUri(result.imageUri);
-      setOrderId(result.orderId);
-      setQrExpiresAt(result.qrisExpiresAt);
-      setStage('qr');
+      const session = await createCheckoutSession(deviceId, language);
+      setCheckoutUrl(session.url);
+      setStage('waiting');
+      await WebBrowser.openBrowserAsync(session.url, { enableBarCollapsing: true });
+      // Browser closed without a focus event firing (edge): nudge one re-read.
+      await refreshEntitlement();
+      const isPremiumNow = useAACStore.getState().premium.isPremium;
+      if (isPremiumNow) {
+        Toast.show({ type: 'success', text1: t('paywall.toastPaid'), text2: t('paywall.toastPaidDesc'), position: 'top' });
+        setStage('idle');
+        setTimeout(goBack, 900);
+      } else if (useAACStore.getState().webPaymentActive) {
+        setStage('waiting');
+      } else {
+        setStage('idle');
+      }
     } catch (e) {
       setStage('idle');
-      // paywall.ts throws stable error CODES (PAYMENT_SERVER_TIMEOUT /
-      // CHECKOUT_NO_QRIS) — map them to localized toasts. Anything else is a
-      // raw transport error (e.g. network) shown as-is.
       const code = e instanceof Error ? e.message : '';
-      const localizedCode = code === 'PAYMENT_SERVER_TIMEOUT' || code === 'CHECKOUT_NO_QRIS';
+      // WebBrowser throws when no browser app can handle the URL.
+      if (code.includes('ERR_WEB_BROWSER') || code.includes('ActivityNotFound')) {
+        Toast.show({
+          type: 'error',
+          text1: t('paywall.toastBrowserFailedTitle'),
+          text2: t('paywall.toastBrowserFailed'),
+          position: 'top',
+        });
+        return;
+      }
+      // paywall.ts throws stable error CODES (PAYMENT_SERVER_TIMEOUT /
+      // CHECKOUT_NO_URL / QRIS_SIGNATURE_REJECTED) — map them to localized
+      // toasts. Anything else is a raw transport error shown as-is.
+      const localizedCode =
+        code === 'PAYMENT_SERVER_TIMEOUT' ||
+        code === 'CHECKOUT_NO_URL' ||
+        code === 'QRIS_SIGNATURE_REJECTED' ||
+        code === 'QRIS_API_SECRET_MISSING';
       Toast.show({
         type: 'error',
         text1: t('paywall.toastCheckoutFailed'),
@@ -142,53 +178,44 @@ export default function PaywallScreen() {
   };
 
   /**
-   * Manual verification — instant-verify FIRST (ask the backend to poll the
-   * merchant's GoBiz journals now and settle on a match), then re-read
-   * subscriptions. The ledger re-read stays the source of truth; the status
-   * call only nudges the backend so "Saya Sudah Membayar" settles within
-   * seconds instead of waiting for the worker's next cron sweep.
+   * Manual re-check ("Saya Sudah Bayar"): plain refreshEntitlement() re-read —
+   * the browser provider settles server-side (webhook + poller), so nothing
+   * to nudge here; the ledger is the source of truth.
    */
-  const handleVerifyPayment = async () => {
+  const handleCheckStatus = async (showToast = true) => {
     if (stage === 'verifying') return;
     setStage('verifying');
-    if (orderId) {
-      // Verification failures are swallowed server-side — a hiccup just
-      // returns status null and we fall through to the entitlement re-read.
-      await checkQrisStatus(orderId);
-    }
     await refreshEntitlement();
     const isPremiumNow = useAACStore.getState().premium.isPremium;
 
     if (isPremiumNow) {
       Toast.show({ type: 'success', text1: t('paywall.toastPaid'), text2: t('paywall.toastPaidDesc'), position: 'top' });
-      // Small pause so the toast renders before the modal dismisses.
+      setStage('idle');
       setTimeout(goBack, 900);
     } else {
-      setStage('qr');
-      setVerifyPending(true);
-      Toast.show({
-        type: 'info',
-        text1: t('paywall.toastNotVerified'),
-        text2: t('paywall.toastNotVerifiedDesc'),
-        position: 'top',
-      });
+      setStage('waiting');
+      if (showToast) {
+        Toast.show({
+          type: 'info',
+          text1: t('paywall.toastNotVerified'),
+          text2: t('paywall.toastNotVerifiedDesc'),
+          position: 'top',
+        });
+      }
     }
   };
 
   const busy = stage === 'requesting' || stage === 'verifying';
 
   // ── Subscription Upgrade CTA (stacking preview) ───────────────────────────
-  // The SAME pure math the QRIS backend will apply (apply_plan_purchase SQL):
-  // a live end date (trial → trial_ends_at, active → expires_at) is APPENDED
-  // to — never burned — an expired/missing one restarts from NOW(). The
-  // 1-month example below is illustrative; a real purchase stacks the CHOSEN
-  // plan's duration. Wrapped in the AAC tremor filter (visually active, no
-  // disabled prop) with its own light haptic on the accepted tap.
+  // The SAME pure math the backend applies (apply_plan_purchase SQL): a live
+  // end date (trial → trial_ends_at, active → expires_at) is APPENDED to —
+  // never burned — an expired/missing one restarts from NOW().
   const renewalPreview = computeRenewalPreview(
     { status: premium.status, trialEndsAt: premium.trialEndsAt, expiresAt: premium.expiresAt },
     1,
   );
-  const openRenewalPlans = useAccessibleAction(() => setRenewalMode(true));
+  const openRenewalCheckout = useAccessibleAction(() => setRenewalMode(true));
 
   // ────────────────────────────── Renders ──────────────────────────────
 
@@ -233,7 +260,7 @@ export default function PaywallScreen() {
         </Text>
       )}
 
-      {/* Stacking promise — the EXACT math the backend will apply. Only in
+      {/* Stacking promise — the EXACT math the backend applies. Only in
           live mode: the review build never surfaces purchasing affordances. */}
       {webPaymentActive ? (
         <View style={styles.stackingCard}>
@@ -251,7 +278,7 @@ export default function PaywallScreen() {
 
       {/* Upgrade / Perpanjang CTA — tremor-filtered, never visually disabled. */}
       {webPaymentActive ? (
-        <TouchableOpacity style={styles.renewCta} onPress={openRenewalPlans} activeOpacity={0.85}>
+        <TouchableOpacity style={styles.renewCta} onPress={openRenewalCheckout} activeOpacity={0.85}>
           <FontAwesome5 name="crown" size={15} color="#FFF" solid />
           <Text style={styles.renewCtaText}>
             {premium.status === 'active' ? t('paywall.extend') : t('paywall.upgrade')}
@@ -282,101 +309,58 @@ export default function PaywallScreen() {
     </View>
   );
 
-  const renderPlans = () => (
+  const renderBrowserCheckout = () => (
     <View>
-      <View style={styles.comboNote}>
-        <FontAwesome5 name="users" size={14} color="#11427B" solid />
-        <Text style={styles.comboNoteText}>
-          {t('paywall.comboNote')}
-        </Text>
-      </View>
+      {renderPerks()}
 
-      {plans.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyStateText}>{t('paywall.emptyPlans')}</Text>
-          <TouchableOpacity onPress={() => void load()}>
-            <Text style={styles.retryText}>{t('paywall.reload')}</Text>
-          </TouchableOpacity>
+      <View style={styles.browserCard}>
+        <View style={styles.browserIconRow}>
+          <View style={styles.browserIconBox}>
+            <FontAwesome5 name="globe" size={22} color="#FFF" solid />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.browserCardTitle}>{t('paywall.browserCta')}</Text>
+            <Text style={styles.browserCardSubtitle}>{t('paywall.browserSubtitle')}</Text>
+          </View>
         </View>
-      ) : (
-        plans.map((plan) => (
-          <TouchableOpacity
-            key={plan.id}
-            style={styles.planCard}
-            activeOpacity={0.85}
-            onPress={() => void handleSelectPlan(plan)}
-            disabled={busy}
-          >
-            <View style={styles.planInfo}>
-              <View style={styles.planBadge}>
-                <Text style={styles.planBadgeText}>{t('paywall.month', { n: plan.duration_months })}</Text>
-              </View>
-              <Text style={styles.planName}>{plan.name}</Text>
-              {plan.description ? (
-                <Text style={styles.planDesc} numberOfLines={2}>{plan.description}</Text>
-              ) : null}
-            </View>
-            <View style={styles.planPriceBox}>
-              <Text style={styles.planPrice}>{formatRupiah(plan.price)}</Text>
-              <Text style={styles.planPerMonth}>
-                {t('paywall.perMonth', { price: formatRupiah(Math.round(plan.price / plan.duration_months)) })}
-              </Text>
-            </View>
-            <View style={styles.planCta}>
-              <FontAwesome5 name="chevron-right" size={14} color="#FFF" solid />
-            </View>
-          </TouchableOpacity>
-        ))
-      )}
+
+        <TouchableOpacity style={styles.primaryBtn} onPress={() => void handleOpenBrowser()} disabled={busy}>
+          <FontAwesome5 name="external-link-alt" size={16} color="#FFF" solid />
+          <Text style={styles.primaryBtnText}>{t('paywall.browserCta')}</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 
-  const renderQr = () => (
+  const renderWaiting = () => (
     <View>
-      <View style={styles.qrCard}>
-        <View style={styles.qrHeaderRow}>
-          <FontAwesome5 name="qrcode" size={18} color="#11427B" solid />
-          <Text style={styles.qrTitle}>{t('paywall.scanToPay')}</Text>
+      <View style={styles.browserCard}>
+        <View style={styles.browserIconRow}>
+          <View style={[styles.browserIconBox, { backgroundColor: '#F59E0B' }]}>
+            <FontAwesome5 name="hourglass-half" size={20} color="#FFF" solid />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.browserCardTitle}>{t('paywall.browserWaiting')}</Text>
+            <Text style={styles.browserCardSubtitle}>{t('paywall.browserWaitingDesc')}</Text>
+          </View>
         </View>
 
-        <View style={styles.qrFrame}>
-          {qrImageUri ? (
-            <Image source={{ uri: qrImageUri }} style={styles.qrImage} resizeMode="contain" />
+        <TouchableOpacity style={styles.primaryBtn} onPress={() => void handleCheckStatus(true)} disabled={busy}>
+          {stage === 'verifying' ? (
+            <ActivityIndicator color="#FFF" />
           ) : (
-            <ActivityIndicator size="large" color="#00B5B8" />
+            <>
+              <FontAwesome5 name="check-circle" size={16} color="#FFF" solid />
+              <Text style={styles.primaryBtnText}>{t('paywall.browserCheckStatus')}</Text>
+            </>
           )}
-        </View>
+        </TouchableOpacity>
 
-        <Text style={styles.qrInstruction}>
-          {t('paywall.qrInstructionPre')}<Text style={{ fontWeight: '800' }}>QRIS</Text>{t('paywall.qrInstructionPost')}
-        </Text>
-
-        {qrExpiresAt ? (
-          <Text style={styles.qrExpiry}>{t('paywall.qrExpiry', { date: formatDate(qrExpiresAt) })}</Text>
-        ) : null}
-        {orderId ? <Text style={styles.qrOrderId}>{t('paywall.qrOrder', { id: orderId })}</Text> : null}
+        <TouchableOpacity style={styles.secondaryBtn} onPress={() => void handleOpenBrowser()} disabled={busy}>
+          <FontAwesome5 name="external-link-alt" size={14} color="#64748B" solid />
+          <Text style={styles.secondaryBtnText}>{t('paywall.browserReopen')}</Text>
+        </TouchableOpacity>
       </View>
-
-      {verifyPending ? (
-        <Text style={styles.verifyHint}>
-          {t('paywall.verifyHint')}
-        </Text>
-      ) : null}
-
-      <TouchableOpacity style={styles.primaryBtn} onPress={() => void handleVerifyPayment()} disabled={busy}>
-        {stage === 'verifying' ? (
-          <ActivityIndicator color="#FFF" />
-        ) : (
-          <>
-            <FontAwesome5 name="check-circle" size={16} color="#FFF" solid />
-            <Text style={styles.primaryBtnText}>{t('paywall.payVerify')}</Text>
-          </>
-        )}
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.secondaryBtn} onPress={() => setStage('idle')} disabled={busy}>
-        <Text style={styles.secondaryBtnText}>{t('paywall.chooseOther')}</Text>
-      </TouchableOpacity>
     </View>
   );
 
@@ -404,10 +388,10 @@ export default function PaywallScreen() {
     body = renderSuccess();
   } else if (!webPaymentActive) {
     body = renderReviewMode();
-  } else if (stage === 'qr' || stage === 'verifying') {
-    body = renderQr();
+  } else if (stage === 'waiting' || stage === 'verifying') {
+    body = renderWaiting();
   } else {
-    body = renderPlans();
+    body = renderBrowserCheckout();
   }
 
   return (
@@ -428,7 +412,7 @@ export default function PaywallScreen() {
           <View style={styles.overlayCard}>
             <ActivityIndicator size="large" color="#00B5B8" />
             <Text style={styles.overlayText}>
-              {stage === 'requesting' ? t('paywall.requesting') : t('paywall.verifying')}
+              {stage === 'requesting' ? t('paywall.preparing') : t('paywall.verifying')}
             </Text>
           </View>
         </View>
@@ -579,102 +563,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 
-  // Live plans
-  comboNote: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#E7F0FB',
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    marginBottom: 14,
-  },
-  comboNoteText: {
-    flex: 1,
-    marginLeft: 10,
-    fontSize: 12,
-    color: '#11427B',
-    fontWeight: '600',
-    lineHeight: 17,
-  },
-  planCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF',
-    borderRadius: 18,
-    padding: 16,
-    marginBottom: 12,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 5,
-  },
-  planInfo: { flex: 1, paddingRight: 8 },
-  planBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#E6FBFA',
-    borderRadius: 8,
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    marginBottom: 6,
-  },
-  planBadgeText: {
-    color: '#00A5A8',
-    fontWeight: '800',
-    fontSize: 11,
-  },
-  planName: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#1E293B',
-    marginBottom: 2,
-  },
-  planDesc: {
-    fontSize: 12,
-    color: '#94A3B8',
-    lineHeight: 16,
-  },
-  planPriceBox: { alignItems: 'flex-end' },
-  planPrice: {
-    fontSize: 16,
-    fontWeight: '900',
-    color: '#11427B',
-  },
-  planPerMonth: {
-    fontSize: 11,
-    color: '#94A3B8',
-    marginTop: 2,
-  },
-  planCta: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#00B5B8',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 10,
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 28,
-  },
-  emptyStateText: {
-    color: '#64748B',
-    fontSize: 14,
-    marginBottom: 10,
-  },
-  retryText: {
-    color: '#00B5B8',
-    fontWeight: '800',
-    fontSize: 15,
-  },
-
-  // QRIS checkout
-  qrCard: {
+  // Browser checkout card
+  browserCard: {
     backgroundColor: '#FFF',
     borderRadius: 20,
-    alignItems: 'center',
     padding: 20,
     marginTop: 4,
     marginBottom: 14,
@@ -684,57 +576,29 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 5,
   },
-  qrHeaderRow: {
+  browserIconRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 14,
+    alignItems: 'flex-start',
+    marginBottom: 16,
+    gap: 12,
   },
-  qrTitle: {
+  browserIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#00B5B8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  browserCardTitle: {
     fontSize: 16,
     fontWeight: '800',
     color: '#11427B',
-    marginLeft: 8,
+    marginBottom: 3,
   },
-  qrFrame: {
-    width: 230,
-    height: 230,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFF',
-    overflow: 'hidden',
-  },
-  qrImage: {
-    width: 220,
-    height: 220,
-  },
-  qrInstruction: {
-    fontSize: 13,
+  browserCardSubtitle: {
+    fontSize: 12,
     color: '#64748B',
-    textAlign: 'center',
-    lineHeight: 19,
-    marginTop: 14,
-    paddingHorizontal: 6,
-  },
-  qrExpiry: {
-    marginTop: 10,
-    fontSize: 12,
-    color: '#F59E0B',
-    fontWeight: '700',
-  },
-  qrOrderId: {
-    marginTop: 4,
-    fontSize: 11,
-    color: '#94A3B8',
-  },
-  verifyHint: {
-    fontSize: 12,
-    color: '#F59E0B',
-    textAlign: 'center',
-    marginBottom: 10,
-    paddingHorizontal: 12,
     lineHeight: 17,
   },
 
@@ -801,6 +665,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   secondaryBtn: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -808,6 +673,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 13,
     marginBottom: 6,
+    gap: 8,
   },
   secondaryBtnText: {
     color: '#64748B',

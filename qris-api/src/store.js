@@ -89,6 +89,8 @@ function createStore(opts = {}) {
     listStalePendingOrders,
     expireOrder,
     attachQrToOrder,
+    attachProviderRefToOrder,
+    listPendingProviderOrders,
     countRecentOrdersForDevice,
     // -- settlement ---------------------------------------------------------
     claimJournal,
@@ -102,6 +104,9 @@ function createStore(opts = {}) {
     pickMerchantForCheckout,
     // -- session guard ------------------------------------------------------
     withAccessToken,
+    // -- checkout helpers (exported module-level too) ------------------------
+    orderExpiresAt,
+    newTransactionRef,
   };
 }
 
@@ -380,7 +385,7 @@ async function getPlan(db, planId) {
   if (typeof planId !== 'string' || !UUID_RE.test(planId)) return null;
   const { data, error } = await db
     .from('plans')
-    .select('id, name, kind, price, currency, is_active')
+    .select('id, name, kind, price, currency, is_active, duration_months')
     .eq('id', planId)
     .maybeSingle();
   if (error) throw dbErr('getPlan', error);
@@ -431,7 +436,7 @@ async function pickMerchantForCheckout(db) {
  *
  * Returns the created order row.
  */
-async function createOrderWithLedger(db, { childDeviceId, planId, planKind, amount, merchantDbId = null, expiresAt = null }) {
+async function createOrderWithLedger(db, { childDeviceId, planId, planKind, amount, merchantDbId = null, expiresAt = null, currency = 'IDR' }) {
   const ref = newTransactionRef();
   const expires = expiresAt || orderExpiresAt();
   const nowIso = new Date().toISOString();
@@ -448,7 +453,15 @@ async function createOrderWithLedger(db, { childDeviceId, planId, planKind, amou
     p_merchant_db_id: merchantDbId,
     p_expires_at: expires,
   });
-  if (!rpc.error) return rpc.data;
+  if (!rpc.error) {
+    // RPC predates multi-currency (its columns default to 'IDR') — correct the
+    // rows when a non-default currency is requested. Idempotent, 2 cheap writes.
+    if (currency && currency !== 'IDR') {
+      await db.from('transactions').update({ currency }).eq('transaction_ref', ref);
+      await db.from('qris_orders').update({ currency }).eq('transaction_ref', ref);
+    }
+    return rpc.data;
+  }
   if (rpc.error.code !== '42883' /* undefined_function — RPC not installed */) {
     throw dbErr('createOrderWithLedger(rpc)', rpc.error);
   }
@@ -464,7 +477,7 @@ async function createOrderWithLedger(db, { childDeviceId, planId, planKind, amou
       child_device_id: childDeviceId,
       plan_id: planId,
       amount,
-      currency: 'IDR',
+      currency: currency || 'IDR',
       status: 'pending',
       payment_gateway: 'qris',
     });
@@ -481,7 +494,7 @@ async function createOrderWithLedger(db, { childDeviceId, planId, planKind, amou
         plan_id: planId,
         plan_kind: planKind,
         amount,
-        currency: 'IDR',
+        currency: currency || 'IDR',
         merchant_db_id: merchantDbId,
         status: 'pending',
         expires_at: expires,
@@ -586,6 +599,45 @@ async function attachQrToOrder(db, orderId, qrString, merchantDbId) {
     .single();
   if (error) throw dbErr('attachQrToOrder', error);
   return data;
+}
+
+/**
+ * Store the EXTERNAL provider reference on an order without touching the
+ * QRIS FIFO lock columns (matched_journal_id stays NULL until settlement —
+ * it doubles as the one-time claim lock; raw_journal carries the provider
+ * ref: { provider, billCode, payUrl, … }). jsonb auto-merges nothing: the
+ * caller must pass the COMPLETE object (read-modify-write happens in the
+ * provider layer).
+ */
+async function attachProviderRefToOrder(db, orderId, providerRef) {
+  const { data, error } = await db
+    .from('qris_orders')
+    .update({ raw_journal: providerRef, updated_at: new Date().toISOString() })
+    .eq('id', orderId)
+    .select('id, raw_journal')
+    .single();
+  if (error) throw dbErr('attachProviderRefToOrder', error);
+  return data;
+}
+
+/**
+ * Unexpired PENDING orders whose provider ref matches `provider` — the
+ * multi-provider worker's polling input (e.g. toyyibPay bills that may have
+ * been paid but whose callback has not arrived yet).
+ */
+async function listPendingProviderOrders(db, provider, limit = 200) {
+  const { data, error } = await db
+    .from('qris_orders')
+    .select(ORDER_COLUMNS)
+    .eq('status', 'pending')
+    .gt('expires_at', new Date().toISOString())
+    .not('raw_journal', 'is', null)
+    .order('created_at', { ascending: true })
+    .limit(limit);
+  if (error) throw dbErr('listPendingProviderOrders', error);
+  // jsonb @> filter done client-side (small pending set, keeps the store
+  // portable across PostgREST fakes/tests).
+  return (data || []).filter((o) => o.raw_journal && o.raw_journal.provider === provider);
 }
 
 /** Simple per-device rate signal for the checkout endpoint. */

@@ -31,6 +31,9 @@ export const QRIS_API_BASE_URL = (
 export const QRIS_CHECKOUT_URL = `${QRIS_API_BASE_URL}/api/qris-checkout`;
 export const QRIS_STATUS_URL = `${QRIS_API_BASE_URL}/api/qris-status`;
 
+/** Browser-checkout session mint (multi-provider: QRIS ID + toyyibPay MY). */
+export const CHECKOUT_SESSION_URL = `${QRIS_API_BASE_URL}/api/checkout-session`;
+
 /** Subset of app_settings the paywall needs (stealth kill-switch). */
 export interface PaywallSettings {
   /** Stealth toggle: false during App Review ⇒ paywall must show NO pricing. */
@@ -129,6 +132,56 @@ export const fetchActivePlans = async (): Promise<SubscriptionPlanRow[]> => {
 };
 
 /**
+ * Mint a short-lived BROWSER checkout session for this child device.
+ *
+ * The backend returns a signed token URL (/pay/<token>) — the checkout PAGE
+ * (not the app) then lists the plans and the payment providers for the chosen
+ * region (QRIS for Indonesia; DuitNow QR / FPX / card via toyyibPay for
+ * Malaysia). Carrying the child's deviceId INSIDE the signed token keeps the
+ * web session bound to exactly one child — entitlements stay consistent no
+ * matter which device's parent opens the link.
+ *
+ * @param deviceId  the CHILD device uuid (paywall is always child-scoped).
+ * @param lang      UI language for the web page (id|en|zh|ms).
+ * @throws stable CODES mapped by the caller: PAYMENT_SERVER_TIMEOUT,
+ *                  CHECKOUT_NO_URL, QRIS_API_SECRET_MISSING.
+ */
+export const createCheckoutSession = async (
+  deviceId: string,
+  lang: string = 'id',
+): Promise<CheckoutSessionResult> => {
+  const { ok, status, body } = await signedPost(CHECKOUT_SESSION_URL, { device_id: deviceId, lang });
+
+  if (!ok) {
+    const errCode = typeof body.error === 'string' ? body.error : null;
+    if (status === 401 && (errCode === 'BAD_SIGNATURE' || errCode === 'TIMESTAMP_SKEW')) {
+      throw new Error('QRIS_SIGNATURE_REJECTED');
+    }
+    const serverMessage =
+      typeof body.message === 'string' ? body.message : `Kode error ${status}`;
+    throw new Error(`Checkout gagal: ${serverMessage}`);
+  }
+
+  // Token URL — absolute (backend builds it) or relative to the API base.
+  const rawUrl = typeof body.url === 'string' ? body.url : null;
+  const token = typeof body.token === 'string' ? body.token : null;
+  const url = rawUrl
+    ? rawUrl.startsWith('http')
+      ? rawUrl
+      : `${QRIS_API_BASE_URL}${rawUrl}`
+    : token
+      ? `${QRIS_API_BASE_URL}/pay/${token}`
+      : null;
+  if (!url) throw new Error('CHECKOUT_NO_URL');
+
+  return {
+    url,
+    token: token ?? '',
+    expiresAt: typeof body.expires_at === 'string' ? body.expires_at : null,
+  };
+};
+
+/**
  * POST the signed JSON body to a qris-api endpoint.
  *
  * Signing: X-Sensoria-Sign = HMAC-SHA256("<unix-ts>.<rawBody>", secret) —
@@ -177,6 +230,16 @@ const signedPost = async (
   }
   return { ok: response.ok, status: response.status, body };
 };
+
+/** Normalized BROWSER checkout session minted by the web backend. */
+export interface CheckoutSessionResult {
+  /** Absolute https URL of the browser checkout page (/pay/<token>). */
+  url: string;
+  /** Raw session token (url already embeds it). */
+  token: string;
+  /** ISO timestamp when the session (and its URL) expires. */
+  expiresAt: string | null;
+}
 
 /** Normalized QRIS checkout result returned by the web backend. */
 export interface QrisCheckoutResult {
