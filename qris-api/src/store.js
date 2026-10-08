@@ -484,7 +484,12 @@ async function createOrderWithLedger(db, { childDeviceId, planId, planKind, amou
     }
     return rpc.data;
   }
-  if (rpc.error.code !== '42883' /* undefined_function — RPC not installed */) {
+  // "RPC not installed here" → two-insert fallback. Postgres names an
+  // unknown function with 42883; PostgREST wraps the same miss as PGRST202
+  // (observed in production: the RPC was never installed, and only PGRST202
+  // surfaced). Both must engage the fallback — it is the primary path the
+  // test suite exercises.
+  if (rpc.error.code !== '42883' && rpc.error.code !== 'PGRST202') {
     throw dbErr('createOrderWithLedger(rpc)', rpc.error);
   }
 

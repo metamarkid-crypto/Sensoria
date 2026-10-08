@@ -342,6 +342,31 @@ test('createOrderWithLedger falls back to two inserts when the RPC is absent', a
   assert.equal(db._state.transactions[0].transaction_ref, order.transaction_ref);
 });
 
+test('createOrderWithLedger falls back on PostgREST PGRST202 too (production miss)', async () => {
+  const { db, store } = makeStore();
+  // Production observed PGRST202 — PostgREST's wrapper for an unknown
+  // function — NOT 42883. The fallback must engage there as well.
+  db.rpc = async (fn) => ({
+    data: null,
+    error: {
+      code: 'PGRST202',
+      message: `Could not find the function public.${fn} in the schema cache`,
+    },
+  });
+  const order = await store.createOrderWithLedger(db, {
+    childDeviceId: 'child-1',
+    planId: 'plan-1',
+    planKind: 'combo',
+    amount: 199000,
+    merchantDbId: 'm-1',
+  });
+  assert.equal(order.status, 'pending');
+  assert.equal(order.plan_kind, 'combo');
+  assert.equal(db._state.transactions.length, 1);
+  assert.equal(db._state.transactions[0].currency, 'IDR');
+  assert.equal(db._state.transactions[0].transaction_ref, order.transaction_ref);
+});
+
 test('createOrderWithLedger retries with a NEW ref on a rare collision', async () => {
   const { db, store } = makeStore();
   db.rpc = async () => ({ data: null, error: { code: '42883', message: 'missing' } });
