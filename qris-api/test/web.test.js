@@ -6,9 +6,11 @@
  * Uses the REAL express stack (buildApp) with the in-memory fakeDb store,
  * then drives HTTP over node:http:
  *   • POST /api/checkout-session (HMAC) mints a token bound to the child.
- *   • GET /pay/:token renders the plan page (region switch, MYR/IDR plans).
- *   • GET /pay/:token/plan/:planId creates the order server-side; the MY
- *     path redirects to the (stubbed) gateway URL, the ID path renders QRIS.
+ *   • GET /pay/:token renders the plan page (single QRIS-global rail: IDR
+ *     plans for BOTH regions; legacy ?region=MY links render the same page).
+ *   • GET /pay/:token/plan/:planId creates the order server-side; the active
+ *     rail renders the dynamic QRIS, the DORMANT toyyibpay rollback (explicit
+ *     provider=toyyibpay + MYR plan) redirects to the (stubbed) gateway URL.
  *   • POST /api/webhook/toyyibpay settles on a VALID MD5 hash and rejects
  *     tampered ones; a replay is a no-op.
  *   • GET /pay/:token/status/:ref serves the poll JSON (device-scoped).
@@ -157,7 +159,7 @@ test('checkout-session: HMAC required, device must be a Child', async () => {
   }
 });
 
-test('checkout page: token page renders IDR plans by default and switches to MYR', async () => {
+test('checkout page: single QRIS-global rail — IDR plans for every region', async () => {
   const db = seedDb();
   const server = await listen(buildTestApp(db));
   try {
@@ -166,12 +168,31 @@ test('checkout page: token page renders IDR plans by default and switches to MYR
     assert.equal(idPage.status, 200);
     assert.match(idPage.raw, /Combo 1 Bulan/);
     assert.match(idPage.raw, /Rp35\.000/);
+    assert.match(idPage.raw, /name="provider" value="qris-gobiz"/);
     assert.doesNotMatch(idPage.raw, /RM25/);
 
+    // Legacy ?region=MY links from older pages still render — as the SAME
+    // single-rail page (QRIS global: MY pays the IDR plans).
     const myPage = await request(server, 'GET', `/pay/${token}?region=MY`);
     assert.equal(myPage.status, 200);
-    assert.match(myPage.raw, /RM25/);
-    assert.doesNotMatch(myPage.raw, /Rp35\.000/);
+    assert.match(myPage.raw, /Rp35\.000/);
+    assert.doesNotMatch(myPage.raw, /RM25/);
+  } finally {
+    server.close();
+  }
+});
+
+test('currency guard: MYR plan without an explicit toyyibpay hint is refused', async () => {
+  const db = seedDb();
+  const server = await listen(buildTestApp(db));
+  try {
+    const { token } = await mintSession(server, CHILD_ID, 'en');
+    // MY now defaults to qris-gobiz (IDR) — an MYR plan must NEVER print a
+    // wrong-amount IDR QR, so checkout fails closed with 400.
+    const res = await request(server, 'GET', `/pay/${token}/plan/${MY_PLAN}`);
+    assert.equal(res.status, 400);
+    assert.equal(db._state.qris_orders.length, 0, 'no order may be created');
+    assert.equal(db._state.transactions.length, 0, 'no ledger row may be created');
   } finally {
     server.close();
   }

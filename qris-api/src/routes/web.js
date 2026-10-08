@@ -5,13 +5,17 @@
  * reach a web page). Authority comes from the signed checkout TOKEN the app
  * obtained via POST /api/checkout-session.
  *
- *   GET  /pay/:token            → checkout page (plan list + provider select)
- *   GET  /pay/:token/plan/:planId?provider=toyyibpay|qris-gobiz
- *                               → creates the order server-side, redirects to
- *                                 the provider (toyyibPay bill) or shows the
- *                                 dynamic QRIS (ID) with a status poll
+ *   GET  /pay/:token            → checkout page (plan list; IDR plans for
+ *                                 BOTH regions — QRIS global covers MY too)
+ *   GET  /pay/:token/plan/:planId?provider=qris-gobiz
+ *                               → creates the order server-side and shows the
+ *                                 dynamic QRIS with a status poll (the only
+ *                                 ACTIVE rail — Malaysia pays the same IDR
+ *                                 QRIS via QRIS-global cross-border scanning;
+ *                                 provider=toyyibpay remains as a DORMANT
+ *                                 rollback path through its hosted bill page)
  *   GET  /pay/:token/status/:ref → JSON order status for the page's poller
- *   POST /api/webhook/toyyibpay → gateway callback (MD5-hash verified)
+ *   POST /api/webhook/toyyibpay → dormant gateway callback (MD5-hash verified)
  *
  * SECURITY:
  *   • Token: tamper-proof HMAC binding to ONE child device uuid + expiry
@@ -24,30 +28,32 @@
  *   • CSRF: order creation requires a fresh GET (token link) — money writes
  *     only happen from our own rendered page or the verified webhook.
  *
- * The page is intentionally dependency-free inline HTML (no view engine) —
- * it must render even when node_modules is minimal and load fast on mobile
- * data in both ID and MY.
+ * The pages render from plain HTML template files in qris-checkout/ (via
+ * src/templates.js — no view-engine dependency): they must render even when
+ * node_modules is minimal and load fast on mobile data in both ID and MY.
  */
 
 const express = require('express');
+const path = require('path');
 const QRCode = require('qrcode');
 const { verifyCheckoutToken } = require('../checkoutToken');
 const providers = require('../providers');
 const toyyibpay = require('../toyyibpay');
+const { render, esc } = require('../templates');
 
 const router = express.Router();
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// Static checkout assets (QRIS frame, success/expired art) from the
+// qris-checkout folder. Immutable-ish cache — art changes only on deploy.
+router.use(
+  '/pay-assets',
+  express.static(path.join(__dirname, '..', '..', 'qris-checkout', 'images'), {
+    maxAge: '1d',
+    fallthrough: false,
+  }),
+);
 
-/** Minimal HTML escaping for every interpolated value. */
-function esc(v) {
-  return String(v ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Locale strings for the checkout page (id/en/zh/ms — matches the app). */
 const PAGE_STRINGS = {
@@ -57,16 +63,20 @@ const PAGE_STRINGS = {
     month: 'Bulan',
     months: 'Bulan',
     perMonth: '/bln',
-    payWith: 'Bayar dengan',
-    region: 'Wilayah',
-    regionID: 'Indonesia (QRIS)',
-    regionMY: 'Malaysia (DuitNow QR / FPX / Kad)',
+
     choose: 'Bayar Sekarang',
     secure: 'Pembayaran diproses oleh penyedia pembayaran resmi. Sensoria tidak menyimpan data kartu Anda.',
     loading: 'Memproses…',
     errorGeneric: 'Terjadi kesalahan. Silakan coba lagi.',
     orderRef: 'Ref',
     scanQris: 'Scan QRIS ini dengan aplikasi bank / e-wallet Anda',
+    scanTitle: 'Scan QRIS',
+    statusLabel: 'Status Pembayaran',
+    timeLeft: 'Sisa Waktu',
+    checkStatus: 'Cek Status',
+    downloadQris: 'Unduh QRIS',
+    pendingLabel: 'Menunggu',
+    expiredBadge: 'Kedaluwarsa',
     waiting: 'Menunggu pembayaran…',
     paid: 'Pembayaran Berhasil!',
     paidDesc: 'Premium telah aktif untuk perangkat anak Anda. Kembali ke aplikasi untuk melanjutkan.',
@@ -80,16 +90,20 @@ const PAGE_STRINGS = {
     month: 'Month',
     months: 'Months',
     perMonth: '/mo',
-    payWith: 'Pay with',
-    region: 'Region',
-    regionID: 'Indonesia (QRIS)',
-    regionMY: 'Malaysia (DuitNow QR / FPX / Card)',
+
     choose: 'Pay Now',
     secure: 'Payment is processed by official payment providers. Sensoria never stores your card data.',
     loading: 'Processing…',
     errorGeneric: 'Something went wrong. Please try again.',
     orderRef: 'Ref',
     scanQris: 'Scan this QRIS code with your bank / e-wallet app',
+    scanTitle: 'Scan QRIS',
+    statusLabel: 'Payment Status',
+    timeLeft: 'Time Left',
+    checkStatus: 'Check Status',
+    downloadQris: 'Download QRIS',
+    pendingLabel: 'Pending',
+    expiredBadge: 'Expired',
     waiting: 'Waiting for payment…',
     paid: 'Payment Successful!',
     paidDesc: 'Premium is now active for your child\u2019s device. Return to the Sensoria app to continue.',
@@ -103,16 +117,20 @@ const PAGE_STRINGS = {
     month: '个月',
     months: '个月',
     perMonth: '/月',
-    payWith: '支付方式',
-    region: '地区',
-    regionID: '印度尼西亚（QRIS）',
-    regionMY: '马来西亚（DuitNow QR / FPX / 银行卡）',
+
     choose: '立即支付',
     secure: '支付由官方支付服务商处理。Sensoria 不会存储您的银行卡信息。',
     loading: '处理中…',
     errorGeneric: '发生错误，请重试。',
     orderRef: '编号',
     scanQris: '使用您的银行 / 电子钱包应用扫描此 QRIS 码',
+    scanTitle: '扫描 QRIS',
+    statusLabel: '支付状态',
+    timeLeft: '剩余时间',
+    checkStatus: '检查状态',
+    downloadQris: '下载二维码',
+    pendingLabel: '待支付',
+    expiredBadge: '已过期',
     waiting: '等待支付…',
     paid: '支付成功！',
     paidDesc: '高级版已在您孩子的设备上激活。请返回 Sensoria 应用继续使用。',
@@ -126,16 +144,20 @@ const PAGE_STRINGS = {
     month: 'Bulan',
     months: 'Bulan',
     perMonth: '/bln',
-    payWith: 'Bayar dengan',
-    region: 'Wilayah',
-    regionID: 'Indonesia (QRIS)',
-    regionMY: 'Malaysia (DuitNow QR / FPX / Kad)',
+
     choose: 'Bayar Sekarang',
     secure: 'Pembayaran diproses oleh penyedia pembayaran rasmi. Sensoria tidak menyimpan data kad anda.',
     loading: 'Memproses…',
     errorGeneric: 'Masalah berlaku. Sila cuba lagi.',
     orderRef: 'Rujukan',
     scanQris: 'Imbas kod QRIS ini dengan aplikasi bank / e-dompet anda',
+    scanTitle: 'Imbas QRIS',
+    statusLabel: 'Status Pembayaran',
+    timeLeft: 'Masa Berbaki',
+    checkStatus: 'Semak Status',
+    downloadQris: 'Muat Turun QRIS',
+    pendingLabel: 'Menunggu',
+    expiredBadge: 'Tamat Tempoh',
     waiting: 'Menunggu pembayaran…',
     paid: 'Pembayaran Berjaya!',
     paidDesc: 'Premium kini aktif untuk peranti anak anda. Kembali ke aplikasi Sensoria untuk teruskan.',
@@ -159,62 +181,15 @@ function formatPrice(amount, currency) {
 }
 
 function pageShell(lang, title, bodyHtml) {
-  const s = PAGE_STRINGS[lang] || PAGE_STRINGS.en;
-  return `<!DOCTYPE html>
-<html lang="${esc(lang)}">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="robots" content="noindex,nofollow">
-<title>${esc(title)}</title>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-         background: #F8FAFC; color: #1E293B; min-height: 100vh; }
-  .wrap { max-width: 460px; margin: 0 auto; padding: 24px 16px 48px; }
-  .logo { font-size: 20px; font-weight: 900; color: #11427B; margin-bottom: 2px; }
-  .sub { font-size: 13px; color: #64748B; margin-bottom: 18px; line-height: 1.45; }
-  .card { background: #FFF; border-radius: 16px; padding: 16px; margin-bottom: 12px;
-          box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
-  .plan { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-  .plan-name { font-size: 15px; font-weight: 800; }
-  .plan-desc { font-size: 12px; color: #94A3B8; margin-top: 2px; }
-  .plan-price { text-align: right; }
-  .price { font-size: 17px; font-weight: 900; color: #11427B; }
-  .permo { font-size: 11px; color: #94A3B8; }
-  .btn { display: block; width: 100%; border: 0; border-radius: 12px; padding: 14px;
-         font-size: 15px; font-weight: 800; color: #FFF; background: #00B5B8;
-         margin-top: 14px; cursor: pointer; }
-  .btn:active { opacity: 0.85; }
-  .region { font-size: 12px; color: #64748B; margin: 14px 0 6px; font-weight: 700; }
-  .radio-row { display: flex; align-items: center; gap: 8px; padding: 10px 12px;
-               background: #FFF; border-radius: 12px; margin-bottom: 8px;
-               box-shadow: 0 2px 6px rgba(0,0,0,0.06); cursor: pointer; }
-  .note { font-size: 11px; color: #94A3B8; text-align: center; line-height: 1.5; margin-top: 14px; }
-  .qr-img { width: 240px; height: 240px; display: block; margin: 12px auto; }
-  .center { text-align: center; }
-  .ok { color: #059669; font-weight: 900; font-size: 18px; }
-  .ref { font-size: 11px; color: #94A3B8; margin-top: 6px; }
-  .err { background: #FFF0F5; color: #BE185D; border-radius: 12px; padding: 12px;
-         font-size: 13px; margin-bottom: 12px; }
-</style>
-</head>
-<body><div class="wrap">${bodyHtml}</div></body>
-</html>`;
+  return render('layout', { lang, title, body: bodyHtml });
 }
 
 function renderExpiredPage(lang) {
   const s = PAGE_STRINGS[lang] || PAGE_STRINGS.en;
-  return pageShell(
-    lang,
-    s.expired,
-    `<div class="card center"><div style="font-size:34px;margin-bottom:8px">⏳</div>
-     <div class="plan-name">${esc(s.expired)}</div>
-     <div class="sub" style="margin-top:6px">${esc(s.expiredDesc)}</div></div>`,
-  );
+  return render('expired', { expired: s.expired, expiredDesc: s.expiredDesc });
 }
 
-/** GET /pay/:token — plan list + region/provider choice. */
+/** GET /pay/:token — plan list (IDR plans for BOTH regions — QRIS global). */
 async function checkoutPage(req, res, next) {
   try {
     const { token } = req.params;
@@ -233,45 +208,36 @@ async function checkoutPage(req, res, next) {
       return res.status(403).send(renderExpiredPage(lang));
     }
 
-    const region = String(req.query.region || 'ID').toUpperCase() === 'MY' ? 'MY' : 'ID';
-    const currency = region === 'MY' ? 'MYR' : 'IDR';
-    const plans = await providers.listPlansForCurrency(db, currency);
-    const provider = providers.resolveProvider(region);
+    // QRIS global: Malaysia pays the SAME IDR plans — the payer's DuitNow
+    // app converts IDR→MYR at scan time, so there is no region switch and
+    // no MYR plan list. (A ?region=MY link from an older page still works:
+    // it simply renders this same single-rail page.)
+    const plans = await providers.listPlansForCurrency(db, 'IDR');
+    const provider = providers.resolveProvider('ID');
 
     const planCards = plans
       .map((p) => {
         const perMonth = Math.round(Number(p.price) / Math.max(1, p.duration_months));
-        const monthsLabel = p.duration_months > 1 ? s.months : s.month;
-        return `<div class="card plan">
-          <div>
-            <div class="plan-name">${esc(p.name)}</div>
-            <div class="plan-desc">${esc(p.duration_months)} ${esc(monthsLabel)}${p.description ? ' — ' + esc(p.description) : ''}</div>
-          </div>
-          <div class="plan-price">
-            <div class="price">${esc(formatPrice(p.price, p.currency))}</div>
-            <div class="permo">${esc(formatPrice(perMonth, p.currency))}${esc(s.perMonth)}</div>
-          </div>
-        </div>
-        <form method="get" action="/pay/${encodeURIComponent(token)}/plan/${encodeURIComponent(p.id)}">
-          <input type="hidden" name="provider" value="${esc(provider.id)}">
-          <button class="btn" type="submit">${esc(s.choose)} — ${esc(formatPrice(p.price, p.currency))}</button>
-        </form>`;
+        return render('plan-card', {
+          name: p.name,
+          monthsLine: `${p.duration_months} ${p.duration_months > 1 ? s.months : s.month}`,
+          descSuffix: p.description ? ` — ${p.description}` : '',
+          price: formatPrice(p.price, p.currency),
+          perMonth: formatPrice(perMonth, p.currency),
+          perMonthSuffix: s.perMonth,
+          action: `/pay/${encodeURIComponent(token)}/plan/${encodeURIComponent(p.id)}`,
+          provider: provider.id,
+          buttonLabel: `${s.choose} — ${formatPrice(p.price, p.currency)}`,
+        });
       })
       .join('');
 
-    const regionSwitch =
-      region === 'ID'
-        ? `<a class="btn" style="background:#E2E8F0;color:#334155;text-decoration:none;text-align:center" href="/pay/${encodeURIComponent(token)}?region=MY">${esc(s.regionMY)} →</a>`
-        : `<a class="btn" style="background:#E2E8F0;color:#334155;text-decoration:none;text-align:center" href="/pay/${encodeURIComponent(token)}?region=ID">${esc(s.regionID)} →</a>`;
-
-    const body = `
-      <div class="logo">Sensoria Premium</div>
-      <div class="sub">${esc(s.subtitle)}</div>
-      ${plans.length === 0 ? `<div class="err">${esc(s.errorGeneric)}</div>` : ''}
-      ${planCards}
-      <div class="region">${esc(s.region)}</div>
-      ${regionSwitch}
-      <div class="note">${esc(s.secure)}</div>`;
+    const body = render('checkout', {
+      subtitle: s.subtitle,
+      plansError: plans.length === 0 ? `<div class="err">${esc(s.errorGeneric)}</div>` : '',
+      planCards,
+      secure: s.secure,
+    });
     return res.send(pageShell(lang, s.title, body));
   } catch (err) {
     return next(err);
@@ -301,6 +267,15 @@ async function createOrderAndRedirect(req, res, next) {
     if (!plan || !plan.is_active) return res.status(404).send(renderExpiredPage(lang));
     const provider = providers.resolveProvider(plan.currency === 'MYR' ? 'MY' : 'ID', req.query.provider);
 
+    // Currency discipline: a plan can never be paid through a provider whose
+    // currency mismatches the plan (e.g. an MYR plan forced onto the IDR
+    // QRIS rail would print a WRONG-AMOUNT QR). With MY defaulted to
+    // qris-gobiz (IDR), this also refuses MYR plans without an explicit
+    // toyyibpay hint — the dormant rollback path.
+    if (provider.currency !== (plan.currency || 'IDR')) {
+      return res.status(400).send(renderExpiredPage(lang));
+    }
+
     const expiresAt = store.orderExpiresAt();
     const { order, qrString } = await providers.createOrderForProvider(store, db, {
       provider,
@@ -310,36 +285,34 @@ async function createOrderAndRedirect(req, res, next) {
     });
 
     if (qrString) {
-      // ID path: render the dynamic QRIS + a status poller.
+      // Active rail: render the invoice-style QRIS page + status poller.
       const dataUrl = await QRCode.toBuffer(qrString, { errorCorrectionLevel: 'M', margin: 2, scale: 6 });
-      const body = `
-        <div class="card center">
-          <div class="plan-name">QRIS</div>
-          <img class="qr-img" src="data:image/png;base64,${dataUrl.toString('base64')}" alt="QRIS">
-          <div class="sub">${esc(s.scanQris)}</div>
-          <div id="st" class="sub">${esc(s.waiting)}</div>
-          <div class="ref">${esc(s.orderRef)}: ${esc(order.transaction_ref)}</div>
-        </div>
-        <script>
-          (function poll() {
-            fetch('/pay/${encodeURIComponent(token)}/status/${encodeURIComponent(order.transaction_ref)}')
-              .then(function (r) { return r.json(); })
-              .then(function (j) {
-                if (j.status === 'paid') {
-                  document.getElementById('st').innerHTML = '<span class="ok">✓ ${esc(s.paid)}</span>';
-                  setTimeout(function () { location.href = '/pay/${encodeURIComponent(token)}/done'; }, 1800);
-                  return;
-                }
-                if (j.status === 'expired' || j.status === 'failed') { location.reload(); return; }
-                setTimeout(poll, 4000);
-              })
-              .catch(function () { setTimeout(poll, 6000); });
-          })();
-        </script>`;
-      return res.send(pageShell(lang, 'QRIS', body));
+      const qrSrc = `data:image/png;base64,${dataUrl.toString('base64')}`;
+      return res.send(
+        render('qris', {
+          lang,
+          title: s.scanTitle,
+          scanTitle: s.scanTitle,
+          qrDataUrl: qrSrc,
+          statusLabel: s.statusLabel,
+          timeLeft: s.timeLeft,
+          pendingLabel: s.pendingLabel,
+          expiredBadge: s.expiredBadge,
+          checkStatus: s.checkStatus,
+          downloadQris: s.downloadQris,
+          downloadUrl: qrSrc,
+          orderRef: s.orderRef,
+          ref: order.transaction_ref,
+          expiresAtMs: Date.parse(order.expires_at || new Date(Date.now() + 15 * 60 * 1000).toISOString()),
+          statusUrl: `/pay/${encodeURIComponent(token)}/status/${encodeURIComponent(order.transaction_ref)}`,
+          paidText: s.paid,
+          doneUrl: `/pay/${encodeURIComponent(token)}/done`,
+        }),
+      );
     }
 
-    // MY path: hand off to the gateway's hosted bill page (FPX / card / DuitNow QR).
+    // Dormant rollback path: hand off to the gateway's hosted bill page
+    // (FPX / card / DuitNow QR). No region reaches this by default anymore.
     const raw = order.raw_journal || {};
     if (raw.payUrl) return res.redirect(302, raw.payUrl);
     return res.status(502).send(renderExpiredPage(lang));
@@ -375,9 +348,7 @@ function donePage(req, res) {
     pageShell(
       lang,
       s.paid,
-      `<div class="card center"><div style="font-size:36px;margin-bottom:8px">🎉</div>
-       <div class="ok">${esc(s.paid)}</div>
-       <div class="sub" style="margin-top:6px">${esc(s.paidDesc)}</div></div>`,
+      render('done', { paid: s.paid, paidDesc: s.paidDesc }),
     ),
   );
 }

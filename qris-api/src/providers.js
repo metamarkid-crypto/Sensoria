@@ -5,13 +5,19 @@
  *
  * One fulfilment contract, many providers:
  *
- *   qris-gobiz   region ID  currency IDR  → dynamic QRIS rendered IN the
- *                 browser page; settlement via GoBiz journal polling
+ *   qris-gobiz   region ID + MY  currency IDR  → dynamic QRIS rendered IN
+ *                 the browser page; settlement via GoBiz journal polling
  *                 (existing settle.js machinery — worker + instantVerify).
- *   toyyibpay    region MY  currency MYR  → hosted bill page (FPX online
- *                 banking, cards, DuitNow QR); settlement via callback +
- *                 getBillTransactions polling below. QRIS does NOT exist in
- *                 Malaysia — QRIS is Indonesia's interoperable QR standard.
+ *                 MALAYSIA PAYES THROUGH THE SAME QRIS RAIL: QRIS is now
+ *                 interoperable cross-border (QRIS Global), so a Malaysian
+ *                 bank/e-wallet app (DuitNow) scans the same dynamic QR and
+ *                 converts IDR→MYR on the payer's side. The merchant ledger
+ *                 stays IDR — no MYR plans, no second gateway.
+ *   toyyibpay    DORMANT — kept for rollback only. It was the MY gateway
+ *                 (FPX / card / DuitNow QR via toyyibPay) before QRIS went
+ *                 global. Not listed as any region's default anymore; it
+ *                 still works when a request explicitly passes
+ *                 provider=toyyibpay, and its webhook stays registered.
  *
  * Invariants carried over from the QRIS-only build (blueprint §4.5):
  *   • The AMOUNT never comes from the client — resolved from plans.price.
@@ -20,11 +26,10 @@
  *     idempotent RPC) flips them to paid — identical fulfilment for both
  *     providers, so entitlements behave the same in both countries.
  *
- * MYR pricing: plans carry price + currency (default IDR). The MY checkout
- * resolves a plans row with currency='MYR' for the same duration (fallback:
- * same duration in IDR is NEVER converted blindly — the plan must exist or
- * checkout fails with PLAN_NOT_AVAILABLE, forcing the operator to seed MYR
- * plans first). `plans.duration_months` is shared by both markets.
+ * Currency discipline: BOTH regions list IDR plans (QRIS global converts on
+ * the payer's side). A plan's currency selects the provider — a plan row can
+ * never be paid through a provider whose currency mismatches the plan (web.js
+ * guards this), so an MYR plan can never produce a mislabeled IDR QR.
  */
 
 const { staticToDynamic } = require('./emv');
@@ -33,11 +38,12 @@ const toyyibpay = require('./toyyibpay');
 /** Human-readable provider + region labels for the checkout page. */
 const PROVIDERS = {
   'qris-gobiz': { id: 'qris-gobiz', region: 'ID', currency: 'IDR', label: 'QRIS' },
+  // DORMANT: rollback path only — no region defaults to this anymore.
   toyyibpay: { id: 'toyyibpay', region: 'MY', currency: 'MYR', label: 'DuitNow QR / FPX / Card' },
 };
 
 const DEFAULT_ID_PROVIDER = 'qris-gobiz';
-const DEFAULT_MY_PROVIDER = 'toyyibpay';
+const DEFAULT_MY_PROVIDER = 'qris-gobiz'; // QRIS global — same rail as ID.
 
 /** Resolve which provider a (region, providerHint) pair maps to. */
 function resolveProvider(region, providerHint) {
@@ -50,8 +56,8 @@ function resolveProvider(region, providerHint) {
 const CURRENCY_NUMERIC = { IDR: '360', MYR: '458' };
 
 /**
- * Find the active plan for a (duration, currency) pair. MYR first, then —
- * only for ID — the legacy currency-agnostic read (all IDR rows).
+ * Find the active plan for a (duration, currency) pair. Fallback for IDR
+ * only — the legacy currency-agnostic read (all IDR rows).
  */
 async function findPlanForCurrency(db, durationMonths, currency) {
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -117,7 +123,7 @@ async function listPlansForCurrency(db, currency) {
  *
  * Provider-specific:
  *   • qris-gobiz → dynamic QR string attached to the order (store.attachQrToOrder).
- *   • toyyibpay  → bill created at the gateway; billCode stored in
+ *   • toyyibpay (dormant) → bill created at the gateway; billCode stored in
  *                  matched_journal_id is NOT used (that is the QRIS FIFO lock);
  *                  instead the provider ref rides raw_journal alongside the
  *                  pay URL — no schema change needed.
