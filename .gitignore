@@ -70,3 +70,9 @@ scripts/arasaac-visual-check.html
 # Backup copies of generated data (e.g. arasaac.json.bak.orig — the tracked
 # original is always recoverable from git history).
 *.orig
+
+# VPS deploy session artifacts — temporary credentials & SSH keys, NEVER commit.
+.vps-credentials.txt
+.vps-key
+.vps-key.pub
+.vps-askpass.sh

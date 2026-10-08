@@ -28,6 +28,26 @@
 const { createClient } = require('@supabase/supabase-js');
 const { GoBizClient, isAuthError } = require('./gobiz');
 
+/**
+ * Node 20 (production runtime) has no native WebSocket; @supabase/realtime-js
+ * throws "Node.js 20 detected without native WebSocket support" straight from
+ * createClient(). Feed it the `ws` package as transport on such runtimes —
+ * on Node 22+ (native WebSocket) this resolves to undefined and the client
+ * uses its default. Keeps `npm ci` installs bootable across supabase-js
+ * versions regardless of their Node engine floor.
+ */
+function resolveWebSocketTransport() {
+  if (typeof WebSocket !== 'undefined') return undefined;
+  try {
+    // eslint-disable-next-line global-require
+    return require('ws');
+  } catch (err) {
+    throw new Error(
+      'store: runtime Node tanpa native WebSocket — upgrade ke Node 22+ atau install package "ws".'
+    );
+  }
+}
+
 const QRIS_CHECKOUT_TTL_MINUTES = parseInt(process.env.QRIS_CHECKOUT_TTL_MINUTES || '15', 10);
 
 /** Injectable for tests — defaults to the real GoBiz SDK client. */
@@ -58,11 +78,13 @@ function createStore(opts = {}) {
   if (!url || !key) {
     throw new Error('store: SUPABASE_URL dan SUPABASE_SERVICE_ROLE_KEY wajib di-set (service role).');
   }
+  const wsTransport = resolveWebSocketTransport();
   const db =
     opts.client ||
     createClient(url, key, {
       auth: { persistSession: false, autoRefreshToken: false },
       global: { headers: { 'X-Client-Info': 'sensoria-qris-api/1.0' } },
+      ...(wsTransport ? { realtime: { transport: wsTransport } } : {}),
     });
 
   return {
