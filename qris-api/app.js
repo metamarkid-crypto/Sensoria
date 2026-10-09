@@ -28,6 +28,7 @@ const { createStore } = require('./src/store');
 const { hmacVerify } = require('./src/hmac');
 const mobileRoutes = require('./src/routes/mobile');
 const internalRoutes = require('./src/routes/internal');
+const appUpdateRoutes = require('./src/routes/appUpdate');
 const webRoutes = require('./src/routes/web');
 
 /**
@@ -77,6 +78,11 @@ function buildApp(opts = {}) {
   // not the signed mobile client.
   app.use('/', webRoutes.router);
 
+  // -- app self-update (mobile Android distribution from this VPS) --------------
+  // /api/app-update/* — public version check; the DOWNLOAD itself is gated by
+  // an expiring HMAC link minted here (no static open file server).
+  app.use('/', appUpdateRoutes.router);
+
   // -- raw body → HMAC → routes ------------------------------------------------
   // Mobile mount: signed with QRIS_API_SECRET (the APK-embedded secret). This
   // is a scanner filter only — real security is server-side amount/plan
@@ -103,10 +109,18 @@ function buildApp(opts = {}) {
   app.use(
     '/internal',
     internalIpAllowlist(opts.internalAllowlist),
+    // App-update APK uploads are big; everything else stays tiny. (multipart
+    // form-data IS an express-raw-parseable binary — parseMultipart splits it.)
+    express.raw({ type: 'application/vnd.android.package-archive', limit: '200mb' }),
+    express.raw({ type: 'application/octet-stream', limit: '200mb' }),
+    express.raw({ type: 'multipart/form-data', limit: '200mb' }),
     express.raw({ type: '*/*', limit: '8mb' }),
     hmacVerify(opts.internalHmac || opts.hmac || { secretEnv: 'QRIS_INTERNAL_SECRET' }),
     parseMultipart,
+    // App-update publish/status share the SAME HMAC gate (dashboard Owner-only).
+    // Mounted WITH the internal router so both live behind identical gates.
     internalRoutes.router,
+    appUpdateRoutes.router,
   );
 
   // -- 404 + error sink ---------------------------------------------------------

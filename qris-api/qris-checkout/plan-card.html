@@ -2,14 +2,16 @@
   plan-card.html — one plan card + its order button (GET /pay/:token/plan/:planId).
   Rendered once per active plan by src/routes/web.js.
 -->
-<div class="card plan">
-  <div>
-    <div class="plan-name">{{name}}</div>
-    <div class="plan-desc">{{monthsLine}}{{descSuffix}}</div>
-  </div>
-  <div class="plan-price">
-    <div class="price">{{price}}</div>
-    <div class="permo">{{perMonth}}{{perMonthSuffix}}</div>
+<div class="card" style="margin-bottom:0">
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+    <div>
+      <div class="plan-name">{{name}}</div>
+      <div class="plan-desc">{{monthsLine}}{{descSuffix}}</div>
+    </div>
+    <div style="text-align:right;flex:none">
+      <div class="price">{{price}}</div>
+      <div class="permo">{{perMonth}}{{perMonthSuffix}}</div>
+    </div>
   </div>
 </div>
 <form method="get" action="{{action}}">

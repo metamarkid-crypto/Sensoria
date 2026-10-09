@@ -137,6 +137,15 @@ async function createOrderForProvider(store, db, { provider, device, plan, expir
   }
 
   if (provider.id === 'qris-gobiz') {
+    // RELOAD SAFETY: a re-opened/refreshed pay page re-attaches to the user's
+    // existing live pending order instead of minting a duplicate (the
+    // "double transactions" report). Price drift guard lives in the store
+    // helper: a stale-amount order is NOT reused — a fresh one is created.
+    const reusable = await store.findReusableOrderForDevice(db, device.id, plan.id, amount);
+    if (reusable && reusable.merchant_db_id) {
+      // The stored QR string is still valid (amount payload unchanged).
+      return { order: reusable, qrString: reusable.qr_string || null, payUrl: null, reused: true };
+    }
     const merchant = await store.pickMerchantForCheckout(db);
     if (!merchant || !merchant.static_qris) {
       const e = new Error('NO_MERCHANT');
@@ -175,6 +184,9 @@ async function createOrderForProvider(store, db, { provider, device, plan, expir
       e.message = 'Sistem pembayaran sedang tidak tersedia. Coba lagi nanti.';
       throw e;
     }
+    // toyyibpay bills are external (billcode bound to the transaction_ref),
+    // so a reload must NOT reuse — a reused order would hand back a second
+    // bill for a pending ref. The per-device cap brakes hammering instead.
     const order = await store.createOrderWithLedger(db, {
       childDeviceId: device.id,
       planId: plan.id,

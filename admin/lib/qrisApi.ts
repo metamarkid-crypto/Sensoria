@@ -253,5 +253,67 @@ export const refreshMerchantToken = (merchantId: string) =>
     { merchant_id: merchantId },
   );
 
+// ─── App self-update (VPS-hosted Android APK distribution) ─────────────────
+
+export interface AppUpdateConfig {
+  latest_version_code: number;
+  latest_version_name: string | null;
+  apk_file: string | null;
+  release_notes: string | null;
+  mandatory: boolean;
+  updated_at: string | null;
+}
+
+export interface AppUpdateStatusResponse {
+  config: AppUpdateConfig;
+}
+
+export interface AppUpdatePublishResponse {
+  ok: boolean;
+  config: AppUpdateConfig;
+}
+
+/** APK byte ceiling — a 100 MB guard against accidental huge uploads. */
+export const APK_MAX_BYTES = 100 * 1024 * 1024;
+
+export const getAppUpdateStatus = () =>
+  qrisApiRequest<AppUpdateStatusResponse>("GET", "/internal/app-update/status");
+
+/**
+ * Publish a config-only version bump (no APK bytes). Field names mirror
+ * qris-api/src/routes/appUpdate.js publishUpdate.
+ */
+export const publishAppUpdateConfig = (input: {
+  version_code?: number;
+  version_name?: string;
+  notes?: string;
+  mandatory?: boolean;
+}) => qrisApiRequest<AppUpdatePublishResponse>("POST", "/internal/app-update", input);
+
+/**
+ * Upload a release APK: multipart/form-data with a `file` field. The API
+ * stores it under updates/ and returns the effective config. Signing is the
+ * same raw-bytes HMAC as the QR image upload.
+ */
+export function publishAppUpdateApk(apkBytes: Uint8Array, apkName: string): Promise<AppUpdatePublishResponse> {
+  const boundary = `----sensoriapk${crypto.randomBytes(12).toString("hex")}`;
+  const contentType = `multipart/form-data; boundary=${boundary}`;
+  const head =
+    `--${boundary}\r\n` +
+    `Content-Disposition: form-data; name="file"; filename="${apkName.replace(/["\r\n]/g, "")}"\r\n` +
+    `Content-Type: application/vnd.android.package-archive\r\n\r\n`;
+  const tail = `\r\n--${boundary}--\r\n`;
+  const headBytes = Buffer.from(head, "utf8");
+  const tailBytes = Buffer.from(tail, "utf8");
+  const body = new Uint8Array(headBytes.length + apkBytes.length + tailBytes.length);
+  body.set(headBytes, 0);
+  body.set(apkBytes, headBytes.length);
+  body.set(tailBytes, headBytes.length + apkBytes.length);
+  return qrisApiRequest<AppUpdatePublishResponse>("POST", "/internal/app-update", body, {
+    contentType,
+    timeoutMs: 120_000, // 100 MB at modest uplink speeds
+  });
+}
+
 export const runWorkerSweep = () =>
   qrisApiRequest<WorkerRunResponse>("POST", "/internal/worker/run", {});

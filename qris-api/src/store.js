@@ -114,6 +114,7 @@ function createStore(opts = {}) {
     attachProviderRefToOrder,
     listPendingProviderOrders,
     countRecentOrdersForDevice,
+    findReusableOrderForDevice,
     // -- settlement ---------------------------------------------------------
     claimJournal,
     settleOrder,
@@ -665,6 +666,41 @@ async function listPendingProviderOrders(db, provider, limit = 200) {
   // jsonb @> filter done client-side (small pending set, keeps the store
   // portable across PostgREST fakes/tests).
   return (data || []).filter((o) => o.raw_journal && o.raw_journal.provider === provider);
+}
+
+/**
+ * RELOAD SAFETY — one pending order per (device, plan).
+ *
+ * The QR page has no client state: when the user pulls-to-refresh (or the
+ * Chrome Custom Tab is re-opened) the route previously created a FRESH order
+ * every time — the user's "double transactions, same device" report. Money
+ * discipline: the OLD order stays pending for its whole TTL with no payer
+ * attached, and only ONE of them can ever actually be paid
+ * (one journal = one order), so the others are pure noise rows.
+ *
+ * checkoutPage re-attaches to the OLDEST live pending order for the same
+ * device+plan+amount instead of minting an identical duplicate. The order's
+ * amount snapshot is re-validated against the plan so a dashboard price
+ * change after order creation is never silently honoured.
+ */
+async function findReusableOrderForDevice(db, childDeviceId, planId, amount) {
+  const { data, error } = await db
+    .from('qris_orders')
+    .select(ORDER_COLUMNS)
+    .eq('child_device_id', childDeviceId)
+    .eq('plan_id', planId)
+    .eq('status', 'pending')
+    .gt('expires_at', new Date().toISOString())
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw dbErr('findReusableOrderForDevice', error);
+  const order = data || null;
+  if (!order) return null;
+  // Price drift guard: the plan's CURRENT price must equal the snapshot.
+  // Admin test hacks (Rp199.000 → Rp1.000) otherwise keep re-attaching users
+  // to a stale-amount order whose QR no longer matches any live journal.
+  return Number(order.amount) === Number(amount) ? order : null;
 }
 
 /** Simple per-device rate signal for the checkout endpoint. */

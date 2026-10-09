@@ -9,6 +9,7 @@ import { useAACStore } from './src/store/useAACStore';
 import { subscribeEntitlementRealtime } from './src/services/db/entitlementRealtime';
 import { flushPendingMessages, flushCloudOps } from './src/services/db/supabase';
 import SplashGate from './src/components/SplashGate';
+import AppUpdateGate from './src/components/AppUpdateGate';
 
 Sentry.init({
   dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
@@ -217,6 +218,7 @@ function App() {
         <AppNavigator />
       </Sentry.ErrorBoundary>
       <SplashGate />
+      <AppUpdateGate />
       <Toast config={toastConfig} />
     </SafeAreaProvider>
   );
