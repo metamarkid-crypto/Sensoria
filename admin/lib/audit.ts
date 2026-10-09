@@ -38,6 +38,7 @@ export const AUDIT_ACTIONS = [
   "qris_token_refresh",
   "qris_worker_run",
   "app_update_publish",
+  "about_content_update",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

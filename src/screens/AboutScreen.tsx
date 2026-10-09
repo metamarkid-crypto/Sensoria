@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Linking, ActivityIndicator } from 'react-native';
+import {
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Linking,
+  ActivityIndicator, ImageBackground, useColorScheme, Dimensions, type ViewStyle,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -7,24 +10,60 @@ import { supabase } from '../services/db/supabase';
 import { useAACStore, AboutContent } from '../store/useAACStore';
 import { useTranslation } from '../i18n';
 
+/* ── Richer content contract (backward compatible) ─────────────────────
+   The admin /admin/about panel writes these optional fields into
+   app_content.content_json.next to the original 4 the old screen read.
+   Everything optional resolves to '' so old rows never break the screen. */
+interface RichAbout extends AboutContent {
+  heroImageUrl?: string;
+  missionParagraphs?: string[];
+  featureList?: { icon: string; title: string; text: string }[];
+  whatsappNumber?: string;
+}
+
+const NAVY = '#11427B';
+const NAVY_DEEP = '#0B2545';
+const TEAL = '#00B5B8';
+const SKY = '#F2FAFE';
+const INK = '#334155';
+const SLATE_LIGHT = '#E1F2FD';
+
+const ICON_MAP: Record<string, keyof typeof Ionicons.glyphMap> = {
+  star: 'star',
+  heart: 'heart',
+  bulb: 'bulb',
+  school: 'school',
+  people: 'people',
+  chatbubbles: 'chatbubbles',
+  mic: 'mic',
+  game: 'game-controller',
+  shield: 'shield-checkmark',
+  sparkles: 'sparkles',
+};
+
+/** Feature card icon colors cycle through a compact brand-friendly set. */
+const ICON_COLORS = [TEAL, '#6366F1', '#F59E0B', '#10B981', '#EC4899', '#0EA5E9', '#8B5CF6', '#14B8A6'];
+
 export default function AboutScreen() {
   const navigation = useNavigation<any>();
   const { t } = useTranslation();
+  const scheme = useColorScheme();
+  const isDark = scheme === 'dark';
   const { aboutContent, setAboutContent } = useAACStore();
   const [isFetching, setIsFetching] = useState(false);
 
-  // Fallback content if completely offline and store is empty
-  const defaultContent: AboutContent = {
+  const defaultContent: RichAbout = {
     description: t('about.defaultDescription'),
-    contactEmail: "support@aacsensoria.id",
-    version: "v1.0.0 (Beta)",
-    privacyPolicyUrl: "https://aacsensoria.id/privacy"
+    contactEmail: 'support@aacsensoria.id',
+    version: 'v1.0.10',
+    privacyPolicyUrl: 'https://aacsensoria.id/privacy',
+    missionParagraphs: [],
+    featureList: [],
   };
 
-  const displayContent = aboutContent || defaultContent;
+  const c: RichAbout = { ...defaultContent, ...(aboutContent ?? {}) };
 
   useEffect(() => {
-    // 1. Initial Load: Fetch from Supabase if empty (or to get latest)
     const fetchContent = async () => {
       if (!aboutContent) setIsFetching(true);
       try {
@@ -35,8 +74,6 @@ export default function AboutScreen() {
           .single();
 
         if (!error && data?.content_json) {
-          // PostgREST returns jsonb as an object, text as a string — normalize
-          // both so a schema drift (jsonb vs text) can never blank the screen.
           let parsed = data.content_json;
           if (typeof parsed === 'string') {
             try {
@@ -58,195 +95,316 @@ export default function AboutScreen() {
 
     fetchContent();
 
-    // 2. Real-Time Background Sync
-    const channel = supabase.channel('about_content_updates')
+    const channel = supabase
+      .channel('about_content_updates')
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'app_content', filter: "id=eq.about_sensoria" },
         (payload: any) => {
           if (payload.new && payload.new.content_json) {
-            // Silently update the Zustand store in the background
             setAboutContent(payload.new.content_json);
           }
-        }
+        },
       )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color="#1A2980" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('about.title')}</Text>
-        <View style={{ width: 40 }} />
-      </View>
+  const openUrl = (url: string) => {
+    if (!url) return;
+    Linking.openURL(url).catch(() => {});
+  };
 
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
-        
-        {/* App Logo & Name */}
-        <View style={styles.logoContainer}>
-          <View style={styles.logoBox}>
-            {/* Placeholder for Logo, using an Icon for now */}
-            <Ionicons name="shapes" size={64} color="#2488FF" />
+  const cardBg = isDark ? 'rgba(22,32,58,0.92)' : '#FFFFFF';
+  const heroHeight = Math.min(260, Dimensions.get('window').width * 0.55);
+
+  return (
+    <View style={[styles.root, { backgroundColor: isDark ? NAVY_DEEP : SKY }]}>
+      {/* ── Hero header — brand gradient block with optional poster image ── */}
+      {c.heroImageUrl ? (
+        <ImageBackground
+          source={{ uri: c.heroImageUrl }}
+          style={[styles.hero, { height: heroHeight }]}
+          imageStyle={{ opacity: 0.9 }}
+        >
+          <View style={[styles.heroScrim, { backgroundColor: 'rgba(8,20,40,0.35)' }]} />
+          <SafeAreaView edges={['top']} style={styles.heroSafe}>
+            <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+              <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
+            </TouchableOpacity>
+            <Text style={styles.heroTitle}>{t('about.title')}</Text>
+          </SafeAreaView>
+        </ImageBackground>
+      ) : (
+        <SafeAreaView edges={['top']} style={[styles.heroSolid, { backgroundColor: isDark ? '#101B33' : NAVY }]}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={22} color="#E1F2FD" />
+          </TouchableOpacity>
+          <Text style={[styles.heroTitle, { color: '#FFFFFF' }]}>{t('about.title')}</Text>
+        </SafeAreaView>
+      )}
+
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ── Logo block ── */}
+        <View style={styles.logoRow}>
+          <View style={[styles.logoBox, { backgroundColor: cardBg }]}>
+            <Image
+              source={require('../../assets/icon.png')}
+              style={styles.logoImg}
+              resizeMode="contain"
+            />
           </View>
-          <Text style={styles.appName}>Sensoria AAC</Text>
+          <Text style={[styles.appName, { color: isDark ? '#FFFFFF' : NAVY }]}>Sensoria AAC</Text>
+          <View style={styles.badgeRow}>
+            <View style={[styles.badge, { backgroundColor: isDark ? 'rgba(0,181,184,0.16)' : 'rgba(0,181,184,0.12)' }]}>
+              <Ionicons name="sparkles" size={11} color={TEAL} />
+              <Text style={[styles.badgeText, { color: TEAL }]}>AAC</Text>
+            </View>
+            <View style={[styles.badge, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(17,66,123,0.08)' }]}>
+              <Ionicons name="shield-checkmark" size={11} color={isDark ? '#93C5FD' : NAVY} />
+              <Text style={[styles.badgeText, { color: isDark ? '#93C5FD' : NAVY }]}>{t('about.title')}</Text>
+            </View>
+          </View>
         </View>
 
-        {/* Dynamic Content Area */}
-        <View style={styles.card}>
+        {/* ── Description (long text, center) ── */}
+        <View style={[styles.card, { backgroundColor: cardBg }]}>
           {isFetching && !aboutContent ? (
-            <ActivityIndicator size="small" color="#2488FF" style={{ padding: 20 }} />
+            <ActivityIndicator size="small" color={TEAL} style={{ paddingVertical: 24 }} />
           ) : (
             <>
-              <Text style={styles.description}>{displayContent.description}</Text>
-              
-              <TouchableOpacity 
-                style={styles.linkRow} 
-                onPress={() => Linking.openURL(`mailto:${displayContent.contactEmail}`)}
-              >
-                <Ionicons name="mail" size={20} color="#2488FF" />
-                <Text style={styles.linkText}>{displayContent.contactEmail}</Text>
-              </TouchableOpacity>
+              <Text style={[styles.description, { color: isDark ? '#CBD5E0' : INK }]}>{c.description}</Text>
 
-              <View style={styles.divider} />
-
-              <TouchableOpacity 
-                style={styles.linkRow} 
-                onPress={() => Linking.openURL(displayContent.privacyPolicyUrl)}
-              >
-                <Ionicons name="shield-checkmark" size={20} color="#2488FF" />
-                <Text style={styles.linkText}>{t('about.privacyPolicy')}</Text>
-              </TouchableOpacity>
+              {c.missionParagraphs?.length ? (
+                <View style={styles.missionBlock}>
+                  <Text style={[styles.sectionLabel, { color: isDark ? '#93C5FD' : NAVY }]}>
+                    {t('about.missions') || 'Misi Kami'}
+                  </Text>
+                  {c.missionParagraphs.filter(Boolean).map((p, i) => (
+                    <Text key={i} style={[styles.missionText, { color: isDark ? '#A8B3C4' : '#64748B' }]}>
+                      <Text style={{ color: TEAL, fontWeight: '800' }}>• </Text>
+                      {p}
+                    </Text>
+                  ))}
+                </View>
+              ) : null}
             </>
           )}
         </View>
 
+        {/* ── Feature grid (up to 8, admin-managed) ── */}
+        {c.featureList?.length ? (
+          <View style={styles.featureWrap}>
+            {c.featureList.filter((f) => f.title).map((f, i) => (
+              <View key={i} style={[styles.featureCard, { backgroundColor: cardBg }]}>
+                <View style={[styles.featureIcon, { backgroundColor: `${ICON_COLORS[i % ICON_COLORS.length]}1A` }]}>
+                  <Ionicons
+                    name={ICON_MAP[f.icon] ?? 'star'}
+                    size={18}
+                    color={ICON_COLORS[i % ICON_COLORS.length]}
+                  />
+                </View>
+                <Text style={[styles.featureTitle, { color: isDark ? '#E2E8F0' : NAVY }]} numberOfLines={1}>
+                  {f.title}
+                </Text>
+                <Text style={[styles.featureText, { color: isDark ? '#8B99AE' : '#64748B' }]}>{f.text}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        {/* ── Contact card ── */}
+        <View style={[styles.card, { backgroundColor: cardBg }]}>
+          <Text style={[styles.sectionLabel, { color: isDark ? '#93C5FD' : NAVY }]}>
+            Hubungi Kami
+          </Text>
+          {c.contactEmail ? (
+            <TouchableOpacity style={styles.contactRow} onPress={() => openUrl(`mailto:${c.contactEmail}`)}>
+              <View style={[styles.contactIcon, { backgroundColor: `${TEAL}1A` }]}>
+                <Ionicons name="mail" size={17} color={TEAL} />
+              </View>
+              <Text style={[styles.contactText, { color: isDark ? '#CBD5E0' : INK }]} numberOfLines={1}>
+                {c.contactEmail}
+              </Text>
+              <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+            </TouchableOpacity>
+          ) : null}
+          {c.whatsappNumber ? (
+            <TouchableOpacity
+              style={styles.contactRow}
+              onPress={() => openUrl(`https://wa.me/${c.whatsappNumber}`)}
+            >
+              <View style={[styles.contactIcon, { backgroundColor: 'rgba(37,211,102,0.14)' }]}>
+                <Ionicons name="logo-whatsapp" size={18} color="#25D366" />
+              </View>
+              <Text style={[styles.contactText, { color: isDark ? '#CBD5E0' : INK }]}>WhatsApp Support</Text>
+              <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+            </TouchableOpacity>
+          ) : null}
+          {c.privacyPolicyUrl ? (
+            <TouchableOpacity style={styles.contactRow} onPress={() => openUrl(c.privacyPolicyUrl)}>
+              <View style={[styles.contactIcon, { backgroundColor: 'rgba(99,102,241,0.13)' }]}>
+                <Ionicons name="document-text" size={17} color="#6366F1" />
+              </View>
+              <Text style={[styles.contactText, { color: isDark ? '#CBD5E0' : INK }]}>
+                {t('about.privacyPolicy')}
+              </Text>
+              <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+            </TouchableOpacity>
+          ) : null}
+        </View>
       </ScrollView>
 
-      {/* Footer Area */}
-      <View style={styles.footer}>
-        <Text style={styles.versionText}>{displayContent.version}</Text>
-        <Text style={styles.footerText}>{t('about.developedIn')}</Text>
+      {/* ── Footer ── */}
+      <View style={[styles.footer, { backgroundColor: isDark ? '#101B33' : '#FFFFFF' }]}>
+        <Text style={[styles.versionText, { color: isDark ? '#64748B' : '#94A3B8' }]}>{c.version}</Text>
+        <Text style={[styles.footerText, { color: isDark ? '#475569' : '#CBD5E1' }]}>
+          {t('about.developedIn')}
+        </Text>
       </View>
-
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
+  root: { flex: 1 },
+  /* hero */
+  hero: { width: '100%' },
+  heroScrim: StyleSheet.absoluteFill as unknown as ViewStyle,
+  heroSafe: { flex: 1, paddingHorizontal: 16, paddingBottom: 34 },
+  backBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(8,20,40,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  header: {
+  heroTitle: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 18,
+    textAlign: 'center',
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
+  },
+  heroSolid: {
+    height: 96,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  /* body */
+  scroll: { flex: 1 },
+  content: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 32 },
+  logoRow: { alignItems: 'center', marginBottom: 24 },
+  logoBox: {
+    width: 104,
+    height: 104,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#00B5B8',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    elevation: 8,
+    marginBottom: 14,
+  },
+  logoImg: { width: 72, height: 72, borderRadius: 16 },
+  appName: { fontSize: 22, fontWeight: '900', letterSpacing: -0.5, marginBottom: 10 },
+  badgeRow: { flexDirection: 'row', gap: 8 },
+  badge: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center', // Centered properly
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-    position: 'relative',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
   },
-  backButton: {
-    position: 'absolute',
-    left: 16,
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-    zIndex: 10,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1A2980',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  content: {
-    padding: 24,
-    alignItems: 'center',
-  },
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: 32,
-    marginTop: 16,
-  },
-  logoBox: {
-    width: 120,
-    height: 120,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#2488FF',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 10,
-    marginBottom: 16,
-  },
-  appName: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: '#1A2980',
-    letterSpacing: -0.5,
-  },
+  badgeText: { fontSize: 11, fontWeight: '700' },
+  /* cards */
   card: {
     width: '100%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 24,
-    shadowColor: '#000',
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: '#0B2545',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 5,
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 4,
+    marginBottom: 16,
   },
-  description: {
-    fontSize: 15,
-    lineHeight: 24,
-    color: '#475569',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#F1F5F9',
-    marginVertical: 16,
-  },
-  linkRow: {
+  description: { fontSize: 15, lineHeight: 25, textAlign: 'center' },
+  missionBlock: { marginTop: 18, paddingTop: 16, borderTopWidth: 1, borderTopColor: 'rgba(148,163,184,0.15)' },
+  sectionLabel: { fontSize: 13, fontWeight: '800', marginBottom: 10, letterSpacing: 0.2 },
+  missionText: { fontSize: 14, lineHeight: 22, marginBottom: 8 },
+  /* features */
+  featureWrap: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 16,
+    width: '100%',
+  },
+  featureCard: {
+    flexGrow: 1,
+    flexBasis: '46%',
+    borderRadius: 16,
+    padding: 14,
+    shadowColor: '#0B2545',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  featureIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
+    marginBottom: 8,
   },
-  linkText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#2488FF',
-  },
-  footer: {
-    padding: 24,
+  featureTitle: { fontSize: 13.5, fontWeight: '800', marginBottom: 4 },
+  featureText: { fontSize: 12, lineHeight: 17 },
+  /* contacts */
+  contactRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
+    paddingVertical: 10,
   },
-  versionText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#94A3B8',
-    marginBottom: 4,
+  contactIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  footerText: {
-    fontSize: 12,
-    color: '#CBD5E1',
+  contactText: { flex: 1, fontSize: 14, fontWeight: '600' },
+  /* footer */
+  footer: {
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(148,163,184,0.12)',
   },
+  versionText: { fontSize: 13, fontWeight: '700', marginBottom: 3 },
+  footerText: { fontSize: 11.5 },
 });
+
+// SLATE_LIGHT kept for potential future accent use; avoids import removal churn.
+void SLATE_LIGHT;
