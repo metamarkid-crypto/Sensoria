@@ -50,6 +50,15 @@ const openAndMigrate = async (): Promise<void> => {
       attempts INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS translation_queue (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      word_id TEXT NOT NULL,
+      word TEXT NOT NULL,
+      from_lang TEXT NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL
+    );
   `);
 };
 
@@ -489,6 +498,55 @@ export const deleteCloudOp = async (id: number): Promise<void> => {
   await ensureDB();
   if (!db) return;
   await db.runAsync('DELETE FROM cloud_outbox WHERE id = ?', [id]);
+};
+
+// --- TRANSLATION QUEUE (non-AI auto-translate, offline-deferred) ---
+// User-added custom words are saved IMMEDIATELY with the typed label in all
+// four columns; the three sibling languages are filled later by the free
+// (non-AI) translator. Offline? The job parks here and is flushed when the
+// device is back online — adding a word NEVER fails because of translation.
+export const MAX_TRANSLATION_ATTEMPTS = 8;
+
+export const enqueueTranslationJob = async (wordId: string, word: string, fromLang: string): Promise<void> => {
+  await ensureDB();
+  if (!db) return;
+  try {
+    // One job per word — a re-rename replaces the pending job (latest label wins).
+    await db.runAsync('DELETE FROM translation_queue WHERE word_id = ?', [wordId]);
+    await db.runAsync(
+      'INSERT INTO translation_queue (word_id, word, from_lang, attempts, created_at) VALUES (?, ?, ?, 0, ?)',
+      [wordId, word, fromLang, Date.now()],
+    );
+  } catch (e) {
+    console.warn('[TranslationQueue] enqueue failed:', e);
+  }
+};
+
+export const getTranslationJobs = async (limit = 20): Promise<Array<{ id: number; word_id: string; word: string; from_lang: string; attempts: number }>> => {
+  await ensureDB();
+  if (!db) return [];
+  return db.getAllAsync('SELECT id, word_id, word, from_lang, attempts FROM translation_queue ORDER BY id ASC LIMIT ?', [limit]);
+};
+
+export const deleteTranslationJob = async (id: number): Promise<void> => {
+  await ensureDB();
+  if (!db) return;
+  await db.runAsync('DELETE FROM translation_queue WHERE id = ?', [id]);
+};
+
+export const bumpTranslationAttempts = async (id: number): Promise<number> => {
+  await ensureDB();
+  if (!db) return 0;
+  await db.runAsync('UPDATE translation_queue SET attempts = attempts + 1 WHERE id = ?', [id]);
+  const row = await db.getAllAsync<{ attempts: number }>('SELECT attempts FROM translation_queue WHERE id = ?', [id]);
+  return row[0]?.attempts ?? 0;
+};
+
+export const countTranslationJobs = async (): Promise<number> => {
+  await ensureDB();
+  if (!db) return 0;
+  const row = await db.getAllAsync<{ n: number }>('SELECT COUNT(*) AS n FROM translation_queue');
+  return row[0]?.n ?? 0;
 };
 
 export const bumpCloudOpAttempts = async (id: number): Promise<number> => {

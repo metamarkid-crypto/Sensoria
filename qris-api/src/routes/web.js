@@ -55,6 +55,35 @@ router.use(
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/**
+ * Checkout-page security headers (helmet-lite already sets the globals in
+ * app.js; these are page-specific):
+ *   • CSP — everything is inline by design (zero external JS/CSS, pages must
+ *     render on flaky mobile data), so the policy pins the SAME inline
+ *     sources: no external script/style/img/connect origin can ever load,
+ *     which kills exfil-via-network even if an injection ever slipped past
+ *     the esc() renderer. data: is needed for the QR image + Download QRIS.
+ *     form-action 'self' (NOT 'none'): the plan list orders via a plain
+ *     same-origin GET <form> — 'none' silently killed every Pay button.
+ *   • no-store — a QR page is a live money view; a cached page would show a
+ *     spent QR after Back-navigation (users re-pay an expired code).
+ */
+function checkoutPageHeaders(res) {
+  res.setHeader(
+    'Content-Security-Policy',
+    [
+      "default-src 'none'",
+      "style-src 'unsafe-inline'",
+      "img-src 'self' data:",
+      "script-src 'unsafe-inline'",
+      "connect-src 'self'",
+      "form-action 'self'",
+      "base-uri 'none'",
+    ].join('; '),
+  );
+  res.setHeader('Cache-Control', 'no-store');
+}
+
 /** Locale strings for the checkout page (id/en/zh/ms — matches the app). */
 const PAGE_STRINGS = {
   id: {
@@ -232,6 +261,7 @@ async function checkoutPage(req, res, next) {
       })
       .join('');
 
+    checkoutPageHeaders(res);
     const body = render('checkout', {
       subtitle: s.subtitle,
       plansError: plans.length === 0 ? `<div class="err">${esc(s.errorGeneric)}</div>` : '',
@@ -286,6 +316,7 @@ async function createOrderAndRedirect(req, res, next) {
 
     if (qrString) {
       // Active rail: render the invoice-style QRIS page + status poller.
+      checkoutPageHeaders(res);
       const dataUrl = await QRCode.toBuffer(qrString, { errorCorrectionLevel: 'M', margin: 2, scale: 6 });
       const qrSrc = `data:image/png;base64,${dataUrl.toString('base64')}`;
       return res.send(
@@ -327,12 +358,16 @@ async function orderStatusForPage(req, res, next) {
     const payload = verifyCheckoutToken(req.params.token);
     if (!payload) return res.status(403).json({ error: 'TOKEN_EXPIRED' });
     const ref = String(req.params.ref || '');
+    if (!/^AAC-\d{8}-[0-9A-F]{6}$/i.test(ref)) {
+      return res.status(400).json({ error: 'BAD_REF' });
+    }
     const store = req.app.get('store');
     const db = store.db;
     const order = await store.getOrderByRef(db, ref);
     if (!order || order.child_device_id !== payload.d) {
       return res.status(404).json({ error: 'ORDER_NOT_FOUND' });
     }
+    res.setHeader('Cache-Control', 'no-store');
     return res.json({ status: order.status, paid_at: order.paid_at, amount: Number(order.amount), currency: order.currency });
   } catch (err) {
     return next(err);
@@ -344,6 +379,7 @@ function donePage(req, res) {
   const payload = verifyCheckoutToken(req.params.token);
   const lang = payload ? payload.l : 'en';
   const s = PAGE_STRINGS[lang] || PAGE_STRINGS.en;
+  checkoutPageHeaders(res);
   return res.send(
     pageShell(
       lang,

@@ -5,8 +5,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { useAACStore, AACWord, resolveWordText } from '../store/useAACStore';
 import { evaluateAccess } from '../services/db/entitlement';
-import { initDB, getAllWords, addCustomWord, updateWord, setWordFavorite, queuePendingMessage } from '../services/db/sqlite';
-import { tagImageWithBilingualNames, translateWordBilingual, isNoConfidenceTag } from '../services/ai/gemini';
+import { initDB, getAllWords, addCustomWord, updateWord, setWordFavorite, queuePendingMessage, enqueueTranslationJob } from '../services/db/sqlite';
+import { tagImageWithBilingualNames, isNoConfidenceTag } from '../services/ai/gemini';
+import { startTranslationFlusher } from '../services/translation/translationQueue';
 import { logger } from '../utils/logger';
 import Toast from 'react-native-toast-message';
 import AACGrid from '../components/sensory/AACGrid';
@@ -169,6 +170,11 @@ export default function ChildAACScreen() {
   useEffect(() => {
     loadDatabase();
     setupLocation();
+
+    // NON-AI translation flusher: fills pending custom-word translations when
+    // the device (re)gains connectivity. adding Words offline never blocks —
+    // the queue persists in SQLite until a later online flush succeeds.
+    const stopTranslationFlusher = startTranslationFlusher(() => loadDatabase());
     
     // Greet the child on first load!
     if (childProfile?.nickname) {
@@ -304,6 +310,7 @@ export default function ChildAACScreen() {
       if (settingsChannel) supabase.removeChannel(settingsChannel);
       if (familyLinksChannel) supabase.removeChannel(familyLinksChannel);
       if (pingChannel) supabase.removeChannel(pingChannel);
+      stopTranslationFlusher();
     };
   }, []);
 
@@ -582,31 +589,19 @@ export default function ChildAACScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     Toast.show({ type: 'success', text1: t('common.success'), text2: t('aac.toastCardAdded', { name: label }), position: 'top' });
 
-    // Non-blocking background tasks: cloud backup + translation of the
-    // languages the user did not type. Failures are logged, never surfaced
-    // as blocking errors — the card is already saved and usable offline.
+    // Non-blocking background tasks: cloud backup + NON-AI translation of the
+    // languages the user did not type. The translation is OFFLINE-DEFERRED:
+    // the typed label is already stored in all four columns, so the card is
+    // immediately usable; the free MT queue fills the siblings when online
+    // (flushTranslationQueue on network reconnect). The human's typed label
+    // is never overwritten.
     void syncCustomWordToCloud(newWord, deviceId).catch((e: any) => {
       logger.logError(e, { action: 'custom_words cloud sync failed', role: 'Child' });
     });
-    // Translate when the save did NOT originate from a trusted AI prefill
-    // (manual fallback), or when the user corrected the AI's word — in both
-    // cases the silent siblings are placeholders/stale. The human's typed
-    // label is never overwritten: only the OTHER three languages are patched.
     const needsTranslation =
       aiOriginalRef.current === null || label !== aiOriginalRef.current;
     if (needsTranslation) {
-      void translateWordBilingual(label, activeLang)
-        .then((quad) => {
-          const patch: Partial<AACWord> = {};
-          if (activeLang !== 'id') patch.word_id = quad.id;
-          if (activeLang !== 'en') patch.word_en = quad.en;
-          if (activeLang !== 'zh') patch.word_zh = quad.zh;
-          if (activeLang !== 'ms') patch.word_ms = quad.ms;
-          return updateWord(newWord.id, patch).then(() => loadDatabase());
-        })
-        .catch((e: any) => {
-          logger.logError(e, { action: 'background quad-lingual fill failed', role: 'Child' });
-        });
+      void enqueueTranslationJob(newWord.id, label, activeLang);
     }
   };
 
@@ -701,29 +696,16 @@ export default function ChildAACScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     // Keep the quad-lingual dataset sealed: when the label actually changed,
-    // refresh the OTHER three languages in the background so word_en, word_zh
-    // and word_ms stay in sync in SQLite. Fire-and-forget — never blocks the
-    // UI; failures are logged, the renamed card is already saved and usable.
+    // refresh the OTHER three languages via the NON-AI translation queue
+    // (offline-deferred — nothing blocks, nothing is lost when offline). The
+    // old labels' cached AI voices are evicted up front so the next playback
+    // fetches the NEW name; the queue's patch lands afterwards.
     if (label !== previousLabel) {
-      void translateWordBilingual(label, activeLang)
-        .then(async (quad) => {
-          // Evict the pre-edit sibling caches so the next playback fetches
-          // a voice for the NEW name instead of playing the stale one.
-          if (activeLang !== 'id' && selectedWord.word_id) await clearAudioCache(selectedWord.word_id, 'id', 'Child');
-          if (activeLang !== 'en' && selectedWord.word_en) await clearAudioCache(selectedWord.word_en, 'en', 'Child');
-          if (activeLang !== 'zh' && selectedWord.word_zh) await clearAudioCache(selectedWord.word_zh, 'zh', 'Child');
-          if (activeLang !== 'ms' && selectedWord.word_ms) await clearAudioCache(selectedWord.word_ms, 'ms', 'Child');
-
-          const siblingPatch: Partial<AACWord> = {};
-          if (activeLang !== 'id') siblingPatch.word_id = quad.id;
-          if (activeLang !== 'en') siblingPatch.word_en = quad.en;
-          if (activeLang !== 'zh') siblingPatch.word_zh = quad.zh;
-          if (activeLang !== 'ms') siblingPatch.word_ms = quad.ms;
-          return updateWord(selectedWord.id, siblingPatch).then(() => loadDatabase());
-        })
-        .catch((e: any) => {
-          logger.logError(e, { action: 'background quad-lingual rename failed', role: 'Child' });
-        });
+      if (activeLang !== 'id' && selectedWord.word_id) await clearAudioCache(selectedWord.word_id, 'id', 'Child');
+      if (activeLang !== 'en' && selectedWord.word_en) await clearAudioCache(selectedWord.word_en, 'en', 'Child');
+      if (activeLang !== 'zh' && selectedWord.word_zh) await clearAudioCache(selectedWord.word_zh, 'zh', 'Child');
+      if (activeLang !== 'ms' && selectedWord.word_ms) await clearAudioCache(selectedWord.word_ms, 'ms', 'Child');
+      void enqueueTranslationJob(selectedWord.id, label, activeLang);
     }
   };
 

@@ -1,14 +1,16 @@
-/*
- * layout.html — shared page shell for the browser checkout.
- *
- * Plain HTML template with {{escaped}} and {{{raw}}} placeholder tokens
- * (rendered by src/templates.js). No view-engine dependency: this must
- * render even when node_modules is minimal and load fast on mobile data.
- *
- * The checkout page is intentionally dependency-free inline CSS — it must
- * render on any browser the APK can open (system browser on Android/iOS).
- */
 <!DOCTYPE html>
+<!--
+  layout.html — shared page shell for the browser checkout.
+
+  Plain HTML template with {{escaped}} and {{{raw}}} placeholder tokens
+  (rendered by src/templates.js). No view-engine dependency: this must
+  render even when node_modules is minimal and load fast on mobile data.
+
+  The checkout page is intentionally dependency-free inline CSS — it must
+  render on any browser the APK can open (system browser on Android/iOS).
+  NOTE: the doctype MUST stay the first line — anything before it (even a
+  comment) throws the browser into quirks mode.
+-->
 <html lang="{{lang}}">
 <head>
 <meta charset="utf-8">

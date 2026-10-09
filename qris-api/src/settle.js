@@ -73,6 +73,20 @@ async function settleFromMutations(store, merchant, mutations) {
   const pending = await store.listPendingOrdersForMerchant(store.db, merchant.id);
   if (pending.length === 0) return 0;
 
+  // EARLY-WARNING: journals responding but permanently empty while live
+  // pending orders exist is the fingerprint of a QR↔session mismatch — e.g.
+  // the injected static QRIS payload belongs to a DIFFERENT GoBiz account
+  // than the one whose session we poll (paid money lands in the other
+  // account, so OUR journals can never show it). Surface it loudly per
+  // merchant instead of silently polling to zero forever.
+  if (mutations.length === 0) {
+    console.warn(
+      '[settle] journals kosong untuk merchant', merchant.merchant_id,
+      `padahal ada ${pending.length} order PENDING — jika berulang, cek: ` +
+        'static_qris mungkin milik akun GoBiz lain (lihat NMID pada payload) atau akun belum aktif/KYC.',
+    );
+  }
+
   // Dedup: a journal reference can only ever settle once — claimJournal's
   // guarded UPDATE + UNIQUE(matched_journal_id) is the hard lock; this skip
   // is just to avoid re-processing journals already parked on an order.

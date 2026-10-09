@@ -121,17 +121,39 @@
         (seconds < 10 ? '0' + seconds : seconds);
     }, 1000);
 
-    // Status polling (the blade reference also polled as a websocket
-    // fallback — we are fetch-only, same 5s cadence).
-    setInterval(function () {
+    // Status polling — fetch-only, 5s cadence with jitter, hardening:
+    //   • AbortController timeout: a hung request can never pile up
+    //   • exponential backoff on repeated failures (5s→10s→…→60s cap)
+    //   • status applied via handleStatusUpdate — no page reload (keeps the
+    //     countdown and never re-serves a spent QR from cache)
+    var pollDelay = 5000;
+    var POLL_MAX_DELAY = 60000;
+    var pollTimer = null;
+    function schedulePoll(delay) {
       if (isFinalized) return;
-      fetch(statusUrl)
-        .then(function (r) { return r.json(); })
+      pollTimer = setTimeout(pollStatus, delay);
+    }
+    function pollStatus() {
+      if (isFinalized) return;
+      var ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+      var timedOut = false;
+      var killer = ctrl ? setTimeout(function () { timedOut = true; ctrl.abort(); }, 8000) : null;
+      fetch(statusUrl, ctrl ? { signal: ctrl.signal } : undefined)
+        .then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
         .then(function (data) {
+          if (killer) clearTimeout(killer);
+          pollDelay = 5000; // healthy — reset backoff
           if (data && data.status && data.status !== 'pending') handleStatusUpdate(data.status);
         })
-        .catch(function () { /* transient network error — next tick retries */ });
-    }, 5000);
+        .catch(function () {
+          if (killer) clearTimeout(killer);
+          if (timedOut || !isFinalized) {
+            pollDelay = Math.min(pollDelay * 2, POLL_MAX_DELAY);
+          }
+        })
+        .then(function () { schedulePoll(pollDelay); });
+    }
+    schedulePoll(pollDelay);
 
     function handleStatusUpdate(status) {
       if (isFinalized) return;
