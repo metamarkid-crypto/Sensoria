@@ -63,24 +63,41 @@ function installedVersionCode(): number {
 }
 
 /**
- * Check for an update. Resolves null when: iOS, version unknown, network
- * error, non-200, or no newer version published.
+ * Outcome of one update check:
+ *   • available — a newer, downloadable APK is published
+ *   • none      — up to date, iOS/unknown version, or not yet downloadable
+ *   • error     — transient failure (network, timeout, non-200, bad JSON);
+ *                 the caller may retry
  */
-export async function checkForAppUpdate(): Promise<AppUpdateInfo | null> {
-  if (Platform.OS !== 'android') return null;
+export type AppUpdateCheck =
+  | { status: 'available'; info: AppUpdateInfo }
+  | { status: 'none' }
+  | { status: 'error' };
+
+const CHECK_TIMEOUT_MS = 15_000;
+
+/** Check for an update. Never throws; the result says whether to retry. */
+export async function checkForAppUpdate(): Promise<AppUpdateCheck> {
+  if (Platform.OS !== 'android') return { status: 'none' };
   const code = installedVersionCode();
-  if (!code || code <= 0) return null;
+  if (!code || code <= 0) return { status: 'none' };
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), CHECK_TIMEOUT_MS);
   try {
     const res = await fetch(
       `${QRIS_API_BASE_URL}/api/app-update/check?version_code=${encodeURIComponent(String(code))}`,
-      { method: 'GET', headers: { Accept: 'application/json' } },
+      { method: 'GET', headers: { Accept: 'application/json' }, signal: controller.signal },
     );
-    if (!res.ok) return null;
+    if (!res.ok) return { status: 'error' };
     const body = (await res.json()) as AppUpdateInfo;
-    if (!body || !body.update_available || !body.download_url || !body.apk_ready) return null;
-    return body;
+    if (!body || !body.update_available || !body.download_url || !body.apk_ready) {
+      return { status: 'none' };
+    }
+    return { status: 'available', info: body };
   } catch {
-    return null;
+    return { status: 'error' };
+  } finally {
+    clearTimeout(timer);
   }
 }
 

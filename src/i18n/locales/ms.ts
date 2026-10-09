@@ -99,6 +99,7 @@ export const ms: Record<TranslationKey, string> = {
   'aac.send': 'Hantar',
   'aac.tabAll': 'Semua',
   'aac.tabFavorites': 'Kegemaran',
+  'aac.noFavoritesYet': 'Belum ada perkataan kegemaran',
   'aac.catPronoun': 'Orang',
   'aac.catVerb': 'Tindakan',
   'aac.catNoun': 'Benda',

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, Platform, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, AppState, Modal, Platform, StyleSheet, Text, View } from 'react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import {
@@ -28,25 +28,79 @@ import {
  */
 
 const POLL_DELAY_MS = 12_000; // first check after splash has fully landed
+const MIN_RECHECK_MS = 15 * 60_000; // foreground re-check at most every 15 min
+const RETRY_BASE_MS = 30_000; // error backoff: 30s, 60s, 120s, ... capped
+const RETRY_MAX_MS = 10 * 60_000;
+const MAX_RETRIES = 4;
 const PROGRESS_POLL_MS = 500;
 
 export default function AppUpdateGate() {
   const [update, setUpdate] = useState<AppUpdateInfo | null>(null);
   const [phase, setPhase] = useState<'idle' | 'downloading' | 'installing'>('idle');
   const [progress, setProgress] = useState(0);
+  // Refs keep the scheduler stable across renders and let it see the latest
+  // phase/dismissal without re-subscribing.
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
+  const dismissedVersionRef = useRef<number | null>(null);
+  const lastCheckRef = useRef(0);
+  const inFlightRef = useRef(false);
+  const retryRef = useRef(0);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const runCheck = useCallback(async () => {
+    if (Platform.OS !== 'android') return;
+    if (inFlightRef.current || phaseRef.current !== 'idle') return;
+    inFlightRef.current = true;
+    lastCheckRef.current = Date.now();
+    let result;
+    try {
+      result = await checkForAppUpdate();
+    } finally {
+      inFlightRef.current = false;
+    }
+    if (result.status === 'available') {
+      retryRef.current = 0;
+      // Dismissed this exact version in this session: stay quiet until restart
+      // or a newer version appears.
+      if (result.info.latest_version_code !== dismissedVersionRef.current) {
+        setUpdate(result.info);
+      }
+      return;
+    }
+    if (result.status === 'none') {
+      retryRef.current = 0;
+      return;
+    }
+    // error: bounded exponential backoff, then give up until next foreground.
+    if (retryRef.current < MAX_RETRIES) {
+      const delay = Math.min(RETRY_BASE_MS * 2 ** retryRef.current, RETRY_MAX_MS);
+      retryRef.current += 1;
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => void runCheck(), delay);
+    }
+  }, []);
 
   useEffect(() => {
     if (Platform.OS !== 'android') return;
-    let cancelled = false;
-    const timer = setTimeout(async () => {
-      const info = await checkForAppUpdate();
-      if (!cancelled && info) setUpdate(info);
-    }, POLL_DELAY_MS);
+    const launch = setTimeout(() => void runCheck(), POLL_DELAY_MS);
+    // Re-check when the app returns to the foreground. Without this, an app
+    // kept alive in the background would never learn about a new release.
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next !== 'active') return;
+      if (Date.now() - lastCheckRef.current < MIN_RECHECK_MS) return;
+      // Cancel any pending error-retry so it cannot double up with this check.
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = null;
+      retryRef.current = 0;
+      void runCheck();
+    });
     return () => {
-      cancelled = true;
-      clearTimeout(timer);
+      clearTimeout(launch);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      sub.remove();
     };
-  }, []);
+  }, [runCheck]);
 
   const startDownload = useCallback(() => {
     if (!update?.download_url || phase !== 'idle') return;
@@ -84,9 +138,10 @@ export default function AppUpdateGate() {
   }, [update, phase]);
 
   const dismiss = useCallback(() => {
+    if (update) dismissedVersionRef.current = update.latest_version_code;
     setUpdate(null);
     void cleanupUpdateApk();
-  }, []);
+  }, [update]);
 
   if (!update) return null;
   const mandatory = update.mandatory;

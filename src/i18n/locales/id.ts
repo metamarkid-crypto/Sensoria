@@ -94,6 +94,7 @@ export const id = {
   'aac.send': 'Kirim',
   'aac.tabAll': 'Semua',
   'aac.tabFavorites': 'Favorit',
+  'aac.noFavoritesYet': 'Belum ada kata favorit',
   'aac.catPronoun': 'Orang',
   'aac.catVerb': 'Aksi',
   'aac.catNoun': 'Benda',

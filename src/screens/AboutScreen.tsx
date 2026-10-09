@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Linking,
-  ActivityIndicator, ImageBackground, useColorScheme, Dimensions, type ViewStyle,
+  ActivityIndicator, useColorScheme,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../services/db/supabase';
@@ -15,7 +15,6 @@ import { useTranslation } from '../i18n';
    app_content.content_json.next to the original 4 the old screen read.
    Everything optional resolves to '' so old rows never break the screen. */
 interface RichAbout extends AboutContent {
-  heroImageUrl?: string;
   missionParagraphs?: string[];
   featureList?: { icon: string; title: string; text: string }[];
   whatsappNumber?: string;
@@ -46,6 +45,7 @@ const ICON_COLORS = [TEAL, '#6366F1', '#F59E0B', '#10B981', '#EC4899', '#0EA5E9'
 
 export default function AboutScreen() {
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const scheme = useColorScheme();
   const isDark = scheme === 'dark';
@@ -55,7 +55,7 @@ export default function AboutScreen() {
   const defaultContent: RichAbout = {
     description: t('about.defaultDescription'),
     contactEmail: 'support@aacsensoria.id',
-    version: 'v1.0.10',
+    version: 'v1.0.11',
     privacyPolicyUrl: 'https://aacsensoria.id/privacy',
     missionParagraphs: [],
     featureList: [],
@@ -120,33 +120,24 @@ export default function AboutScreen() {
   };
 
   const cardBg = isDark ? 'rgba(22,32,58,0.92)' : '#FFFFFF';
-  const heroHeight = Math.min(260, Dimensions.get('window').width * 0.55);
 
   return (
     <View style={[styles.root, { backgroundColor: isDark ? NAVY_DEEP : SKY }]}>
-      {/* ── Hero header — brand gradient block with optional poster image ── */}
-      {c.heroImageUrl ? (
-        <ImageBackground
-          source={{ uri: c.heroImageUrl }}
-          style={[styles.hero, { height: heroHeight }]}
-          imageStyle={{ opacity: 0.9 }}
-        >
-          <View style={[styles.heroScrim, { backgroundColor: 'rgba(8,20,40,0.35)' }]} />
-          <SafeAreaView edges={['top']} style={styles.heroSafe}>
-            <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-              <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
-            </TouchableOpacity>
-            <Text style={styles.heroTitle}>{t('about.title')}</Text>
-          </SafeAreaView>
-        </ImageBackground>
-      ) : (
-        <SafeAreaView edges={['top']} style={[styles.heroSolid, { backgroundColor: isDark ? '#101B33' : NAVY }]}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={22} color="#E1F2FD" />
+      {/* ── Header — white bar, back button left, consistent with other screens ── */}
+      <SafeAreaView
+        edges={['top']}
+        style={[styles.header, { backgroundColor: isDark ? '#101B33' : '#FFFFFF', borderBottomColor: isDark ? '#1E293B' : '#F1F5F9' }]}
+      >
+        <View style={styles.headerRow}>
+          <TouchableOpacity style={styles.headerBack} onPress={() => navigation.goBack()} hitSlop={8}>
+            <Ionicons name="arrow-back" size={24} color={isDark ? '#E2E8F0' : '#1A2980'} />
           </TouchableOpacity>
-          <Text style={[styles.heroTitle, { color: '#FFFFFF' }]}>{t('about.title')}</Text>
-        </SafeAreaView>
-      )}
+          <Text style={[styles.headerTitle, { color: isDark ? '#E2E8F0' : '#1A2980' }]} numberOfLines={1}>
+            {t('about.title')}
+          </Text>
+          <View style={styles.headerBack} />
+        </View>
+      </SafeAreaView>
 
       <ScrollView
         style={styles.scroll}
@@ -264,7 +255,7 @@ export default function AboutScreen() {
       </ScrollView>
 
       {/* ── Footer ── */}
-      <View style={[styles.footer, { backgroundColor: isDark ? '#101B33' : '#FFFFFF' }]}>
+      <View style={[styles.footer, { backgroundColor: isDark ? '#101B33' : '#FFFFFF', paddingBottom: 18 + insets.bottom }]}>
         <Text style={[styles.versionText, { color: isDark ? '#64748B' : '#94A3B8' }]}>{c.version}</Text>
         <Text style={[styles.footerText, { color: isDark ? '#475569' : '#CBD5E1' }]}>
           {t('about.developedIn')}
@@ -276,34 +267,28 @@ export default function AboutScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  /* hero */
-  hero: { width: '100%' },
-  heroScrim: StyleSheet.absoluteFill as unknown as ViewStyle,
-  heroSafe: { flex: 1, paddingHorizontal: 16, paddingBottom: 34 },
-  backBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: 'rgba(8,20,40,0.35)',
-    alignItems: 'center',
-    justifyContent: 'center',
+  /* header */
+  header: {
+    borderBottomWidth: 1,
   },
-  heroTitle: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 18,
-    textAlign: 'center',
-    fontSize: 17,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 0.3,
-  },
-  heroSolid: {
-    height: 96,
-    justifyContent: 'center',
+  headerRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  headerBack: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+  },
+  headerTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
   /* body */
   scroll: { flex: 1 },

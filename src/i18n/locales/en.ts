@@ -90,6 +90,7 @@ export const en: Record<TranslationKey, string> = {
   'aac.send': 'Send',
   'aac.tabAll': 'All',
   'aac.tabFavorites': 'Favorites',
+  'aac.noFavoritesYet': 'No favorite words yet',
   'aac.catPronoun': 'People',
   'aac.catVerb': 'Actions',
   'aac.catNoun': 'Objects',

@@ -831,7 +831,12 @@ export default function ChildAACScreen() {
 
       {/* Grid */}
       <View style={styles.gridContainer}>
-        <AACGrid words={filteredWords} onWordPress={handleCardPress} onWordLongPress={handleWordLongPress} />
+        <AACGrid
+          words={filteredWords}
+          onWordPress={handleCardPress}
+          onWordLongPress={handleWordLongPress}
+          emptyState={activeCategory === 'favorit' ? { icon: 'star', message: t('aac.noFavoritesYet') } : undefined}
+        />
 
         {/* Soft-lock past the grace window: dim + friendly offline-safe message.
             Never a paywall — parents renew from THEIR phone. */}

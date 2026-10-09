@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, StyleSheet, FlatList } from 'react-native';
+import { View, Text, StyleSheet, FlatList } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { AACWord, useAACStore } from '../../store/useAACStore';
 import AACCard from './AACCard';
 
@@ -7,9 +8,11 @@ interface AACGridProps {
   words: AACWord[];
   onWordPress: (word: AACWord) => void;
   onWordLongPress?: (word: AACWord) => void;
+  /** When set, shown centered with an icon if the grid has no words. */
+  emptyState?: { icon: keyof typeof Ionicons.glyphMap; message: string };
 }
 
-export default function AACGrid({ words, onWordPress, onWordLongPress }: AACGridProps) {
+export default function AACGrid({ words, onWordPress, onWordLongPress, emptyState }: AACGridProps) {
   const { cardSize, cardSpacing } = useAACStore();
 
   const getNumColumns = () => {
@@ -38,6 +41,14 @@ export default function AACGrid({ words, onWordPress, onWordLongPress }: AACGrid
           </View>
         )}
         showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
+          emptyState ? (
+            <View style={styles.emptyWrap}>
+              <Ionicons name={emptyState.icon} size={64} color="#FFD700" />
+              <Text style={styles.emptyText}>{emptyState.message}</Text>
+            </View>
+          ) : null
+        }
       />
     </View>
   );
@@ -50,5 +61,20 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     padding: 10,
+    flexGrow: 1,
+  },
+  emptyWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    paddingVertical: 48,
+  },
+  emptyText: {
+    marginTop: 12,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#64748B',
+    textAlign: 'center',
   },
 });

@@ -90,6 +90,7 @@ export const zh: Record<TranslationKey, string> = {
   'aac.send': '发送',
   'aac.tabAll': '全部',
   'aac.tabFavorites': '收藏',
+  'aac.noFavoritesYet': '还没有收藏的词语',
   'aac.catPronoun': '人物',
   'aac.catVerb': '动作',
   'aac.catNoun': '物品',

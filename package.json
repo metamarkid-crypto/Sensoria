@@ -1,6 +1,6 @@
 {
   "name": "sensoria",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "main": "index.ts",
   "dependencies": {
     "@expo/vector-icons": "^15.1.1",
