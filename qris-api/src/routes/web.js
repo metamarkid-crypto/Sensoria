@@ -384,7 +384,7 @@ function donePage(req, res) {
     pageShell(
       lang,
       s.paid,
-      render('done', { paid: s.paid, paidDesc: s.paidDesc }),
+      render('done', { paid: s.paid, paidDesc: s.paidDesc, backToApp: s.backToApp }),
     ),
   );
 }

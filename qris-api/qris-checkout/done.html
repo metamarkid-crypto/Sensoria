@@ -3,4 +3,6 @@
   <img src="/pay-assets/paysuccess.webp" style="width: 40%; margin: 8px auto 12px; display: block;" alt="Success">
   <div class="ok">{{paid}}</div>
   <div class="sub" style="margin-top:6px">{{paidDesc}}</div>
+  <a class="btn" href="sensoria://pay-result?status=paid" style="text-decoration:none;text-align:center">{{backToApp}}</a>
 </div>
+<script>setTimeout(function () { window.location.href = 'sensoria://pay-result?status=paid'; }, 1500);</script>

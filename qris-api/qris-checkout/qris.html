@@ -175,6 +175,7 @@
         countdown.innerHTML = '00:00';
         document.getElementById('qr-wrapper').innerHTML =
           '<img src="/pay-assets/expired.webp" style="width: 50%; margin: 2rem auto; display: block;" alt="Expired">';
+        setTimeout(function () { window.location.href = 'sensoria://pay-result?status=expired'; }, 1500);
       }
     }
   })();

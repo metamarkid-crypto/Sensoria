@@ -19,6 +19,9 @@ import { computeRenewalPreview } from '../services/db/entitlement';
 import { useAccessibleAction } from '../hooks/useAccessibleAction';
 import { useTranslation } from '../i18n';
 
+/** Deep link the checkout page redirects to after paid/expired (app.json scheme). */
+const PAY_RESULT_URL = 'sensoria://pay-result';
+
 /**
  * PaywallScreen — Browser Checkout (multi-provider, Master Blueprint).
  *
@@ -134,8 +137,9 @@ export default function PaywallScreen() {
       const session = await createCheckoutSession(deviceId, language);
       setCheckoutUrl(session.url);
       setStage('waiting');
-      await WebBrowser.openBrowserAsync(session.url, { enableBarCollapsing: true });
-      // Browser closed without a focus event firing (edge): nudge one re-read.
+      // Custom Tab closes itself when the checkout page redirects to
+      // sensoria://pay-result (paid/expired) or the user dismisses it.
+      await WebBrowser.openAuthSessionAsync(session.url, PAY_RESULT_URL, { enableBarCollapsing: true });
       await refreshEntitlement();
       const isPremiumNow = useAACStore.getState().premium.isPremium;
       if (isPremiumNow) {
