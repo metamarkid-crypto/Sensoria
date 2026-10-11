@@ -3,7 +3,7 @@
     "name": "Sensoria",
     "slug": "Sensoria",
     "scheme": "sensoria",
-    "version": "1.0.14",
+    "version": "1.0.15",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -19,7 +19,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "id.sensoria.aac",
-      "versionCode": 14,
+      "versionCode": 15,
       "permissions": [
         "android.permission.POST_NOTIFICATIONS"
       ]
