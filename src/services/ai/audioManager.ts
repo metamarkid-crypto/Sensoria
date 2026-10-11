@@ -18,24 +18,39 @@ const TTS_LOCALES: Record<'id' | 'en' | 'zh' | 'ms', string> = {
   ms: 'ms-MY',
 };
 
-// UI voice presets (VoiceSettingsScreen) → custom-trained Fish Audio reference IDs.
+// UI voice presets (VoiceSettingsScreen) → optional offline asset profile +
+// custom-trained Fish Audio reference IDs.
+//
+// DESIGN (user decision, 2026-10-12):
+//   • Preset 1 (id-female-1 / id-male-1) = DEFAULT OFFLINE — dictionary words
+//     play the bundled clips (wanita/ / pria/) instantly, no network.
+//   • Preset 2 (id-female-2 / id-male-2) = FORCED FISH AUDIO — offlineProfile is
+//     deliberately absent, so EVERY tap (“bicara” on a dictionary card, a
+//     sentence, the “kirim” strip, the settings test button) streams Fish Audio
+//     with that preset’s custom-trained reference. When offline it falls back
+//     to System TTS (never silent), never to the preset-1 clips.
+//
+// NOTE: id-male-1/id-male-2 currently share the same env reference (.env), but
+// keep both entries so wiring does not change when a second boy model lands.
 // Strict 1:1 mapping to environment variables — NO string fallbacks. Every ID must
 // be the reference_id of a real custom Fish Audio model (configured via .env).
-const VOICE_PRESETS: Record<string, { referenceId: string; isMale: boolean }> = {
-  'id-female-1': { referenceId: process.env.EXPO_PUBLIC_VOICE_GIRL as string, isMale: false },
+const VOICE_PRESETS: Record<string, { referenceId: string; isMale: boolean; offlineProfile?: 'pria' | 'wanita' }> = {
+  'id-female-1': { referenceId: process.env.EXPO_PUBLIC_VOICE_GIRL as string, isMale: false, offlineProfile: 'wanita' },
   'id-female-2': { referenceId: process.env.EXPO_PUBLIC_VOICE_GIRL_2 as string, isMale: false },
-  'id-male-1': { referenceId: process.env.EXPO_PUBLIC_VOICE_BOY as string, isMale: true },
+  'id-male-1': { referenceId: process.env.EXPO_PUBLIC_VOICE_BOY as string, isMale: true, offlineProfile: 'pria' },
   'id-male-2': { referenceId: process.env.EXPO_PUBLIC_VOICE_BOY_2 as string, isMale: true },
 };
 
 // Resolve which voice to use. Explicit user pick (store.selectedVoice) wins for Child speech;
 // parents keep the smart role-based keyword mapping so defaults are unchanged.
-const resolveVoice = (role: string): { voiceId: string; isMale: boolean } => {
+const resolveVoice = (role: string): { voiceId: string; isMale: boolean; offlineProfile?: 'pria' | 'wanita' } => {
   const store = useAACStore.getState();
 
   const preset = store.selectedVoice && VOICE_PRESETS[store.selectedVoice];
   if (role === 'Child' && preset) {
-    return { voiceId: preset.referenceId, isMale: preset.isMale };
+    // Preset 2 has no offlineProfile → offlineProfile stays undefined and the
+    // offline tier is deliberately skipped (see resolveAudioProfile).
+    return { voiceId: preset.referenceId, isMale: preset.isMale, offlineProfile: preset.offlineProfile };
   }
 
   if (role === 'Child') {
@@ -45,6 +60,7 @@ const resolveVoice = (role: string): { voiceId: string; isMale: boolean } => {
         ? process.env.EXPO_PUBLIC_VOICE_BOY
         : process.env.EXPO_PUBLIC_VOICE_GIRL) as string,
       isMale,
+      offlineProfile: isMale ? 'pria' : 'wanita',
     };
   }
 
@@ -61,12 +77,20 @@ const resolveVoice = (role: string): { voiceId: string; isMale: boolean } => {
 
 // Map the speaking role (and the child's gender for Child speech) to the
 // pre-recorded asset profile folder: ayah (dad) / ibu (mom) / pria (male
-// child) / wanita (female child). Mirrors resolveVoice's keyword logic so the
-// local tier and the AI tier pick the same persona.
-const resolveAudioProfile = (role: string): string => {
+// child) / wanita (female child).
+//
+// Returns null when the offline tier must be SKIPPED entirely:
+//   • Child + preset 2 selected → forced Fish Audio route (per user decision).
+// Parents keep the smart role-based keyword mapping so defaults are unchanged.
+const resolveAudioProfile = (role: string): string | null => {
   const store = useAACStore.getState();
 
   if (role === 'Child') {
+    // Explicit preset wins: preset 1 → its bundled clip folder, preset 2 →
+    // null (all speech via Fish Audio). Without a valid preset, fall back to
+    // the child profile gender (legacy behavior, default offline tier).
+    const preset = store.selectedVoice && VOICE_PRESETS[store.selectedVoice];
+    if (preset) return preset.offlineProfile ?? null;
     return store.childProfile?.gender === 'Boy' ? 'pria' : 'wanita';
   }
 
@@ -89,6 +113,10 @@ const resolveLocalAudio = (
   role: string
 ): any | null => {
   const profile = resolveAudioProfile(role);
+  // Forced-Fish route (preset 2 selected): never touch the bundled clips.
+  // Unknown preset id → resolveAudioProfile already fell back to the gender
+  // default, matching resolveVoice's fallback.
+  if (!profile) return null;
   return (
     localAudioMap[`${text}_${profile}_${language}`] ??
     localAudioMap[`${text}_${profile}`] ??
