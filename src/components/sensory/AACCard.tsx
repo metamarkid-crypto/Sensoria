@@ -10,11 +10,42 @@ interface AACCardProps {
   size?: 'small' | 'large';
 }
 
+/**
+ * HIGH CONTRAST palette (Appearance → Kontras Tinggi).
+ *
+ * The normal category colors are near-white 4% tints (#EFF6FF, #FFF0F5, …)
+ * designed to sit quietly behind pictograms — which is exactly why the toggle
+ * looked broken: switching it on changed nothing visible. These are the SOLID
+ * equivalents: a saturated fill with a dark same-hue border, so a card edge is
+ * a real edge at any visual acuity.
+ *
+ * Contrast: every fill pairs with the navy label (#0B2545) at ≥ 7:1 (WCAG AAA
+ * for normal text), and each border is ≥ 3:1 against the neighbouring card
+ * (WCAG 1.4.11 non-text contrast), so adjacent cards in a grid stay separable.
+ */
+const HIGH_CONTRAST_CATEGORY: Record<string, { bg: string; border: string }> = {
+  pronoun: { bg: '#FFC2D1', border: '#AD1457' },
+  verb: { bg: '#86EFAC', border: '#15803D' },
+  noun: { bg: '#93C5FD', border: '#1D4ED8' },
+  social: { bg: '#C4B5FD', border: '#6D28D9' },
+  emotion: { bg: '#FCD34D', border: '#B45309' },
+  body: { bg: '#FCA5A5', border: '#B91C1C' },
+  number: { bg: '#67E8F9', border: '#0E7490' },
+  people: { bg: '#A5B4FC', border: '#4338CA' },
+  food: { bg: '#FDA4AF', border: '#BE123C' },
+  place: { bg: '#7DD3FC', border: '#0369A1' },
+  time: { bg: '#5EEAD4', border: '#0F766E' },
+  animal: { bg: '#BEF264', border: '#4D7C0F' },
+  clothing: { bg: '#F0ABFC', border: '#A21CAF' },
+  color: { bg: '#D8B4FE', border: '#7E22CE' },
+};
+
 const AACCard = React.memo(({ item, onPress, onLongPress }: AACCardProps) => {
   const language = useAACStore(state => state.language);
   const childProfile = useAACStore(state => state.childProfile);
   const textSize = useAACStore(state => state.textSize);
   const enableCategoryColors = useAACStore(state => state.enableCategoryColors);
+  const highContrast = useAACStore(state => state.highContrast);
   const holdDuration = useAACStore(state => state.holdDuration);
   const ignoreRepeat = useAACStore(state => state.ignoreRepeat);
   const releaseToSpeak = useAACStore(state => state.releaseToSpeak);
@@ -58,10 +89,19 @@ const AACCard = React.memo(({ item, onPress, onLongPress }: AACCardProps) => {
   }
 
   // Determine Semantic Colors
+  // High Contrast swaps the quiet tints for solid fills; when category colors
+  // are OFF it keeps a pure-white card with a dark navy border, so the toggle
+  // still strengthens every card instead of doing nothing.
   let bgColor = '#FFFFFF';
-  let borderColor = '#F1F5F9';
-  
-  if (enableCategoryColors) {
+  let borderColor = highContrast ? '#0B2545' : '#F1F5F9';
+
+  if (highContrast) {
+    const solid = HIGH_CONTRAST_CATEGORY[item.categoryId];
+    if (enableCategoryColors && solid) {
+      bgColor = solid.bg;
+      borderColor = solid.border;
+    }
+  } else if (enableCategoryColors) {
     switch (item.categoryId) {
       case 'pronoun':
         bgColor = '#FFF0F5'; // Soft Pink
@@ -199,6 +239,7 @@ const AACCard = React.memo(({ item, onPress, onLongPress }: AACCardProps) => {
         opacity: opacityValue,
         backgroundColor: bgColor,
         borderColor: borderColor,
+        borderWidth: highContrast ? 2 : 1,
       }]}>
         {item.isFavorite ? (
           <View style={styles.favBadge} pointerEvents="none">
@@ -207,10 +248,17 @@ const AACCard = React.memo(({ item, onPress, onLongPress }: AACCardProps) => {
         ) : null}
         <Image 
           source={imageSource} 
-          style={styles.image} 
+          style={[styles.image, highContrast && styles.imageContrast]} 
           resizeMode="contain"
         />
-        <Text style={[styles.text, { fontSize: getFontSize() }]} numberOfLines={1}>
+        <Text
+          style={[
+            styles.text,
+            { fontSize: getFontSize() },
+            highContrast && styles.textContrast,
+          ]}
+          numberOfLines={1}
+        >
           {resolveWordText(item, language)}
         </Text>
       </Animated.View>
@@ -252,6 +300,16 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#11427B',
     textAlign: 'center',
+  },
+  // White plate under the pictogram: on a solid saturated card the transparent
+  // PNG line-art would otherwise lose its background contrast.
+  imageContrast: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+  },
+  textContrast: {
+    color: '#0B2545',
+    fontWeight: '900',
   },
   favBadge: {
     position: 'absolute',

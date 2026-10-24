@@ -10,6 +10,8 @@ import { subscribeEntitlementRealtime } from './src/services/db/entitlementRealt
 import { flushPendingMessages, flushCloudOps } from './src/services/db/supabase';
 import SplashGate from './src/components/SplashGate';
 import AppUpdateGate from './src/components/AppUpdateGate';
+import SettingsSyncBridge from './src/components/SettingsSyncBridge';
+import MessageAlertBridge from './src/components/MessageAlertBridge';
 
 Sentry.init({
   dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
@@ -214,6 +216,12 @@ function App() {
           the Sentry boundary (an error boundary can't intercept a sibling).
           Toast stays on top (toast must top everything). */}
       <EntitlementLifecycle />
+      {/* Settings mirror (parent ⇄ child): app-level so it keeps running while
+          the child is inside Settings — the one place these values are edited. */}
+      <SettingsSyncBridge />
+      {/* Notifikasi pesan masuk (anak ⇄ orang tua): app-level supaya tetap
+          bekerja saat layar chat tidak terbuka dan app di background. */}
+      <MessageAlertBridge />
       <Sentry.ErrorBoundary fallback={ErrorFallbackScreen}>
         <AppNavigator />
       </Sentry.ErrorBoundary>

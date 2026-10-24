@@ -1,13 +1,13 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, Platform, ActionSheetIOS } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import Slider from '@react-native-community/slider';
-import { supabase } from '../services/db/supabase';
-import { useAACStore, resolveChildDeviceId } from '../store/useAACStore';
-import { queueCloudOp } from '../services/db/sqlite';
+import { useAACStore } from '../store/useAACStore';
+import { useSettingsSync } from '../hooks/useSettingsSync';
 import { playTTS } from '../services/ai/audioManager';
+import { requestNotificationPermission } from '../services/notifications/messageAlerts';
 import { useTranslation } from '../i18n';
 
 const AVAILABLE_VOICES = [
@@ -20,60 +20,19 @@ const AVAILABLE_VOICES = [
 export default function VoiceSettingsScreen() {
   const navigation = useNavigation<any>();
   const { t } = useTranslation();
-  const { 
-    childProfile, 
+  const {
     language,
     selectedVoice, setSelectedVoice,
     speechRate, setSpeechRate,
     volume, setVolume,
     speakOnTap, setSpeakOnTap,
-    soundFeedback, setSoundFeedback
+    soundFeedback, setSoundFeedback,
+    notificationsEnabled, setNotificationsEnabled,
   } = useAACStore();
-  const role = useAACStore((state) => state.role);
-  const deviceId = useAACStore((state) => state.deviceId);
-
-  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
-
-  const syncToDatabase = useCallback(async (newSettings: any) => {
-    // Onboarding profiles historically carry no device_id; resolve flexibly
-    // so voice settings keep syncing on the child device (see store helper).
-    const targetDeviceId = resolveChildDeviceId(childProfile, deviceId, role);
-    if (!targetDeviceId || !childProfile) return;
-    
-    try {
-      const mergedSettings = { ...(childProfile.settings || {}), ...newSettings };
-      
-      const { error } = await supabase
-        .from('child_profiles')
-        .update({ settings: mergedSettings })
-        .eq('device_id', targetDeviceId);
-        
-      if (error) {
-        // Queue ONLY the fields this edit changed — the flusher re-merges them
-        // over the remote settings, so a replay never clobbers edits made from
-        // another device while we were offline.
-        await queueCloudOp('child_profiles.settings', {
-          device_id: targetDeviceId,
-          settings: newSettings,
-        });
-        throw error;
-      }
-      
-      useAACStore.setState({
-        childProfile: { ...childProfile, settings: mergedSettings }
-      });
-      
-    } catch (error) {
-      console.error('Failed to sync voice settings', error);
-    }
-  }, [childProfile, deviceId, role]);
-
-  const debouncedSync = useCallback((newSettings: any) => {
-    if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    debounceTimer.current = setTimeout(() => {
-      syncToDatabase(newSettings);
-    }, 800);
-  }, [syncToDatabase]);
+  // ONE shared write path: local mirror + instant peer push + offline-queued
+  // cloud write, so a voice change is heard on the other device immediately
+  // and survives an offline edit.
+  const { syncSettings: debouncedSync } = useSettingsSync();
 
   // Handlers
   const handleSelectVoice = () => {
@@ -119,6 +78,15 @@ export default function VoiceSettingsScreen() {
   const toggleSoundFeedback = (val: boolean) => {
     setSoundFeedback(val);
     debouncedSync({ soundFeedback: val });
+  };
+
+  const toggleNotifications = (val: boolean) => {
+    setNotificationsEnabled(val);
+    debouncedSync({ notificationsEnabled: val });
+    // Izin OS hanya diminta saat pengguna MENGAKTIFKAN — bukan di tengah sesi
+    // AAC. Bila sebelumnya ditolak, menyalakan toggle ini memunculkan dialog
+    // izin lagi (Android 13+ / iOS).
+    if (val) void requestNotificationPermission();
   };
 
   const handleTestVoice = () => {
@@ -208,6 +176,21 @@ export default function VoiceSettingsScreen() {
           <Switch
             value={soundFeedback}
             onValueChange={toggleSoundFeedback}
+            trackColor={{ false: '#E2E8F0', true: '#2488FF' }}
+            thumbColor={'#FFFFFF'}
+          />
+        </View>
+
+        {/* Notifikasi pesan masuk — ikut settings mirror, jadi parent bisa
+            membisukan notifikasi di perangkat anak (dan sebaliknya). */}
+        <View style={styles.toggleRow}>
+          <View style={{ flex: 1, paddingRight: 12 }}>
+            <Text style={styles.toggleLabel}>{t('voice.notifications')}</Text>
+            <Text style={styles.notifHint}>{t('voice.notificationsDesc')}</Text>
+          </View>
+          <Switch
+            value={notificationsEnabled}
+            onValueChange={toggleNotifications}
             trackColor={{ false: '#E2E8F0', true: '#2488FF' }}
             thumbColor={'#FFFFFF'}
           />
@@ -324,6 +307,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#334155',
+  },
+  notifHint: {
+    fontSize: 12,
+    lineHeight: 16,
+    color: '#64748B',
+    marginTop: 2,
   },
   footer: {
     padding: 20,

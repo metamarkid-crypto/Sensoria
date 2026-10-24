@@ -80,6 +80,22 @@ jobs:
           # but without it the paywall can never open a checkout.
           echo "EXPO_PUBLIC_QRIS_API_SECRET=${{ secrets.EXPO_PUBLIC_QRIS_API_SECRET }}" >> .env
 
+      # ── FCM untuk PUSH (app ditutup total) ────────────────────────────────
+      # Tanpa google-services.json, getExpoPushTokenAsync() gagal dan app
+      # hanya punya notifikasi Realtime (mati saat app dibunuh). File ini
+      # BUKAN rahasia server, tapi tetap disimpan sebagai secret supaya repo
+      # tidak menyimpan konfigurasi Firebase per project.
+      # Expo prebuild menyalin ./google-services.json → android/app/.
+      - name: 🔔 Pasang google-services.json (FCM)
+        run: |
+          if [ -z "${{ secrets.GOOGLE_SERVICES_JSON }}" ]; then
+            echo "::warning::GOOGLE_SERVICES_JSON kosong — APK ini TIDAK bisa menerima push saat app ditutup (Realtime saja)."
+            exit 0
+          fi
+          printf '%s' "${{ secrets.GOOGLE_SERVICES_JSON }}" > google-services.json
+          node -e "JSON.parse(require('fs').readFileSync('google-services.json','utf8'))" \
+            || { echo "::error::GOOGLE_SERVICES_JSON bukan JSON valid"; exit 1; }
+
       - name: 🏗️ Run Expo Prebuild (Generate Native Code)
         run: npx expo prebuild --platform android --clean
 

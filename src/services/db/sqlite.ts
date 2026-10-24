@@ -343,6 +343,33 @@ export const setWordFavorite = async (id: string, favorite: boolean): Promise<vo
   ]);
 };
 
+/**
+ * Delete a USER-ADDED card. Guarded at the SQL level (`isCustom = 1`) so a
+ * bug in the caller — or a tampered id — can never remove a built-in
+ * dictionary word: the shared 244-word pictogram set is immutable by design
+ * (every child relies on the same motor plan for those positions).
+ *
+ * Also drops any pending translation job for the card, so the flusher cannot
+ * resurrect translations for a word that no longer exists.
+ *
+ * @returns true when a custom row was actually removed.
+ */
+export const deleteCustomWord = async (id: string): Promise<boolean> => {
+  await ensureDB();
+  if (!db) return false;
+  try {
+    const result = await db.runAsync(
+      'DELETE FROM aac_words WHERE id = ? AND isCustom = 1',
+      [id],
+    );
+    await db.runAsync('DELETE FROM translation_queue WHERE word_id = ?', [id]);
+    return (result as { changes?: number } | undefined)?.changes ? true : false;
+  } catch (e) {
+    console.warn('[CustomWord] delete failed:', e);
+    return false;
+  }
+};
+
 // --- AUDIO CACHE METADATA (LRU) ---
 
 export const recordAudioAccess = async (fileUri: string, fileSize: number) => {

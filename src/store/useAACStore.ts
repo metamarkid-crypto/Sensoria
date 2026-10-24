@@ -9,6 +9,22 @@ import {
 import { fetchPaywallSettings } from '../services/db/paywall';
 import type { SubscriptionStatus } from '../services/db/types';
 import type { AccessPhase, EntitlementRole } from '../services/db/entitlement';
+import {
+  SYNCED_SETTING_KEYS,
+  diffSettingsPatch,
+  sanitizeSettingsPatch,
+  type SettingValue,
+  type SettingsRecord,
+  type SyncedSettingKey,
+} from './settingsMirror';
+
+export {
+  SYNCED_SETTING_KEYS,
+  sanitizeSettingsPatch,
+  type SettingValue,
+  type SettingsRecord,
+  type SyncedSettingKey,
+};
 
 export type UserRole = 'None' | 'Child' | 'Parent';
 /** Supported UI + AAC languages: Indonesia, English, Mandarin, Bahasa Melayu. */
@@ -135,6 +151,25 @@ export interface PremiumState {
   lastError: string | null;
 }
 
+/**
+ * SETTINGS MIRROR — the mirrored subset of settings that travel between the
+ * Child device and its linked Parent device (`child_profiles.settings`).
+ *
+ * The whitelist + validation rules live in `./settingsMirror` (pure, no
+ * imports) so they can be executed in plain Node; this module re-exports them
+ * for every caller and owns the actual state write.
+ *
+ * WHY a whitelist instead of `setState(remote.settings)`:
+ *   • the JSON blob is written by BOTH modes, so an unrestricted merge would
+ *     let a stale/foreign key overwrite unrelated store state (or reintroduce
+ *     a removed field after an app downgrade);
+ *   • only these keys are ever broadcast over the realtime mesh or replayed
+ *     from the offline outbox, so visual replies, appearance and voice cannot
+ *     drift between the two modes.
+ */
+/** A partial settings update — only mirrored keys, values already validated. */
+export type SyncedSettingsPatch = Partial<Pick<AACState, SyncedSettingKey>>;
+
 export interface AACState {
   hasSeenOnboarding: boolean;
   role: UserRole;
@@ -163,6 +198,13 @@ export interface AACState {
    * secara remote karena ikut settings mirror `child_profiles.settings`.
    */
   visualRepliesEnabled: boolean;
+
+  /**
+   * Notifikasi pesan masuk (banner OS + suara TTS saat app di background).
+   * Saat false: banner tetap tampil, suara dibungkam. Ikut settings mirror
+   * supaya parent bisa membisukan notifikasi di perangkat anak.
+   */
+  notificationsEnabled: boolean;
 
   // Accessibility Settings
   holdDuration: number;
@@ -220,6 +262,7 @@ export interface AACState {
   setEnableCategoryColors: (status: boolean) => void;
   setHighContrast: (status: boolean) => void;
   setVisualRepliesEnabled: (status: boolean) => void;
+  setNotificationsEnabled: (status: boolean) => void;
   setHoldDuration: (duration: number) => void;
   setIgnoreRepeat: (status: boolean) => void;
   setReleaseToSpeak: (status: boolean) => void;
@@ -230,6 +273,16 @@ export interface AACState {
   
   setChildStatus: (status: Partial<AACState['childStatus']>) => void;
   setLocalParentName: (name: string) => void;
+  /**
+   * Apply a settings patch that came from the PEER device (parent ⇄ child).
+   * Whitelisted + validated, writes only values that actually changed, and
+   * mirrors them into `childProfile.settings` so the settings screens keep
+   * merging over the newest blob. NEVER writes back to the cloud — the
+   * originating device is the single writer, which is what prevents an
+   * endless mirror loop.
+   * @returns the subset that was actually applied (empty when nothing changed).
+   */
+  applySettingsPatch: (patch: unknown) => SyncedSettingsPatch;
   /** Re-reads the stealth kill-switch; fails safe to `false`. */
   refreshWebPaymentActive: () => Promise<void>;
   refreshEntitlement: () => Promise<void>;
@@ -292,6 +345,7 @@ export const useAACStore = create<AACState>()(
       enableCategoryColors: false,
       highContrast: false,
       visualRepliesEnabled: false,
+      notificationsEnabled: true,
       holdDuration: 0,
       ignoreRepeat: false,
       releaseToSpeak: false,
@@ -326,10 +380,32 @@ export const useAACStore = create<AACState>()(
       setEnableCategoryColors: (status) => set({ enableCategoryColors: status }),
       setHighContrast: (status) => set({ highContrast: status }),
       setVisualRepliesEnabled: (status) => set({ visualRepliesEnabled: status }),
+      setNotificationsEnabled: (status) => set({ notificationsEnabled: status }),
       setHoldDuration: (duration) => set({ holdDuration: duration }),
       setIgnoreRepeat: (status) => set({ ignoreRepeat: status }),
       setReleaseToSpeak: (status) => set({ releaseToSpeak: status }),
       
+      applySettingsPatch: (patch) => {
+        const current = get();
+        const clean = sanitizeSettingsPatch(patch);
+        const changed = diffSettingsPatch(
+          current as unknown as Record<string, unknown>,
+          clean,
+        );
+        const applied = changed as SyncedSettingsPatch;
+        if (Object.keys(applied).length === 0) return applied;
+        set((state) => ({
+          ...applied,
+          childProfile: state.childProfile
+            ? {
+                ...state.childProfile,
+                settings: { ...(state.childProfile.settings || {}), ...applied },
+              }
+            : state.childProfile,
+        }));
+        return applied;
+      },
+
       setAboutContent: (content) => set({ aboutContent: content }),
       addCustomQuickReply: (text) => set((state) => ({ 
         customQuickReplies: [...state.customQuickReplies, text] 
@@ -455,6 +531,7 @@ export const useAACStore = create<AACState>()(
         delete (persisted as Partial<AACState> & { webPaymentActive?: unknown }).webPaymentActive;
         delete (persisted as Partial<AACState> & { webPaymentLoaded?: unknown }).webPaymentLoaded;
         delete (persisted as Partial<AACState> & { refreshWebPaymentActive?: unknown }).refreshWebPaymentActive;
+        delete (persisted as Partial<AACState> & { applySettingsPatch?: unknown }).applySettingsPatch;
         return persisted;
       },
       // Restore the raw boundaries into a FULL PremiumState and recompute the

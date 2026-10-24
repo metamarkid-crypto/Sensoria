@@ -1,6 +1,6 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import RoleSelectionScreen from '../screens/RoleSelectionScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
 import ChildAACScreen from '../screens/ChildAACScreen';
@@ -18,13 +18,16 @@ import { useAACStore } from '../store/useAACStore';
 
 const Stack = createNativeStackNavigator();
 
+/** Dipakai MessageAlertBridge: tap notifikasi membuka layar pesan. */
+export const navigationRef = createNavigationContainerRef<any>();
+
 export default function AppNavigator() {
   const role = useAACStore((state) => state.role);
   const childProfile = useAACStore((state) => state.childProfile);
   const hasSeenOnboarding = useAACStore((state) => state.hasSeenOnboarding);
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!hasSeenOnboarding ? (
           <Stack.Screen name="WelcomeSlider" component={WelcomeSliderScreen} />

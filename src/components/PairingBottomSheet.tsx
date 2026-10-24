@@ -139,6 +139,11 @@ export default function PairingBottomSheet({ isVisible, onClose }: Props) {
                   : 'Boy',
               settings: profile.settings,
             });
+            // Mirror the child's saved settings into THIS device's store too:
+            // otherwise a fresh parent install shows the parent's old defaults
+            // in Appearance/Voice while the child already has different values
+            // (and the next edit would then write those stale defaults back).
+            useAACStore.getState().applySettingsPatch(profile.settings ?? {});
           }
           // Sync the canonical role label (Ibu/Ayah/...) from family_links —
           // a reinstalled or long-open session kept the stale 'Orang Tua'

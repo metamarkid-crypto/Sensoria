@@ -1,20 +1,17 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import Slider from '@react-native-community/slider';
-import Toast from 'react-native-toast-message';
-import { supabase } from '../services/db/supabase';
-import { useAACStore, resolveChildDeviceId } from '../store/useAACStore';
-import { queueCloudOp } from '../services/db/sqlite';
+import { useAACStore } from '../store/useAACStore';
+import { useSettingsSync } from '../hooks/useSettingsSync';
 import { useTranslation } from '../i18n';
 
 export default function AppearanceSettingsScreen() {
   const navigation = useNavigation<any>();
   const { t } = useTranslation();
   const { 
-    childProfile, 
     cardSize, setCardSize, 
     textSize, setTextSize, 
     cardSpacing, setCardSpacing,
@@ -22,55 +19,10 @@ export default function AppearanceSettingsScreen() {
     highContrast, setHighContrast,
     visualRepliesEnabled, setVisualRepliesEnabled
   } = useAACStore();
-  const role = useAACStore((state) => state.role);
-  const deviceId = useAACStore((state) => state.deviceId);
-
-  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
-
-  // Load from DB initially if needed, but Zustand already handles persistence.
-  // We still ensure the DB is synced when values change.
-  
-  const syncToDatabase = useCallback(async (newSettings: any) => {
-    // Flexible device-id resolution (see store helper) — silent skips here
-    // meant appearance changes never reached the cloud on legacy profiles.
-    const targetDeviceId = resolveChildDeviceId(childProfile, deviceId, role);
-    if (!targetDeviceId || !childProfile) return;
-    
-    try {
-      const mergedSettings = { ...(childProfile.settings || {}), ...newSettings };
-      
-      const { error } = await supabase
-        .from('child_profiles')
-        .update({ settings: mergedSettings })
-        .eq('device_id', targetDeviceId);
-        
-      if (error) {
-        // Queue ONLY the fields this edit changed — the flusher re-merges them
-        // over the remote settings, so a replay never clobbers edits made from
-        // another device while we were offline.
-        await queueCloudOp('child_profiles.settings', {
-          device_id: targetDeviceId,
-          settings: newSettings,
-        });
-        throw error;
-      }
-      
-      // Update local childProfile context quietly
-      useAACStore.setState({
-        childProfile: { ...childProfile, settings: mergedSettings }
-      });
-      
-    } catch (error) {
-      console.error('Failed to sync settings', error);
-    }
-  }, [childProfile, deviceId, role]);
-
-  const debouncedSync = useCallback((newSettings: any) => {
-    if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    debounceTimer.current = setTimeout(() => {
-      syncToDatabase(newSettings);
-    }, 800);
-  }, [syncToDatabase]);
+  // ONE shared write path (local mirror + instant peer push + offline-queued
+  // cloud write). Previously this screen carried its own copy of that logic,
+  // which is why a change here could silently never reach the child device.
+  const { syncSettings: debouncedSync } = useSettingsSync();
 
   // Handlers for optimistic updates + debounced sync
   const handleCardSize = (size: 'S' | 'M' | 'L' | 'XL') => {

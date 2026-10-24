@@ -8,7 +8,7 @@ import { getLocalImage } from '../../assets/imageMap';
 
 export default function SentenceStrip() {
   const { t } = useTranslation();
-  const { currentSentence, removeFromSentence, language, childProfile } = useAACStore();
+  const { currentSentence, removeFromSentence, language, childProfile, highContrast } = useAACStore();
 
   useEffect(() => {
     // Trigger animation when items are added or removed
@@ -44,12 +44,12 @@ export default function SentenceStrip() {
             return (
               <TouchableOpacity 
                 key={`${item.id}-${index}`} 
-                style={styles.chip}
+                style={[styles.chip, highContrast && styles.chipContrast]}
                 onPress={() => speakWord(wordText)}
                 onLongPress={() => handleRemove(index)}
               >
                 <Image source={imageSource} style={styles.chipImage} resizeMode="contain" />
-                <Text style={styles.chipText}>{wordText}</Text>
+                <Text style={[styles.chipText, highContrast && styles.chipTextContrast]}>{wordText}</Text>
                 <TouchableOpacity style={styles.removeButton} onPress={() => handleRemove(index)}>
                   <Text style={styles.removeText}>✕</Text>
                 </TouchableOpacity>
@@ -114,6 +114,17 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#11427B',
     marginRight: 8,
+  },
+  // High Contrast: 2px navy outline + navy 900 label — the sentence tokens are
+  // read at a glance while the child is composing, so they must never be the
+  // faintest thing on screen.
+  chipContrast: {
+    borderWidth: 2,
+    borderColor: '#0B2545',
+  },
+  chipTextContrast: {
+    color: '#0B2545',
+    fontWeight: '900',
   },
   removeButton: {
     backgroundColor: '#FF6B6B',

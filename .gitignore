@@ -76,3 +76,6 @@ scripts/arasaac-visual-check.html
 .vps-key
 .vps-key.pub
 .vps-askpass.sh
+
+# FCM config (CI writes it from the GOOGLE_SERVICES_JSON secret)
+google-services.json

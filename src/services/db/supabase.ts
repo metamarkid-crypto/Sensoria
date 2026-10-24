@@ -147,6 +147,17 @@ const replayCloudOp = async (op: string, payload: any): Promise<'done' | 'retry'
       const { error } = await supabase.from('custom_words').upsert(payload, { onConflict: 'id' });
       return error ? 'retry' : 'done';
     }
+    case 'custom_words.delete': {
+      // Deleting a user card while offline: replay is idempotent (a missing row
+      // is a success), and the device scope keeps a tampered payload from
+      // touching another child's library.
+      let query = supabase.from('custom_words').delete().eq('id', payload.id);
+      if (payload.child_device_id) {
+        query = query.eq('child_device_id', payload.child_device_id);
+      }
+      const { error } = await query;
+      return error ? 'retry' : 'done';
+    }
     case 'devices.upsert': {
       const { error } = await supabase.from('devices').upsert(payload);
       return error ? 'retry' : 'done';
@@ -264,6 +275,52 @@ export const syncCustomWordToCloud = async (
 };
 
 /**
+ * Remove a USER-ADDED card from the cloud copy (mirror of
+ * syncCustomWordToCloud). Fire-and-forget from the UI: when the device is
+ * offline the delete is parked in the cloud outbox and replayed later, so a
+ * card deleted on the child device is not resurrected by the next backup dump.
+ */
+export const deleteCustomWordFromCloud = async (
+  wordId: string,
+  deviceId: string | null,
+): Promise<void> => {
+  if (!supabaseUrl || !supabaseAnonKey) return;
+  if (!deviceId) return; // unlinked device — SQLite alone is the source of truth
+
+  const { error } = await supabase
+    .from('custom_words')
+    .delete()
+    .eq('id', wordId)
+    .eq('child_device_id', deviceId);
+
+  if (error) {
+    console.warn('[CustomWords] cloud delete failed (queued for replay):', error.message);
+    await queueCloudOp('custom_words.delete', { id: wordId, child_device_id: deviceId });
+  }
+
+  // A card added OFFLINE sits in the outbox as `custom_words.upsert`. Without
+  // this purge, the flusher would recreate the row in the cloud right after
+  // the local delete succeeded (local stays clean, but the backup copy would
+  // reappear on a reinstall). Queued DELETEs are left alone.
+  try {
+    const ops = await getCloudOps();
+    for (const row of ops) {
+      if (row.op !== 'custom_words.upsert') continue;
+      let queued: any;
+      try {
+        queued = JSON.parse(row.payload);
+      } catch {
+        continue;
+      }
+      if (queued?.id === wordId) await deleteCloudOp(row.id);
+    }
+  } catch {
+    // Outbox unavailable — the delete replay above is still correct ordering-
+    // wise for the common case; never fail the user action over this.
+  }
+};
+
+/**
  * Menarik 50 pesan terakhir dari tabel (Optimasi Cerdas untuk Load Awal)
  */
 export const getAACMessagesHistory = async (channelId: string) => {
@@ -286,8 +343,20 @@ export const getAACMessagesHistory = async (channelId: string) => {
 /**
  * Mendengarkan pesan baru secara realtime menggunakan Realtime Postgres Changes
  */
-export const subscribeToAACMessages = (channelId: string, onMessageReceived: (payload: any) => void) => {
-  const channel = supabase.channel(`public:messages:channel_id=eq.${channelId}`);
+export const subscribeToAACMessages = (
+  channelId: string,
+  onMessageReceived: (payload: any) => void,
+  /**
+   * Pemisah topik opsional. `supabase.channel(topic)` mengembalikan channel
+   * yang SUDAH ADA untuk topik yang sama, dan `removeChannel` milik pemilik
+   * pertama ikut mematikan listener kedua. Pemanggil app-level (notifikasi)
+   * memakai suffix agar tidak berbagi topik dengan layar chat.
+   */
+  topicSuffix?: string,
+) => {
+  const channel = supabase.channel(
+    `public:messages:channel_id=eq.${channelId}${topicSuffix ? `:${topicSuffix}` : ''}`,
+  );
 
   if (!supabaseUrl || !supabaseAnonKey) {
     // Dev/unconfigured: hand back the detached (never-subscribed) channel so

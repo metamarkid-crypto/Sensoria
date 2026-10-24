@@ -296,6 +296,10 @@ export default function ParentHomeScreen() {
         gender: profile.settings?.childProfileGender ?? current?.gender,
         settings: profile.settings ?? current?.settings,
       });
+      // Mirror the child's preferences into this device's store so the
+      // Parent-mode Appearance/Voice screens open on the CHILD's real values
+      // (applySettingsPatch is whitelisted + diff-only).
+      useAACStore.getState().applySettingsPatch(profile.settings ?? {});
     })();
 
     return () => {
@@ -326,6 +330,9 @@ export default function ParentHomeScreen() {
             gender: payload.new.settings?.childProfileGender || currentProfile?.gender,
             settings: payload.new.settings || currentProfile?.settings
           });
+          if (payload.new.settings) {
+            useAACStore.getState().applySettingsPatch(payload.new.settings);
+          }
         }
       })
       .subscribe();

@@ -1,68 +1,23 @@
-import React, { useRef, useCallback } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import Slider from '@react-native-community/slider';
-import { supabase } from '../services/db/supabase';
-import { useAACStore, resolveChildDeviceId } from '../store/useAACStore';
-import { queueCloudOp } from '../services/db/sqlite';
+import { useAACStore } from '../store/useAACStore';
+import { useSettingsSync } from '../hooks/useSettingsSync';
 import { useTranslation } from '../i18n';
 
 export default function AccessibilitySettingsScreen() {
   const navigation = useNavigation<any>();
   const { t } = useTranslation();
   const { 
-    childProfile, 
     holdDuration, setHoldDuration,
     ignoreRepeat, setIgnoreRepeat,
     releaseToSpeak, setReleaseToSpeak
   } = useAACStore();
-  const role = useAACStore((state) => state.role);
-  const deviceId = useAACStore((state) => state.deviceId);
-
-  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
-
-  const syncToDatabase = useCallback(async (newSettings: any) => {
-    // Flexible device-id resolution (see store helper) — silent skips here
-    // meant accessibility changes never reached the cloud on legacy profiles.
-    const targetDeviceId = resolveChildDeviceId(childProfile, deviceId, role);
-    if (!targetDeviceId || !childProfile) return;
-    
-    try {
-      const mergedSettings = { ...(childProfile.settings || {}), ...newSettings };
-      
-      const { error } = await supabase
-        .from('child_profiles')
-        .update({ settings: mergedSettings })
-        .eq('device_id', targetDeviceId);
-        
-      if (error) {
-        // Queue ONLY the fields this edit changed — the flusher re-merges them
-        // over the remote settings, so a replay never clobbers edits made from
-        // another device while we were offline.
-        await queueCloudOp('child_profiles.settings', {
-          device_id: targetDeviceId,
-          settings: newSettings,
-        });
-        throw error;
-      }
-      
-      useAACStore.setState({
-        childProfile: { ...childProfile, settings: mergedSettings }
-      });
-      
-    } catch (error) {
-      console.error('Failed to sync accessibility settings', error);
-    }
-  }, [childProfile, deviceId, role]);
-
-  const debouncedSync = useCallback((newSettings: any) => {
-    if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    debounceTimer.current = setTimeout(() => {
-      syncToDatabase(newSettings);
-    }, 800);
-  }, [syncToDatabase]);
+  // Shared mirror write path (local + instant peer push + offline-queued cloud).
+  const { syncSettings: debouncedSync } = useSettingsSync();
 
   const handleHoldDuration = (val: number) => {
     setHoldDuration(val);

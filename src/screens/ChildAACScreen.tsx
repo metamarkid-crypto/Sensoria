@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { View, StyleSheet, ActivityIndicator, Text, TouchableOpacity, ScrollView, Modal, TextInput, KeyboardAvoidingView, Platform, Image, Pressable, ImageSourcePropType, useWindowDimensions } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Text, TouchableOpacity, ScrollView, Modal, TextInput, KeyboardAvoidingView, Platform, Image, Pressable, ImageSourcePropType, useWindowDimensions, Alert } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { useAACStore, AACWord, resolveWordText } from '../store/useAACStore';
 import { evaluateAccess } from '../services/db/entitlement';
-import { initDB, getAllWords, addCustomWord, updateWord, setWordFavorite, queuePendingMessage, enqueueTranslationJob } from '../services/db/sqlite';
+import { initDB, getAllWords, addCustomWord, updateWord, setWordFavorite, deleteCustomWord, queuePendingMessage, enqueueTranslationJob } from '../services/db/sqlite';
 import { tagImageWithBilingualNames, isNoConfidenceTag } from '../services/ai/gemini';
 import { startTranslationFlusher } from '../services/translation/translationQueue';
 import { logger } from '../utils/logger';
@@ -18,9 +18,10 @@ import * as Location from 'expo-location';
 import * as Haptics from 'expo-haptics';
 import { playTTS, clearAudioCache } from '../services/ai/audioManager';
 import { useAccessibleAction } from '../hooks/useAccessibleAction';
-import { useTranslation, translate } from '../i18n';
+import { useTapGuard } from '../hooks/useTapGuard';
+import { useTranslation, translate, type TranslationKey } from '../i18n';
 import SettingsScreen from './SettingsScreen';
-import { supabase, sendAACMessage, subscribeToAACMessages, syncCustomWordToCloud } from '../services/db/supabase';
+import { supabase, sendAACMessage, subscribeToAACMessages, syncCustomWordToCloud, deleteCustomWordFromCloud } from '../services/db/supabase';
 import { getVisualReplyImage, resolveVisualReply } from '../assets/replyAssets';
 import {
   ensureBackgroundTracking,
@@ -63,6 +64,70 @@ const AUTO_TAG_CATEGORIES = [
   { id: 'color', labelKey: 'aac.catColor', icon: 'palette', color: '#E9D5FF' },
 ] as const;
 
+/**
+ * One category tab. Extracted so each tab owns its OWN triple-tap guard
+ * (per-instance refs): two taps on "Benda" can never unlock "Kata Kerja",
+ * and the Settings gate is independent of every tab.
+ *
+ * "Favorit" is deliberately exempt — it is the child's fastest escape hatch
+ * back to their preferred words, and burying it behind a 3-tap gate would
+ * punish the one tab that exists for quick access.
+ */
+function CategoryTab({
+  cat,
+  isActive,
+  highContrast,
+  onSelect,
+}: {
+  cat: { id: string; labelKey: TranslationKey; icon: string; color: string; rgba: string };
+  isActive: boolean;
+  highContrast: boolean;
+  onSelect: (id: string) => void;
+}) {
+  const { t } = useTranslation();
+  const requiresGate = cat.id !== 'favorit';
+
+  const guardedTap = useTapGuard({
+    onComplete: () => onSelect(cat.id),
+    onProgress: (_count, remaining) => {
+      Toast.show({
+        type: 'info',
+        text1: t('aac.lockedTitle'),
+        text2: t('aac.tapHintCategory', { n: remaining }),
+        position: 'bottom',
+        visibilityTime: 1200,
+      });
+    },
+  });
+
+  const handlePress = () => {
+    if (isActive) return; // tapping the live tab is a no-op, never a gate counter
+    if (requiresGate) guardedTap();
+    else onSelect(cat.id);
+  };
+
+  return (
+    <TouchableOpacity
+      style={[styles.catBtn, isActive && styles.catBtnActive, !isActive && highContrast && styles.catBtnContrast]}
+      onPress={handlePress}
+    >
+      {isActive && (
+        <LinearGradient
+          colors={[`rgba(${cat.rgba}, 0)`, `rgba(${cat.rgba}, 0.5)`]}
+          style={styles.activeHighlight}
+        />
+      )}
+      <FontAwesome5 name={cat.icon as any} size={highContrast ? 24 : 22} color="#FFF" solid style={{ marginBottom: 6 }} />
+      <Text style={[styles.catText, isActive && { fontWeight: '900' }, highContrast && styles.catTextContrast]}>
+        {t(cat.labelKey)}
+      </Text>
+      {isActive && (
+        <View style={[styles.activeIndicator, { backgroundColor: cat.color }, highContrast && styles.activeIndicatorContrast]} />
+      )}
+    </TouchableOpacity>
+  );
+}
+
 export default function ChildAACScreen() {
   const navigation = useNavigation<any>();
   const { 
@@ -70,6 +135,7 @@ export default function ChildAACScreen() {
     language, childProfile, pairingCode, deviceId, 
     setSpeechRate,
     cardSize, cardSpacing, speakOnTap,
+    highContrast,
     premium, webPaymentActive
   } = useAACStore();
   const { t } = useTranslation();
@@ -194,7 +260,10 @@ export default function ChildAACScreen() {
           .single();
           
         if (!error && data?.settings) {
-          useAACStore.setState(data.settings);
+          // Whitelisted apply (never a raw setState of the remote blob) so
+          // appearance / visual replies / voice land here exactly as they do
+          // through the peer broadcast in SettingsSyncBridge.
+          useAACStore.getState().applySettingsPatch(data.settings);
         }
       } catch (err) {
         console.warn('Catch-up Sync failed (Offline Mode Active):', err);
@@ -220,7 +289,6 @@ export default function ChildAACScreen() {
         // so the closure `language` would otherwise go stale after a language
         // switch and speak parent messages in the previous language.
         const currentLang = useAACStore.getState().language;
-        const senderName = payload.senderName || 'Parent';
 
         if (useAACStore.getState().visualRepliesEnabled) {
           // Balasan Visual: suara DIGANTI modal gambar (oke/tidak/tunggu/
@@ -230,7 +298,8 @@ export default function ChildAACScreen() {
             image: getVisualReplyImage(resolveVisualReply(payload.text)),
           });
         } else {
-          playTTS(payload.text, currentLang, senderName);
+          // Suara TIDAK diputar di sini: MessageAlertBridge (app-level) yang
+          // memutuskan bunyi, supaya tidak dobel ketika app di background.
           Toast.show({ type: 'info', text1: translate(currentLang, 'aac.toastParentMsg'), text2: payload.text, position: 'top', visibilityTime: 4000 });
         }
       }
@@ -256,8 +325,10 @@ export default function ChildAACScreen() {
               settings: payload.new.settings
             });
 
-            // Juga terapkan setting langsung (jika ada settings lain seperti speechRate dll)
-            useAACStore.setState(payload.new.settings);
+            // Terapkan setting lewat jalur whitelist yang sama dengan mirror
+            // broadcast (lihat SettingsSyncBridge) — hanya key yang berubah
+            // yang menulis ulang state.
+            useAACStore.getState().applySettingsPatch(payload.new.settings);
           }
         }
       )
@@ -644,6 +715,61 @@ export default function ChildAACScreen() {
     });
   };
 
+  // ── Delete a USER-ADDED card ────────────────────────────────────────────
+  // Offered only for `isCustom` cards (the shared 244-word dictionary is
+  // immutable — every child on the app relies on the same motor plan for
+  // those positions, so removing one would silently break their muscle
+  // memory). Deleting is destructive and irreversible, so it is confirmed.
+  const handleDeleteWord = () => {
+    const word = selectedWord;
+    if (!word || word.isCustom !== true) return;
+    const label = resolveWordText(word, language);
+    Alert.alert(
+      t('aac.deleteTitle'),
+      t('aac.deleteDesc', { name: label }),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('aac.optionDelete'),
+          style: 'destructive',
+          onPress: () => { void performDeleteWord(word, label); },
+        },
+      ],
+      { cancelable: true },
+    );
+  };
+
+  const performDeleteWord = async (word: AACWord, label: string) => {
+    setShowWordOptions(false);
+    const removed = await deleteCustomWord(word.id);
+    if (!removed) {
+      Toast.show({ type: 'error', text1: t('common.failed'), text2: t('aac.deleteTitle'), position: 'top' });
+      return;
+    }
+
+    // Drop every occurrence from the sentence strip. Walk BACKWARDS: removing
+    // by index shifts the tail, so a forward loop would skip duplicates.
+    const sentence = useAACStore.getState().currentSentence;
+    for (let i = sentence.length - 1; i >= 0; i--) {
+      if (sentence[i].id === word.id) useAACStore.getState().removeFromSentence(i);
+    }
+
+    // Evict the cached AI voice of the old label (the card is gone — a stale
+    // clip would only eat space) and mirror the delete to the cloud copy.
+    await clearAudioCache(label, language, 'Child');
+    void deleteCustomWordFromCloud(word.id, deviceId ?? null);
+
+    await loadDatabase();
+    setSelectedWord(null);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Toast.show({
+      type: 'success',
+      text1: t('common.success'),
+      text2: t('aac.toastDeleted', { name: label }),
+      position: 'top',
+    });
+  };
+
   const handleChangeImage = async () => {
     if (!selectedWord) return;
     setShowWordOptions(false);
@@ -729,6 +855,25 @@ export default function ChildAACScreen() {
   const speakAllFiltered = useAccessibleAction(handleSpeakAll, { haptics: false });
   const sendToParentFiltered = useAccessibleAction(() => handleSendToParent(), { haptics: false });
 
+  // ── Triple-tap gate: child-mode Settings ─────────────────────────────────
+  // Replaces the old 3-second hold. A steady hold is the hardest gesture for
+  // the children this app serves (tremor / spasticity) and fires by accident
+  // when a palm rests on the screen; three deliberate taps are the same rule
+  // now used by the category bar, so the child learns ONE safety gesture.
+  // Read/Delete/Send are intentionally NOT gated: they are the core AAC verbs.
+  const handleSettingsTap = useTapGuard({
+    onComplete: () => navigation.navigate('Settings'),
+    onProgress: (_count, remaining) => {
+      Toast.show({
+        type: 'info',
+        text1: t('aac.lockedTitle'),
+        text2: t('aac.tapHintSettings', { n: remaining }),
+        position: 'bottom',
+        visibilityTime: 1400,
+      });
+    },
+  });
+
   if (loading || isProcessingAI) {
     return (
       <View style={styles.center}>
@@ -782,18 +927,11 @@ export default function ChildAACScreen() {
             <FontAwesome5 name="camera" size={20} color="#00B5B8" />
           </TouchableOpacity>
 
+          {/* Settings is triple-tap gated (was: 3-second hold). */}
           <TouchableOpacity 
             style={styles.iconButton} 
-            onPress={() => {
-              Toast.show({
-                type: 'info',
-                text1: t('aac.lockedTitle'),
-                text2: t('aac.lockedDesc'),
-                position: 'top',
-                visibilityTime: 2000,
-              });
-            }}
-            onLongPress={() => navigation.navigate('Settings')}
+            onPress={handleSettingsTap}
+            accessibilityLabel={t('aac.lockedDesc')}
           >
             <FontAwesome5 name="cog" size={20} color="#94A3B8" />
           </TouchableOpacity>
@@ -830,7 +968,7 @@ export default function ChildAACScreen() {
       </View>
 
       {/* Grid */}
-      <View style={styles.gridContainer}>
+      <View style={[styles.gridContainer, highContrast && styles.gridContainerContrast]}>
         <AACGrid
           words={filteredWords}
           onWordPress={handleCardPress}
@@ -878,6 +1016,16 @@ export default function ChildAACScreen() {
                 <Text style={styles.optionText}>{t('aac.optionFavorite')}</Text>
               </TouchableOpacity>
             )}
+
+            {/* Destructive action — ONLY for user-added cards. Built-in
+                dictionary words never render this row. */}
+            {selectedWord?.isCustom === true ? (
+              <TouchableOpacity style={styles.optionBtn} onPress={handleDeleteWord}>
+                <Text style={styles.optionEmoji}>🗑️</Text>
+                <Text style={[styles.optionText, styles.optionTextDanger]}>{t('aac.optionDelete')}</Text>
+              </TouchableOpacity>
+            ) : null}
+
           </View>
         </TouchableOpacity>
       </Modal>
@@ -966,26 +1114,15 @@ export default function ChildAACScreen() {
       {/* Category Tab Bar (Motor Planning Standard) */}
       <View style={styles.categoryBar}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryScroll}>
-          {categoriesConfig.map((cat) => {
-            const isActive = activeCategory === cat.id;
-            return (
-              <TouchableOpacity 
-                key={cat.id} 
-                style={[styles.catBtn, isActive && styles.catBtnActive]} 
-                onPress={() => setActiveCategory(cat.id)}
-              >
-                {isActive && (
-                  <LinearGradient
-                    colors={[`rgba(${cat.rgba}, 0)`, `rgba(${cat.rgba}, 0.5)`]}
-                    style={styles.activeHighlight}
-                  />
-                )}
-                <FontAwesome5 name={cat.icon} size={22} color="#FFF" solid style={{ marginBottom: 6 }} />
-                <Text style={[styles.catText, isActive && { fontWeight: '900' }]}>{t(cat.labelKey)}</Text>
-                {isActive && <View style={[styles.activeIndicator, { backgroundColor: cat.color }]} />}
-              </TouchableOpacity>
-            );
-          })}
+          {categoriesConfig.map((cat) => (
+            <CategoryTab
+              key={cat.id}
+              cat={cat}
+              isActive={activeCategory === cat.id}
+              highContrast={highContrast}
+              onSelect={setActiveCategory}
+            />
+          ))}
         </ScrollView>
       </View>
 
@@ -1062,6 +1199,11 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 10,
     backgroundColor: '#F8FAFC',
+  },
+  // High Contrast: pure white plate behind the cards so every solid card edge
+  // is the strongest edge on screen (no off-white-on-off-white container).
+  gridContainerContrast: {
+    backgroundColor: '#FFFFFF',
   },
   graceBanner: {
     backgroundColor: '#FFF3D6',
@@ -1140,6 +1282,15 @@ const styles = StyleSheet.create({
   catBtnActive: {
     opacity: 1,
   },
+  // High Contrast: inactive tabs are still visibly "off" (so the child can
+  // read the hierarchy) but never so faint they become invisible.
+  catBtnContrast: {
+    opacity: 0.9,
+  },
+  catTextContrast: {
+    fontSize: 13,
+    fontWeight: '900',
+  },
   activeHighlight: {
     position: 'absolute',
     top: 0,
@@ -1155,6 +1306,9 @@ const styles = StyleSheet.create({
     height: 4,
     borderTopLeftRadius: 2,
     borderTopRightRadius: 2,
+  },
+  activeIndicatorContrast: {
+    height: 6,
   },
   catText: { color: '#FFF', fontSize: 12, fontWeight: 'bold' },
   
