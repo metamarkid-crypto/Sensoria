@@ -3,7 +3,7 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { supabase, isSupabaseConfigured } from '../db/supabase';
 import { useAACStore } from '../../store/useAACStore';
-import { requestNotificationPermission } from './messageAlerts';
+import { ensureMessageChannel, requestNotificationPermission } from './messageAlerts';
 
 /**
  * pushTokens — mendaftarkan Expo Push Token perangkat ke `device_push_tokens`.
@@ -65,6 +65,11 @@ export const syncPushToken = async (): Promise<void> => {
     return;
   }
 
+  // Android 13+: dialog izin POST_NOTIFICATIONS TIDAK muncul sebelum minimal
+  // satu channel ada. Tanpa urutan ini `requestPermissionsAsync` bisa
+  // mengembalikan 'denied' tanpa pernah bertanya, dan token tidak pernah
+  // terdaftar walau pengguna akan mengizinkannya.
+  await ensureMessageChannel();
   const granted = await requestNotificationPermission();
   if (!granted) return;
 

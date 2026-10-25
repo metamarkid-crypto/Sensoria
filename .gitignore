@@ -79,3 +79,11 @@ scripts/arasaac-visual-check.html
 
 # FCM config (CI writes it from the GOOGLE_SERVICES_JSON secret)
 google-services.json
+
+# Firebase service account private keys (FCM V1). File ini berisi private_key
+# yang bisa mengirim push ke SEMUA perangkat app ini — tidak boleh masuk git.
+# Pola `*adminsdk*.json` menangkap nama unduhan default dari Firebase Console
+# (mis. <project>-firebase-adminsdk-xxxxx-yyyyyyyy.json).
+*adminsdk*.json
+*firebase-adminsdk*.json
+

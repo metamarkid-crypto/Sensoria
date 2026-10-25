@@ -73,6 +73,12 @@ async function main() {
   }
   await mono.writeAsync(path.join(ROOT, 'assets', 'android-icon-monochrome.png'));
 
+  // 3b ── Android NOTIFICATION icon: 96² pure-white silhouette (expo-
+  //       notifications requires an all-white alpha mask; a full-colour app
+  //       icon renders as a grey blob in the status bar).
+  const notif = mono.clone().resize(96, 96, Jimp.RESIZE_BICUBIC);
+  await notif.writeAsync(path.join(ROOT, 'assets', 'notification-icon.png'));
+
   // 4 ── Splash HERO glyph (1024² transparent, scene @72% → fills ~80% of the
   //      Android 12+ circular mask with breathing room; safe on iOS too).
   const hero = new Jimp(1024, 1024, 0x0);

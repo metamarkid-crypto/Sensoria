@@ -87,18 +87,9 @@ function CategoryTab({
   const { t } = useTranslation();
   const requiresGate = cat.id !== 'favorit';
 
-  const guardedTap = useTapGuard({
-    onComplete: () => onSelect(cat.id),
-    onProgress: (_count, remaining) => {
-      Toast.show({
-        type: 'info',
-        text1: t('aac.lockedTitle'),
-        text2: t('aac.tapHintCategory', { n: remaining }),
-        position: 'bottom',
-        visibilityTime: 1200,
-      });
-    },
-  });
+  // No progress toast: the light haptic per tap is the only feedback the
+  // child needs, and a banner on every tab tap covered the grid.
+  const guardedTap = useTapGuard({ onComplete: () => onSelect(cat.id) });
 
   const handlePress = () => {
     if (isActive) return; // tapping the live tab is a no-op, never a gate counter
@@ -164,7 +155,12 @@ export default function ChildAACScreen() {
   const [loading, setLoading] = useState(true);
   const [isProcessingAI, setIsProcessingAI] = useState(false);
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
+  // Landing tab: "Semua" until the first load proves the child has favorites.
+  // `defaultTabResolved` keeps that one-time choice from overriding a tab the
+  // child (or parent) picked later — reloads after adding a word must not yank
+  // them back to Favorit.
   const [activeCategory, setActiveCategory] = useState<string>('all');
+  const defaultTabResolved = useRef(false);
   const [showPairing, setShowPairing] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [linkedParents, setLinkedParents] = useState<any[]>([]);
@@ -458,6 +454,13 @@ export default function ChildAACScreen() {
     await initDB();
     const data = await getAllWords();
     setWords(data);
+    // Favorites are the child's fastest access, so an install that already has
+    // some opens on that tab instead of "Semua". Only decided ONCE per mount —
+    // a later reload must never yank the child off the tab they chose.
+    if (!defaultTabResolved.current) {
+      defaultTabResolved.current = true;
+      if (data.some((w) => w.isFavorite === true)) setActiveCategory('favorit');
+    }
     setLoading(false);
   };
 
@@ -861,17 +864,10 @@ export default function ChildAACScreen() {
   // when a palm rests on the screen; three deliberate taps are the same rule
   // now used by the category bar, so the child learns ONE safety gesture.
   // Read/Delete/Send are intentionally NOT gated: they are the core AAC verbs.
+  // No progress toast here either — a light haptic per tap already tells the
+  // child the gate is counting, and the banner covered the very grid they use.
   const handleSettingsTap = useTapGuard({
     onComplete: () => navigation.navigate('Settings'),
-    onProgress: (_count, remaining) => {
-      Toast.show({
-        type: 'info',
-        text1: t('aac.lockedTitle'),
-        text2: t('aac.tapHintSettings', { n: remaining }),
-        position: 'bottom',
-        visibilityTime: 1400,
-      });
-    },
   });
 
   if (loading || isProcessingAI) {

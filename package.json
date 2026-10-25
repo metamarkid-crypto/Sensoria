@@ -1,6 +1,6 @@
 {
   "name": "sensoria",
-  "version": "1.0.16",
+  "version": "1.0.17",
   "main": "index.ts",
   "dependencies": {
     "@expo/vector-icons": "^15.1.1",
@@ -45,6 +45,7 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
+    "pg": "^8.23.1",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -52,7 +53,11 @@
     "brand": "node scripts/generate-brand-assets.js",
     "android": "node scripts/sync-audio.js && node scripts/sync-images.js && expo run:android",
     "ios": "node scripts/sync-audio.js && node scripts/sync-images.js && expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "push:verify": "node scripts/verify-push-setup.mjs",
+    "push:doctor": "node scripts/push-doctor.mjs",
+    "push:fcm": "node scripts/upload-fcm-key.mjs --check",
+    "push:sha1": "node scripts/android-sha1.mjs"
   },
   "private": true
 }

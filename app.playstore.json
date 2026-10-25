@@ -1,9 +1,9 @@
 {
   "expo": {
-    "name": "Sensoria",
-    "slug": "Sensoria",
+    "name": "Sensoria AAC",
+    "slug": "SensoriaAAC",
     "scheme": "sensoria",
-    "version": "1.0.16",
+    "version": "1.0.17",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -19,7 +19,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "id.sensoria.aac",
-      "versionCode": 16,
+      "versionCode": 17,
       "permissions": [
         "android.permission.POST_NOTIFICATIONS"
       ]
@@ -47,6 +47,14 @@
       ],
       "expo-sqlite",
       "expo-audio",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#2488FF",
+          "defaultChannel": "aac-messages"
+        }
+      ],
       "expo-secure-store",
       [
         "expo-location",
