@@ -134,6 +134,15 @@ jobs:
       - name: 🏗️ Expo Prebuild (generate native code, foreground-only)
         run: npx expo prebuild --platform android --clean
 
+      # Sama seperti APK: AAB yang lolos review tapi tanpa FCM = push mati untuk
+      # SEMUA pengguna Play Store. Periksa hasil prebuild, bukan niatnya.
+      - name: ✅ Verifikasi FCM benar-benar masuk ke build native
+        run: |
+          test -f android/app/google-services.json || { echo "::error::prebuild tidak menyalin google-services.json ke android/app/"; exit 1; }
+          grep -q 'com.google.gms.google-services' android/app/build.gradle \
+            || { echo "::error::plugin google-services tidak diterapkan di android/app/build.gradle"; exit 1; }
+          echo "✅ FCM terpasang: $(node -p "require('./android/app/google-services.json').project_info.project_id")"
+
       - name: 🔑 Setup release keystore from repo secrets
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
