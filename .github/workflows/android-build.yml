@@ -87,17 +87,39 @@ jobs:
       # tidak menyimpan konfigurasi Firebase per project.
       # Expo prebuild menyalin ./google-services.json → android/app/.
       - name: 🔔 Pasang google-services.json (FCM)
+        # WAJIB lewat env, JANGAN `printf '%s' "${{ secrets.X }}"`.
+        # Kutip ganda di dalam JSON menutup string shell → semua '"' hilang dan
+        # file jadi `{ project_info: { ... } }` yang bukan JSON. Itu persis yang
+        # menggagalkan build #76 & #77 walau secret-nya benar.
+        env:
+          GS_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
         run: |
-          if [ -z "${{ secrets.GOOGLE_SERVICES_JSON }}" ]; then
-            echo "::warning::GOOGLE_SERVICES_JSON kosong — APK ini TIDAK bisa menerima push saat app ditutup (Realtime saja)."
-            exit 0
+          if [ -z "$GS_JSON" ]; then
+            # Dulu `exit 0`: build tetap HIJAU dan APK tetap terbit, tapi tanpa
+            # google_app_id di resources → getExpoPushTokenAsync() gagal di HP,
+            # token tidak pernah masuk device_push_tokens, dan push mati total.
+            # Kegagalan senyap itu sudah terjadi (APK r75 terbit tanpa FCM).
+            echo "::error::GOOGLE_SERVICES_JSON kosong — APK ini tidak akan bisa menerima push. Isi secret-nya (Settings → Secrets → Actions) dengan isi google-services.json."
+            exit 1
           fi
-          printf '%s' "${{ secrets.GOOGLE_SERVICES_JSON }}" > google-services.json
+          printf '%s' "$GS_JSON" > google-services.json
           node -e "JSON.parse(require('fs').readFileSync('google-services.json','utf8'))" \
             || { echo "::error::GOOGLE_SERVICES_JSON bukan JSON valid"; exit 1; }
 
       - name: 🏗️ Run Expo Prebuild (Generate Native Code)
         run: npx expo prebuild --platform android --clean
+
+      # Prebuild bisa "sukses" tanpa menyalin FCM. Periksa hasilnya di native
+      # project, bukan di niat: tanpa file + plugin gradle, FirebaseApp tidak
+      # pernah terinisialisasi dan push mustahil walau secret sudah terisi.
+      # (google_app_id sendiri baru dibuat plugin SAAT gradle build, di
+      # build/generated — karena itu tidak bisa dicek di sini.)
+      - name: ✅ Verifikasi FCM benar-benar masuk ke build native
+        run: |
+          test -f android/app/google-services.json || { echo "::error::prebuild tidak menyalin google-services.json ke android/app/"; exit 1; }
+          grep -q 'com.google.gms.google-services' android/app/build.gradle \
+            || { echo "::error::plugin google-services tidak diterapkan di android/app/build.gradle"; exit 1; }
+          echo "✅ FCM terpasang: $(node -p "require('./android/app/google-services.json').project_info.project_id")"
 
       # ── SIGNATURE PARITY with the Play AAB pipeline ────────────────────────
       # When the 4 keystore secrets are set, the APK is signed with the SAME
@@ -128,6 +150,16 @@ jobs:
           cd android
           chmod +x gradlew
           ./gradlew assembleRelease
+
+      # Bukti terakhir dan paling jujur: periksa APK yang benar-benar akan
+      # diunduh pengguna. resources.arsc tanpa gcm_defaultSenderId = push mati
+      # di perangkat, apa pun isi secret dan log build di atas.
+      - name: 🔍 Pastikan APK hasil build memuat konfigurasi Firebase
+        run: |
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          unzip -p "$APK" resources.arsc | grep -a -q 'gcm_defaultSenderId' \
+            || { echo "::error::APK tidak memuat gcm_defaultSenderId — push TIDAK akan jalan di perangkat."; exit 1; }
+          echo "✅ APK memuat konfigurasi Firebase (gcm_defaultSenderId ada)"
 
       # ── PUBLISH (replaces artifact upload) ────────────────────────────────
       # Releases storage is unlimited for this purpose and does not touch the

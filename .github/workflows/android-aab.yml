@@ -108,6 +108,29 @@ jobs:
           cp app.playstore.json app.json
           echo "App config aktif: app.playstore.json (ACCESS_BACKGROUND_LOCATION OFF)"
 
+      # ── FCM untuk PUSH (sama seperti android-build.yml) ───────────────────
+      # TANPA langkah ini AAB Play Store dibangun tanpa google-services.json →
+      # getExpoPushTokenAsync() gagal dan push TIDAK PERNAH aktif untuk pengguna
+      # Play Store, walau APK GitHub Releases punya push. app.config.js menyalin
+      # file ini ke android/app/ saat prebuild.
+      - name: 🔔 Pasang google-services.json (FCM)
+        # WAJIB lewat env: substitusi `"${{ secrets.X }}"` langsung ke dalam
+        # string shell membuang setiap '"' milik JSON (kutip menutup string),
+        # sehingga file yang ditulis bukan JSON valid. Lihat build #76/#77.
+        env:
+          GS_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -z "$GS_JSON" ]; then
+            # Jangan `exit 0`: AAB tanpa FCM tetap lolos review Play Store tapi
+            # push mati untuk SEMUA pengguna, dan tidak ada yang tahu sampai
+            # mereka mengeluh. Lebih baik build gagal di sini.
+            echo "::error::GOOGLE_SERVICES_JSON kosong — AAB ini tidak akan bisa menerima push. Isi secret-nya (Settings → Secrets → Actions)."
+            exit 1
+          fi
+          printf '%s' "$GS_JSON" > google-services.json
+          node -e "JSON.parse(require('fs').readFileSync('google-services.json','utf8'))" \
+            || { echo "::error::GOOGLE_SERVICES_JSON bukan JSON valid"; exit 1; }
+
       - name: 🏗️ Expo Prebuild (generate native code, foreground-only)
         run: npx expo prebuild --platform android --clean
 
