@@ -303,6 +303,9 @@ export const id = {
   'about.title': 'Tentang Sensoria',
   'about.defaultDescription': 'Sensoria AAC adalah aplikasi komunikasi alternatif dan argumentatif yang dirancang khusus untuk memfasilitasi anak-anak dengan spektrum autisme atau tantangan komunikasi lainnya. Kami percaya setiap suara pantas didengar.',
   'about.missions': 'Misi Kami',
+  'about.contactUs': 'Hubungi Kami',
+  'about.socialMedia': 'Media Sosial',
+  'about.whatsappSupport': 'WhatsApp Support',
   'about.privacyPolicy': 'Kebijakan Privasi',
   'about.developedIn': 'Dikembangkan di Medan, Indonesia 🇮🇩',
 

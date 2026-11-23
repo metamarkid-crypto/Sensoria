@@ -22,9 +22,12 @@ import {
   deleteTranslationJob,
   bumpTranslationAttempts,
   MAX_TRANSLATION_ATTEMPTS,
+  updateWord,
+  getAllWords,
 } from '../db/sqlite';
 import { translateWordFree, quadComplete, type Quad } from './freeTranslate';
-import { updateWord } from '../db/sqlite';
+import { syncCustomWordToCloud } from '../db/supabase';
+import { useAACStore } from '../../store/useAACStore';
 import { logger } from '../../utils/logger';
 
 let flushing = false;
@@ -66,6 +69,15 @@ export const flushTranslationQueue = async (): Promise<{ flushed: number; remain
           if (job.from_lang !== 'zh' && partial.zh) patch.word_zh = partial.zh;
           if (job.from_lang !== 'ms' && partial.ms) patch.word_ms = partial.ms;
           await updateWord(job.word_id, patch);
+          // Mirror newly-translated labels to the cloud backup if this is a custom card
+          const deviceId = useAACStore.getState().deviceId;
+          if (deviceId) {
+            const allWords = await getAllWords();
+            const updated = allWords.find((w) => w.id === job.word_id);
+            if (updated?.isCustom) {
+              void syncCustomWordToCloud(updated, deviceId);
+            }
+          }
           await deleteTranslationJob(job.id);
           flushed += 1;
         } else {

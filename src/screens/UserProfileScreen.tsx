@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
 import { supabase } from '../services/db/supabase';
@@ -9,6 +9,7 @@ import { logger } from '../utils/logger';
 import { useAACStore, resolveChildDeviceId } from '../store/useAACStore';
 import { queueCloudOp } from '../services/db/sqlite';
 import { useTranslation } from '../i18n';
+import { normalizeChildGender, buildChildProfileFromRow } from '../utils/childProfileHelpers';
 
 export default function UserProfileScreen() {
   const navigation = useNavigation<any>();
@@ -26,8 +27,8 @@ export default function UserProfileScreen() {
     if (childProfile) {
       setFullName(childProfile.full_name || childProfile.fullName || '');
       setNickname(childProfile.nickname || '');
-      // SAFEGUARD 3: Ensure we strictly read the JSONB payload
-      setGender(childProfile.gender ?? 'Boy');
+      // SAFEGUARD 3: Ensure we strictly read the normalized gender + JSONB payload
+      setGender(normalizeChildGender(childProfile.gender, childProfile.settings));
     }
   }, [childProfile]);
 
@@ -50,7 +51,6 @@ export default function UserProfileScreen() {
 
       // SAFEGUARD 3: Strict Gender Payload
       const updatedSettings = { ...(childProfile?.settings || {}), childProfileGender: gender };
-      // childVoiceGender is no longer needed
 
       // Upsert = UPDATE on conflict: heals a wiped/missing child_profiles row
       // (this is also the first write that backfills childProfile.device_id).
@@ -67,15 +67,7 @@ export default function UserProfileScreen() {
       // Update Zustand FIRST and unconditionally — the local store is the
       // source of truth for this device (offline-first). The failed-cloud
       // path below queues a replay; UI must reflect the user's edit either way.
-      setChildProfile({
-        ...childProfile,
-        device_id: targetDeviceId,
-        full_name: fullName,
-        fullName: fullName,
-        nickname: nickname,
-        gender: gender,
-        settings: updatedSettings
-      });
+      setChildProfile(buildChildProfileFromRow(profilePayload, childProfile, targetDeviceId));
 
       if (error) {
         // Offline-first: the profile edit is REAL user data — queue for replay
@@ -99,7 +91,7 @@ export default function UserProfileScreen() {
       setTimeout(() => navigation.goBack(), 1000);
       
     } catch (err: any) {
-      logger.logError('Failed to save User Profile', err);
+      logger.logError(err, { action: 'save_user_profile', role });
       Toast.show({
         type: 'error',
         text1: t('profile.toastFailed'),
@@ -192,7 +184,6 @@ export default function UserProfileScreen() {
 
         </ScrollView>
       </KeyboardAvoidingView>
-      <Toast />
     </SafeAreaView>
   );
 }
@@ -259,9 +250,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 12,
     position: 'relative',
-  },
-  avatarEmoji: {
-    fontSize: 50,
   },
   editAvatarBtn: {
     position: 'absolute',

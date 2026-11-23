@@ -105,8 +105,8 @@ const sampleSentences = [
   ['Tolong', 'Makan'],
   ['Ibu', 'Tolong'],
   ['Mau', 'Minum'],
-  ['Bicara'],
-  ['Terima Kasih'],
+  ['Saya', 'Bicara'],
+  ['Ibu', 'Terima Kasih'],
 ];
 for (const ids of sampleSentences) {
   const joined = ids.map((wid) => {

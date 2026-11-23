@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, Dimensions, Image, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAACStore } from '../../store/useAACStore';
-import { supabase } from '../../services/db/supabase';
 import { useTranslation } from '../../i18n';
+import { getChildDisplayName } from '../../utils/childProfileHelpers';
 
 const { width } = Dimensions.get('window');
 
@@ -19,8 +19,8 @@ export default function DynamicGlobalHeader({ routeName }: HeaderProps) {
   const { childProfile, childStatus } = useAACStore();
   const { isOnline, lastSeen } = childStatus;
 
-  const fullName = childProfile?.fullName || childProfile?.full_name || childProfile?.nickname || t('header.childFallback');
-  const avatarSource = childProfile?.gender === 'Girl' ? require('../../../assets/icon.png') : require('../../../assets/icon.png');
+  const fullName = getChildDisplayName(childProfile, t('header.childFallback'));
+  const avatarSource = require('../../../assets/icon.png');
 
   // Height Shapeshifting logic
   const isHome = routeName === 'Beranda';
@@ -177,24 +177,6 @@ const styles = StyleSheet.create({
     position: 'relative',
     padding: 4,
   },
-  badge: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    backgroundColor: '#FF3B30',
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#11427B',
-  },
-  badgeText: {
-    color: '#FFF',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
   rowHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -204,12 +186,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    flex: 1,
-  },
-  rowHeaderCenter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
     flex: 1,
   },
   smallAvatarContainer: {

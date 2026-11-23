@@ -6,6 +6,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import * as Application from 'expo-application';
 import { supabase } from '../services/db/supabase';
 import { useAACStore, AboutContent } from '../store/useAACStore';
 import { useTranslation } from '../i18n';
@@ -25,7 +26,6 @@ const NAVY_DEEP = '#0B2545';
 const TEAL = '#00B5B8';
 const SKY = '#F2FAFE';
 const INK = '#334155';
-const SLATE_LIGHT = '#E1F2FD';
 
 const ICON_MAP: Record<string, keyof typeof Ionicons.glyphMap> = {
   star: 'star',
@@ -55,7 +55,7 @@ export default function AboutScreen() {
   const defaultContent: RichAbout = {
     description: t('about.defaultDescription'),
     contactEmail: 'support@aacsensoria.id',
-    version: 'v1.0.11',
+    version: `v${Application.nativeApplicationVersion || '1.0.17'}`,
     privacyPolicyUrl: 'https://aacsensoria.id/privacy',
     missionParagraphs: [],
     featureList: [],
@@ -215,7 +215,7 @@ export default function AboutScreen() {
         {/* ── Contact card ── */}
         <View style={[styles.card, { backgroundColor: cardBg }]}>
           <Text style={[styles.sectionLabel, { color: isDark ? '#93C5FD' : NAVY }]}>
-            Hubungi Kami
+            {t('about.contactUs')}
           </Text>
           {c.contactEmail ? (
             <TouchableOpacity style={styles.contactRow} onPress={() => openUrl(`mailto:${c.contactEmail}`)}>
@@ -236,7 +236,7 @@ export default function AboutScreen() {
               <View style={[styles.contactIcon, { backgroundColor: 'rgba(37,211,102,0.14)' }]}>
                 <Ionicons name="logo-whatsapp" size={18} color="#25D366" />
               </View>
-              <Text style={[styles.contactText, { color: isDark ? '#CBD5E0' : INK }]}>WhatsApp Support</Text>
+              <Text style={[styles.contactText, { color: isDark ? '#CBD5E0' : INK }]}>{t('about.whatsappSupport')}</Text>
               <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
             </TouchableOpacity>
           ) : null}
@@ -251,6 +251,68 @@ export default function AboutScreen() {
               <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
             </TouchableOpacity>
           ) : null}
+        </View>
+
+        {/* ── Social Media card ── */}
+        <View style={[styles.card, { backgroundColor: cardBg }]}>
+          <Text style={[styles.sectionLabel, { color: isDark ? '#93C5FD' : NAVY }]}>
+            {t('about.socialMedia')}
+          </Text>
+          <TouchableOpacity
+            style={styles.contactRow}
+            onPress={() => openUrl('https://www.facebook.com/aacsensoria')}
+          >
+            <View style={[styles.contactIcon, { backgroundColor: 'rgba(24,119,242,0.14)' }]}>
+              <Ionicons name="logo-facebook" size={18} color="#1877F2" />
+            </View>
+            <View style={styles.socialTextWrap}>
+              <Text style={[styles.contactText, { color: isDark ? '#CBD5E0' : INK }]}>Facebook</Text>
+              <Text style={[styles.socialHandle, { color: isDark ? '#8B99AE' : '#64748B' }]}>facebook.com/aacsensoria</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.contactRow}
+            onPress={() => openUrl('https://www.instagram.com/aacsensoria')}
+          >
+            <View style={[styles.contactIcon, { backgroundColor: 'rgba(228,64,95,0.14)' }]}>
+              <Ionicons name="logo-instagram" size={18} color="#E4405F" />
+            </View>
+            <View style={styles.socialTextWrap}>
+              <Text style={[styles.contactText, { color: isDark ? '#CBD5E0' : INK }]}>Instagram</Text>
+              <Text style={[styles.socialHandle, { color: isDark ? '#8B99AE' : '#64748B' }]}>@aacsensoria</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.contactRow}
+            onPress={() => openUrl('https://www.tiktok.com/@aacsensoria')}
+          >
+            <View style={[styles.contactIcon, { backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.08)' }]}>
+              <Ionicons name="logo-tiktok" size={17} color={isDark ? '#F8FAFC' : '#0F172A'} />
+            </View>
+            <View style={styles.socialTextWrap}>
+              <Text style={[styles.contactText, { color: isDark ? '#CBD5E0' : INK }]}>TikTok</Text>
+              <Text style={[styles.socialHandle, { color: isDark ? '#8B99AE' : '#64748B' }]}>@aacsensoria</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.contactRow}
+            onPress={() => openUrl('https://www.youtube.com/@aacsensoria')}
+          >
+            <View style={[styles.contactIcon, { backgroundColor: 'rgba(255,0,0,0.13)' }]}>
+              <Ionicons name="logo-youtube" size={18} color="#FF0000" />
+            </View>
+            <View style={styles.socialTextWrap}>
+              <Text style={[styles.contactText, { color: isDark ? '#CBD5E0' : INK }]}>YouTube</Text>
+              <Text style={[styles.socialHandle, { color: isDark ? '#8B99AE' : '#64748B' }]}>@aacsensoria</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+          </TouchableOpacity>
         </View>
       </ScrollView>
 
@@ -379,6 +441,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   contactText: { flex: 1, fontSize: 14, fontWeight: '600' },
+  socialTextWrap: { flex: 1, justifyContent: 'center' },
+  socialHandle: { fontSize: 12, marginTop: 1 },
   /* footer */
   footer: {
     paddingVertical: 18,
@@ -390,6 +454,3 @@ const styles = StyleSheet.create({
   versionText: { fontSize: 13, fontWeight: '700', marginBottom: 3 },
   footerText: { fontSize: 11.5 },
 });
-
-// SLATE_LIGHT kept for potential future accent use; avoids import removal churn.
-void SLATE_LIGHT;

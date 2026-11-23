@@ -12,7 +12,6 @@ import { logger } from '../utils/logger';
 import Toast from 'react-native-toast-message';
 import AACGrid from '../components/sensory/AACGrid';
 import SentenceStrip from '../components/sensory/SentenceStrip';
-import * as Speech from 'expo-speech';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import * as Haptics from 'expo-haptics';
@@ -20,9 +19,9 @@ import { playTTS, clearAudioCache } from '../services/ai/audioManager';
 import { useAccessibleAction } from '../hooks/useAccessibleAction';
 import { useTapGuard } from '../hooks/useTapGuard';
 import { useTranslation, translate, type TranslationKey } from '../i18n';
-import SettingsScreen from './SettingsScreen';
 import { supabase, sendAACMessage, subscribeToAACMessages, syncCustomWordToCloud, deleteCustomWordFromCloud } from '../services/db/supabase';
 import { getVisualReplyImage, resolveVisualReply } from '../assets/replyAssets';
+import { buildChildProfileFromRow } from '../utils/childProfileHelpers';
 import {
   ensureBackgroundTracking,
   stopBackgroundTracking,
@@ -122,10 +121,9 @@ function CategoryTab({
 export default function ChildAACScreen() {
   const navigation = useNavigation<any>();
   const { 
-    currentSentence, clearSentence, addToSentence, setRole, 
+    currentSentence, clearSentence, addToSentence, 
     language, childProfile, pairingCode, deviceId, 
-    setSpeechRate,
-    cardSize, cardSpacing, speakOnTap,
+    speakOnTap,
     highContrast,
     premium, webPaymentActive
   } = useAACStore();
@@ -161,8 +159,6 @@ export default function ChildAACScreen() {
   // them back to Favorit.
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const defaultTabResolved = useRef(false);
-  const [showPairing, setShowPairing] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
   const [linkedParents, setLinkedParents] = useState<any[]>([]);
   // Gerbang tombol kirim: terkunci sampai minimal satu parent terhubung —
   // mencegah pesan tanpa penerima. DERIVED dari linkedParents (diisi fetch
@@ -179,7 +175,6 @@ export default function ChildAACScreen() {
     const timer = setTimeout(() => setVisualReply(null), 6000);
     return () => clearTimeout(timer);
   }, [visualReply]);
-  const insets = useSafeAreaInsets();
 
   // Ukuran gambar Balasan Visual dihitung dari dimensi layar AGAR TIDAK
   // meluber keluar modal di layar pendek/landscape (tablet anak sering
@@ -311,15 +306,10 @@ export default function ChildAACScreen() {
           if (payload.new && payload.new.settings) {
             const currentProfile = useAACStore.getState().childProfile;
             
-            // Perbarui childProfile dengan gender dari settings dan field lainnya
-            useAACStore.getState().setChildProfile({
-              ...currentProfile,
-              nickname: payload.new.nickname || currentProfile?.nickname,
-              full_name: payload.new.full_name || currentProfile?.full_name,
-              fullName: payload.new.full_name || currentProfile?.fullName,
-              gender: payload.new.settings.childProfileGender || currentProfile?.gender,
-              settings: payload.new.settings
-            });
+            // Perbarui childProfile dengan gender ter-normalisasi dari settings dan field lainnya
+            useAACStore.getState().setChildProfile(
+              buildChildProfileFromRow(payload.new, currentProfile, deviceId),
+            );
 
             // Terapkan setting lewat jalur whitelist yang sama dengan mirror
             // broadcast (lihat SettingsSyncBridge) — hanya key yang berubah
@@ -513,59 +503,35 @@ export default function ChildAACScreen() {
     
     const fullText = sentenceToWrap.map(w => resolveWordText(w, language)).join(' ');
     
-    if (pairingCode) {
-      // Only send when a parent device is ACTUALLY connected — a child can hold
-      // a pairing code long before any parent pairs, and those orphan messages
-      // would otherwise be written to Supabase with no recipient. When the
-      // check itself fails (offline), we do NOT block: connectivity is
-      // re-verified by the outbox flusher once the device is back online.
-      let connected = false;
-      let checkFailed = false;
-      if (deviceId) {
-        const { data: links, error: linkError } = await supabase
-          .from('family_links')
-          .select('id')
-          .eq('child_device_id', deviceId)
-          .limit(1);
-        if (linkError) {
-          checkFailed = true;
-        } else {
-          connected = Array.isArray(links) && links.length > 0;
-        }
-      }
-
-      if (!connected && !checkFailed) {
-        Toast.show({ type: 'info', text1: t('common.failed'), text2: t('aac.toastNotLinked'), position: 'top' });
-        return;
-      }
-
-      const messagePayload = {
-        sender: 'Child' as const,
-        senderName: childProfile?.nickname || t('aac.childFallback'),
-        text: fullText,
-        timestamp: Date.now(),
-        location: loc ? { latitude: loc.coords.latitude, longitude: loc.coords.longitude } : null
-      };
-
-      const delivered = await sendAACMessage(pairingCode, messagePayload);
-      if (delivered) {
-        Toast.show({ type: 'success', text1: t('aac.toastSent'), text2: t('aac.toastSentDesc'), position: 'top' });
-      } else {
-        // Offline / cloud unreachable: never lose the message — park it in the
-        // local outbox; flushPendingMessages() delivers it once back online.
-        await queuePendingMessage({
-          channel_id: pairingCode,
-          sender_role: messagePayload.sender,
-          sender_name: messagePayload.senderName,
-          text_content: messagePayload.text,
-          timestamp: messagePayload.timestamp,
-          location_lat: messagePayload.location?.latitude ?? null,
-          location_lng: messagePayload.location?.longitude ?? null,
-        });
-        Toast.show({ type: 'info', text1: t('aac.toastSent'), text2: t('aac.toastQueuedOffline'), position: 'top' });
-      }
-    } else {
+    if (!pairingCode) {
       Toast.show({ type: 'error', text1: t('common.failed'), text2: t('aac.toastNotLinked'), position: 'top' });
+      return;
+    }
+
+    const messagePayload = {
+      sender: 'Child' as const,
+      senderName: childProfile?.nickname || t('aac.childFallback'),
+      text: fullText,
+      timestamp: Date.now(),
+      location: loc ? { latitude: loc.coords.latitude, longitude: loc.coords.longitude } : null
+    };
+
+    const delivered = await sendAACMessage(pairingCode, messagePayload);
+    if (delivered) {
+      Toast.show({ type: 'success', text1: t('aac.toastSent'), text2: t('aac.toastSentDesc'), position: 'top' });
+    } else {
+      // Offline / cloud unreachable: never lose the message — park it in the
+      // local outbox; flushPendingMessages() delivers it once back online.
+      await queuePendingMessage({
+        channel_id: pairingCode,
+        sender_role: messagePayload.sender,
+        sender_name: messagePayload.senderName,
+        text_content: messagePayload.text,
+        timestamp: messagePayload.timestamp,
+        location_lat: messagePayload.location?.latitude ?? null,
+        location_lng: messagePayload.location?.longitude ?? null,
+      });
+      Toast.show({ type: 'info', text1: t('aac.toastSent'), text2: t('aac.toastQueuedOffline'), position: 'top' });
     }
   };
 
@@ -703,11 +669,15 @@ export default function ChildAACScreen() {
   const handleToggleFavorite = async () => {
     if (!selectedWord) return;
     const isFavorite = selectedWord.isFavorite === true;
+    const nextFav = !isFavorite;
     setShowWordOptions(false);
     // Non-destructive toggle: flips only the `is_favorite` boolean. The
     // card's categoryId is untouched, so it stays in its original tab and
     // the child's motor memory of "Apel is in Benda" is preserved.
-    await setWordFavorite(selectedWord.id, !isFavorite);
+    await setWordFavorite(selectedWord.id, nextFav);
+    if (selectedWord.isCustom) {
+      void syncCustomWordToCloud({ ...selectedWord, isFavorite: nextFav }, deviceId);
+    }
     await loadDatabase();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     Toast.show({
@@ -784,7 +754,11 @@ export default function ChildAACScreen() {
     });
 
     if (!result.canceled && result.assets[0]) {
-      await updateWord(selectedWord.id, { imageUrl: result.assets[0].uri });
+      const nextUri = result.assets[0].uri;
+      await updateWord(selectedWord.id, { imageUrl: nextUri });
+      if (selectedWord.isCustom) {
+        void syncCustomWordToCloud({ ...selectedWord, imageUrl: nextUri }, deviceId);
+      }
       await loadDatabase();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
@@ -819,6 +793,9 @@ export default function ChildAACScreen() {
     await clearAudioCache(previousLabel, activeLang, 'Child');
 
     await updateWord(selectedWord.id, patch);
+    if (selectedWord.isCustom) {
+      void syncCustomWordToCloud({ ...selectedWord, ...patch }, deviceId);
+    }
     await loadDatabase();
 
     setShowEditName(false);

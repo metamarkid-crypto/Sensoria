@@ -8,15 +8,16 @@ import { useAACStore } from '../store/useAACStore';
 import { queueCloudOp } from '../services/db/sqlite';
 import { supabase } from '../services/db/supabase';
 import { useTranslation } from '../i18n';
+import { buildChildProfileFromRow } from '../utils/childProfileHelpers';
 
-export default function OnboardingScreen({ navigation }: any) {
+export default function OnboardingScreen() {
   const { t } = useTranslation();
   const [fullName, setFullName] = useState('');
   const [nickname, setNickname] = useState('');
   const [gender, setGender] = useState<'boy' | 'girl' | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const { setChildProfile, deviceId } = useAACStore();
+  const { setChildProfile, setSelectedVoice, deviceId } = useAACStore();
 
   const handleSave = async () => {
     if (!fullName.trim() || !nickname.trim() || !gender) {
@@ -28,15 +29,27 @@ export default function OnboardingScreen({ navigation }: any) {
     setIsSubmitting(true);
 
     try {
+      const normalizedGender = gender === 'boy' ? 'Boy' : 'Girl';
+      const defaultVoice = normalizedGender === 'Girl' ? 'id-female-1' : 'id-male-1';
+      setSelectedVoice(defaultVoice);
+
+      const profilePayload = {
+        device_id: deviceId ?? undefined,
+        full_name: fullName.trim(),
+        nickname: nickname.trim(),
+        settings: {
+          speechRate: 1.0,
+          selectedVoice: defaultVoice,
+          childProfileGender: normalizedGender,
+        },
+      };
+
       // 1. Simpan ke local store — device_id disertakan supaya seluruh
       //    penulis cloud (UserProfile / Voice / Appearance / Accessibility)
       //    punya target canonical sejak awal, bukan bergantung fallback.
-      setChildProfile({
-        device_id: deviceId ?? undefined,
-        fullName: fullName.trim(),
-        nickname: nickname.trim(),
-        gender: gender === 'boy' ? 'Boy' : 'Girl'
-      });
+      //    Karena AppNavigator bersifat state-driven (mengamati childProfile),
+      //    pemanggilan setChildProfile akan otomatis me-mount ChildAACScreen.
+      setChildProfile(buildChildProfileFromRow(profilePayload, null, deviceId));
       
       // 2. Simpan ke Supabase (jika sudah ada koneksi) — NON-FATAL saat
       //    offline: profil & role sudah tersimpan lokal di atas, jadi sebuah
@@ -45,15 +58,6 @@ export default function OnboardingScreen({ navigation }: any) {
       //    catch-up sync saat perangkat online.
       if (deviceId) {
         try {
-          const profilePayload = {
-            device_id: deviceId,
-            full_name: fullName.trim(),
-            nickname: nickname.trim(),
-            settings: {
-              speechRate: 1.0,
-              childProfileGender: gender === 'boy' ? 'Boy' : 'Girl'
-            }
-          };
           const { error: cloudError } = await supabase
             .from('child_profiles')
             .upsert(profilePayload);
@@ -66,9 +70,6 @@ export default function OnboardingScreen({ navigation }: any) {
           console.warn('Cloud profile write skipped (offline-safe):', cloudError);
         }
       }
-      
-      // 3. Navigasi ke ChildAAC
-      navigation.replace('ChildAAC');
     } catch (error) {
       console.error('Error saving profile:', error);
       Toast.show({ type: 'error', text1: t('common.failed'), text2: t('onboarding.toastFailedDesc') });

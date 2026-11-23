@@ -223,12 +223,13 @@ export default function ParentMessagesScreen() {
 
   const renderMessage = ({ item }: { item: any }) => {
     const isChild = item.sender_role === 'Child';
+    // Support both snake_case (from Postgres / SQLite) and camelCase (if any)
+    const rawSenderName: string | undefined = item.sender_name ?? item.senderName;
     // Self-detection by the canonical role label — with a legacy guard:
     // messages sent before role labels existed were stored as the old
     // 'Orang Tua' default and must still render as THIS parent's bubble.
     const isCurrentUser =
-      item.senderName === localParentName || item.senderName === 'Orang Tua';
-    const isOtherParent = !isChild && !isCurrentUser;
+      rawSenderName === localParentName || rawSenderName === 'Orang Tua';
     // Outbox rows (queued while offline) carry pending=1 — show a sync badge
     // until the flusher replaces them with their real cloud rows.
     const isPending = item.pending === 1;
@@ -257,9 +258,9 @@ export default function ParentMessagesScreen() {
             <Text style={[styles.senderNameTag, isCurrentUser ? styles.nameTagSelf : styles.nameTagOther]}>
               {/* Nama asli pengirim; default legacy ('Orang Tua'/'Parent')
                   di-upgrade ke peran canonical ibu/ayah/dll saat diketahui. */}
-              {item.senderName && item.senderName !== 'Orang Tua' && item.senderName !== 'Parent'
-                ? item.senderName
-                : (roleLabel || localParentName || item.senderName || t('messages.parentRoleFallback'))}
+              {rawSenderName && rawSenderName !== 'Orang Tua' && rawSenderName !== 'Parent'
+                ? rawSenderName
+                : (roleLabel || localParentName || rawSenderName || t('messages.parentRoleFallback'))}
             </Text>
           )}
           

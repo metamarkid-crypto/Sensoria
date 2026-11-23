@@ -18,6 +18,7 @@ import { createCheckoutSession } from '../services/db/paywall';
 import { computeRenewalPreview } from '../services/db/entitlement';
 import { useAccessibleAction } from '../hooks/useAccessibleAction';
 import { useTranslation } from '../i18n';
+import { formatDate } from '../utils/format';
 
 /** Deep link the checkout page redirects to after paid/expired (app.json scheme). */
 const PAY_RESULT_URL = 'sensoria://pay-result';
@@ -50,24 +51,12 @@ const PAY_RESULT_URL = 'sensoria://pay-result';
 
 type FlowStage = 'idle' | 'requesting' | 'waiting' | 'verifying';
 
-const MONTHS_ID = [
-  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
-];
-
 const PERKS = [
   { icon: 'map-marked-alt', textKey: 'paywall.perk1' },
   { icon: 'comments', textKey: 'paywall.perk2' },
   { icon: 'microphone-alt', textKey: 'paywall.perk3' },
   { icon: 'shield-alt', textKey: 'paywall.perk4' },
 ] as const;
-
-const formatDate = (iso: string | null): string => {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return `${d.getDate()} ${MONTHS_ID[d.getMonth()]} ${d.getFullYear()}`;
-};
 
 export default function PaywallScreen() {
   const navigation = useNavigation<any>();
@@ -84,7 +73,6 @@ export default function PaywallScreen() {
 
   // --- Browser checkout flow ---
   const [stage, setStage] = useState<FlowStage>('idle');
-  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
 
   // Renewal mode: a premium user pressing the Upgrade/Perpanjang CTA on the
   // success view re-enters the checkout flow (normally that view has no exit
@@ -111,7 +99,7 @@ export default function PaywallScreen() {
   const load = useCallback(async () => {
     if (!webPaymentLoaded) return; // kill-switch not resolved yet
     setBooting(false);
-  }, [webPaymentActive, webPaymentLoaded]);
+  }, [webPaymentLoaded]);
 
   useEffect(() => {
     void load();
@@ -135,7 +123,6 @@ export default function PaywallScreen() {
     setStage('requesting');
     try {
       const session = await createCheckoutSession(deviceId, language);
-      setCheckoutUrl(session.url);
       setStage('waiting');
       // Custom Tab closes itself when the checkout page redirects to
       // sensoria://pay-result (paid/expired) or the user dismisses it.

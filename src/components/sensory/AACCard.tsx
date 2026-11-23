@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
 import { View, Text, Image, StyleSheet, Animated, Pressable } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { AACWord, useAACStore, resolveWordText } from '../../store/useAACStore';
 import { getLocalImage } from '../../assets/imageMap';
 
@@ -40,6 +41,30 @@ const HIGH_CONTRAST_CATEGORY: Record<string, { bg: string; border: string }> = {
   color: { bg: '#D8B4FE', border: '#7E22CE' },
 };
 
+/** Standard soft-pastel category palette (Appearance → Warna Kategori Kartu). */
+const SOFT_CATEGORY_PALETTE: Record<string, { bg: string; border: string }> = {
+  pronoun: { bg: '#FFF0F5', border: '#FFB6C1' },
+  verb: { bg: '#F0FDF4', border: '#BBF7D0' },
+  noun: { bg: '#EFF6FF', border: '#BFDBFE' },
+  social: { bg: '#F5F3FF', border: '#DDD6FE' },
+  emotion: { bg: '#FFFbeb', border: '#FDE68A' },
+  body: { bg: '#FFF5F5', border: '#FECACA' },
+  number: { bg: '#F0FDFA', border: '#A5F3FC' },
+  people: { bg: '#EEF2FF', border: '#C7D2FE' },
+  food: { bg: '#FFF1F2', border: '#FECDD3' },
+  place: { bg: '#F0F9FF', border: '#BAE6FD' },
+  time: { bg: '#F0FDFA', border: '#99F6E4' },
+  animal: { bg: '#F7FEE7', border: '#D9F99D' },
+  clothing: { bg: '#FDF4FF', border: '#F5D0FE' },
+  color: { bg: '#FAF5FF', border: '#E9D5FF' },
+};
+
+const FONT_SIZE_MAP: Record<'A-' | 'A' | 'A+', number> = {
+  'A-': 12,
+  'A': 15,
+  'A+': 18,
+};
+
 const AACCard = React.memo(({ item, onPress, onLongPress }: AACCardProps) => {
   const language = useAACStore(state => state.language);
   const childProfile = useAACStore(state => state.childProfile);
@@ -49,12 +74,16 @@ const AACCard = React.memo(({ item, onPress, onLongPress }: AACCardProps) => {
   const holdDuration = useAACStore(state => state.holdDuration);
   const ignoreRepeat = useAACStore(state => state.ignoreRepeat);
   const releaseToSpeak = useAACStore(state => state.releaseToSpeak);
+  const soundFeedback = useAACStore(state => state.soundFeedback);
   
   const scaleValue = useRef(new Animated.Value(1)).current;
   const opacityValue = useRef(new Animated.Value(1)).current;
   const lastPressTime = useRef<number>(0);
 
   const handlePressIn = () => {
+    if (soundFeedback) {
+      void Haptics.selectionAsync();
+    }
     // Immediate Visual Feedback (Opacity)
     Animated.timing(opacityValue, {
       toValue: 0.6,
@@ -70,8 +99,6 @@ const AACCard = React.memo(({ item, onPress, onLongPress }: AACCardProps) => {
     }).start();
   };
 
-  // Removed unused onPressOut
-  
   // Determine image source
   let imageSource = null;
   if (item.isCustom) {
@@ -88,92 +115,14 @@ const AACCard = React.memo(({ item, onPress, onLongPress }: AACCardProps) => {
     }
   }
 
-  // Determine Semantic Colors
-  // High Contrast swaps the quiet tints for solid fills; when category colors
-  // are OFF it keeps a pure-white card with a dark navy border, so the toggle
-  // still strengthens every card instead of doing nothing.
-  let bgColor = '#FFFFFF';
-  let borderColor = highContrast ? '#0B2545' : '#F1F5F9';
+  // Determine Semantic Colors via O(1) dictionary lookup
+  const activePalette = enableCategoryColors
+    ? (highContrast ? HIGH_CONTRAST_CATEGORY[item.categoryId] : SOFT_CATEGORY_PALETTE[item.categoryId])
+    : undefined;
+  const bgColor = activePalette?.bg ?? '#FFFFFF';
+  const borderColor = activePalette?.border ?? (highContrast ? '#0B2545' : '#F1F5F9');
 
-  if (highContrast) {
-    const solid = HIGH_CONTRAST_CATEGORY[item.categoryId];
-    if (enableCategoryColors && solid) {
-      bgColor = solid.bg;
-      borderColor = solid.border;
-    }
-  } else if (enableCategoryColors) {
-    switch (item.categoryId) {
-      case 'pronoun':
-        bgColor = '#FFF0F5'; // Soft Pink
-        borderColor = '#FFB6C1';
-        break;
-      case 'verb':
-        bgColor = '#F0FDF4'; // Soft Green
-        borderColor = '#BBF7D0';
-        break;
-      case 'noun':
-        bgColor = '#EFF6FF'; // Soft Blue
-        borderColor = '#BFDBFE';
-        break;
-      case 'social':
-        bgColor = '#F5F3FF'; // Soft Purple
-        borderColor = '#DDD6FE';
-        break;
-      case 'emotion':
-        bgColor = '#FFFbeb'; // Soft Yellow
-        borderColor = '#FDE68A';
-        break;
-      case 'body':
-        bgColor = '#FFF5F5'; // Soft Red
-        borderColor = '#FECACA';
-        break;
-      case 'number':
-        bgColor = '#F0FDFA'; // Soft Cyan
-        borderColor = '#A5F3FC';
-        break;
-      case 'people':
-        bgColor = '#EEF2FF'; // Soft Indigo
-        borderColor = '#C7D2FE';
-        break;
-      case 'food':
-        bgColor = '#FFF1F2'; // Soft Rose
-        borderColor = '#FECDD3';
-        break;
-      case 'place':
-        bgColor = '#F0F9FF'; // Soft Sky
-        borderColor = '#BAE6FD';
-        break;
-      case 'time':
-        bgColor = '#F0FDFA'; // Soft Teal
-        borderColor = '#99F6E4';
-        break;
-      case 'animal':
-        bgColor = '#F7FEE7'; // Soft Lime
-        borderColor = '#D9F99D';
-        break;
-      case 'clothing':
-        bgColor = '#FDF4FF'; // Soft Fuchsia
-        borderColor = '#F5D0FE';
-        break;
-      case 'color':
-        bgColor = '#FAF5FF'; // Soft Purple
-        borderColor = '#E9D5FF';
-        break;
-      default:
-        bgColor = '#FFFFFF';
-        borderColor = '#F1F5F9';
-    }
-  }
-
-  // Dynamic Text Size
-  const getFontSize = () => {
-    switch (textSize) {
-      case 'A-': return 12;
-      case 'A+': return 18;
-      case 'A':
-      default: return 15;
-    }
-  };
+  const getFontSize = () => FONT_SIZE_MAP[textSize] ?? 15;
 
   // --- ACCESSIBILITY LOGIC ---
   const handleAction = () => {

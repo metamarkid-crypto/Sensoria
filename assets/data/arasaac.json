@@ -64,10 +64,10 @@
   },
   {
     "id": "8",
-    "word_id": "Tolong",
+    "word_id": "Mohon",
     "word_en": "Please",
     "word_zh": "请",
-    "word_ms": "Tolong",
+    "word_ms": "Mohon",
     "imageUrl": "https://static.arasaac.org/pictograms/8195/8195_300.png",
     "categoryId": "social"
   },
@@ -563,7 +563,7 @@
     "word_en": "Hand",
     "word_zh": "手",
     "word_ms": "Tangan",
-    "imageUrl": "https://static.arasaac.org/pictograms/28431/28431_300.png",
+    "imageUrl": "https://static.arasaac.org/pictograms/2461/2461_300.png",
     "categoryId": "body"
   },
   {
@@ -1604,10 +1604,10 @@
   {
     "id": "179",
     "word_id": "Baju",
-    "word_en": "Shirt",
+    "word_en": "T-shirt",
     "word_zh": "上衣",
     "word_ms": "Baju",
-    "imageUrl": "https://static.arasaac.org/pictograms/13640/13640_300.png",
+    "imageUrl": "https://static.arasaac.org/pictograms/2308/2308_300.png",
     "categoryId": "clothing"
   },
   {
@@ -1814,7 +1814,7 @@
     "word_en": "Orange",
     "word_zh": "橙色",
     "word_ms": "Oren",
-    "imageUrl": "https://static.arasaac.org/pictograms/2888/2888_300.png",
+    "imageUrl": "https://static.arasaac.org/pictograms/2889/2889_300.png",
     "categoryId": "color"
   },
   {
@@ -1864,7 +1864,7 @@
   },
   {
     "id": "208",
-    "word_id": "Jalan",
+    "word_id": "Berjalan",
     "word_en": "Walk",
     "word_zh": "走路",
     "word_ms": "Berjalan",
@@ -2156,7 +2156,7 @@
     "word_en": "Help me",
     "word_zh": "帮助",
     "word_ms": "Bantu",
-    "imageUrl": "https://static.arasaac.org/pictograms/32648/32648_300.png",
+    "imageUrl": "https://static.arasaac.org/pictograms/7171/7171_300.png",
     "categoryId": "social"
   },
   {
@@ -2194,5 +2194,149 @@
     "word_ms": "Semua",
     "imageUrl": "https://static.arasaac.org/pictograms/5596/5596_300.png",
     "categoryId": "pronoun"
+  },
+  {
+    "id": "245",
+    "word_id": "Sebelas",
+    "word_en": "Eleven",
+    "word_zh": "十一",
+    "word_ms": "Sebelas",
+    "imageUrl": "https://static.arasaac.org/pictograms/7026/7026_300.png",
+    "categoryId": "number"
+  },
+  {
+    "id": "246",
+    "word_id": "Dua Belas",
+    "word_en": "Twelve",
+    "word_zh": "十二",
+    "word_ms": "Dua Belas",
+    "imageUrl": "https://static.arasaac.org/pictograms/7027/7027_300.png",
+    "categoryId": "number"
+  },
+  {
+    "id": "247",
+    "word_id": "Tiga Belas",
+    "word_en": "Thirteen",
+    "word_zh": "十三",
+    "word_ms": "Tiga Belas",
+    "imageUrl": "https://static.arasaac.org/pictograms/7029/7029_300.png",
+    "categoryId": "number"
+  },
+  {
+    "id": "248",
+    "word_id": "Empat Belas",
+    "word_en": "Fourteen",
+    "word_zh": "十四",
+    "word_ms": "Empat Belas",
+    "imageUrl": "https://static.arasaac.org/pictograms/7030/7030_300.png",
+    "categoryId": "number"
+  },
+  {
+    "id": "249",
+    "word_id": "Lima Belas",
+    "word_en": "Fifteen",
+    "word_zh": "十五",
+    "word_ms": "Lima Belas",
+    "imageUrl": "https://static.arasaac.org/pictograms/7031/7031_300.png",
+    "categoryId": "number"
+  },
+  {
+    "id": "250",
+    "word_id": "Enam Belas",
+    "word_en": "Sixteen",
+    "word_zh": "十六",
+    "word_ms": "Enam Belas",
+    "imageUrl": "https://static.arasaac.org/pictograms/7033/7033_300.png",
+    "categoryId": "number"
+  },
+  {
+    "id": "251",
+    "word_id": "Tujuh Belas",
+    "word_en": "Seventeen",
+    "word_zh": "十七",
+    "word_ms": "Tujuh Belas",
+    "imageUrl": "https://static.arasaac.org/pictograms/7034/7034_300.png",
+    "categoryId": "number"
+  },
+  {
+    "id": "252",
+    "word_id": "Delapan Belas",
+    "word_en": "Eighteen",
+    "word_zh": "十八",
+    "word_ms": "Lapan Belas",
+    "imageUrl": "https://static.arasaac.org/pictograms/7035/7035_300.png",
+    "categoryId": "number"
+  },
+  {
+    "id": "253",
+    "word_id": "Sembilan Belas",
+    "word_en": "Nineteen",
+    "word_zh": "十九",
+    "word_ms": "Sembilan Belas",
+    "imageUrl": "https://static.arasaac.org/pictograms/7036/7036_300.png",
+    "categoryId": "number"
+  },
+  {
+    "id": "254",
+    "word_id": "Puluh",
+    "word_en": "Tens",
+    "word_zh": "十位",
+    "word_ms": "Puluh",
+    "imageUrl": "https://static.arasaac.org/pictograms/7037/7037_300.png",
+    "categoryId": "number"
+  },
+  {
+    "id": "255",
+    "word_id": "Ratus",
+    "word_en": "Hundred",
+    "word_zh": "百",
+    "word_ms": "Ratus",
+    "imageUrl": "https://static.arasaac.org/pictograms/7098/7098_300.png",
+    "categoryId": "number"
+  },
+  {
+    "id": "256",
+    "word_id": "Ribu",
+    "word_en": "Thousand",
+    "word_zh": "千",
+    "word_ms": "Ribu",
+    "imageUrl": "https://static.arasaac.org/pictograms/7100/7100_300.png",
+    "categoryId": "number"
+  },
+  {
+    "id": "257",
+    "word_id": "Juta",
+    "word_en": "Million",
+    "word_zh": "百万",
+    "word_ms": "Juta",
+    "imageUrl": "https://static.arasaac.org/pictograms/7101/7101_300.png",
+    "categoryId": "number"
+  },
+  {
+    "id": "258",
+    "word_id": "Tambah",
+    "word_en": "Plus",
+    "word_zh": "加",
+    "word_ms": "Tambah",
+    "imageUrl": "https://static.arasaac.org/pictograms/3220/3220_300.png",
+    "categoryId": "number"
+  },
+  {
+    "id": "259",
+    "word_id": "Kurang",
+    "word_en": "Minus",
+    "word_zh": "减",
+    "word_ms": "Tolak",
+    "imageUrl": "https://static.arasaac.org/pictograms/3218/3218_300.png",
+    "categoryId": "number"
+  },
+  {
+    "id": "260",
+    "word_id": "Sama Dengan",
+    "word_en": "Equals",
+    "word_zh": "等于",
+    "word_ms": "Sama Dengan",
+    "imageUrl": "https://static.arasaac.org/pictograms/3222/3222_300.png",
+    "categoryId": "number"
   }
 ]

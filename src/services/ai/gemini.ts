@@ -1,7 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import { logger } from '../../utils/logger';
 import * as FileSystem from 'expo-file-system/legacy';
-import { Buffer } from 'buffer';
 
 const apiKeys = [
   process.env.EXPO_PUBLIC_GEMINI_API_KEY,
@@ -58,42 +57,6 @@ const executeWithFallback = async <T>(
   throw new Error(`[Gemini API] All ${apiKeys.length} API keys have been exhausted or failed. Last Error: ${lastError?.message}`);
 };
 
-export const transcribeAudio = async (audioUri: string): Promise<string> => {
-  const fileInfo = await FileSystem.getInfoAsync(audioUri);
-  if (!fileInfo.exists) {
-    throw new Error('Audio file does not exist');
-  }
-
-  // Read the audio file as base64 string
-  const base64Data = await FileSystem.readAsStringAsync(audioUri, {
-    encoding: FileSystem.EncodingType.Base64,
-  });
-
-  return executeWithFallback(async (ai) => {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            {
-              inlineData: {
-                data: base64Data,
-                mimeType: 'audio/m4a', // Assuming m4a from expo-av high quality preset
-              },
-            },
-            {
-              text: 'Transcribe the following audio accurately.',
-            },
-          ],
-        },
-      ],
-    });
-
-    return response.text || 'No transcription available.';
-  });
-};
-
 /** Categories a custom card can belong to (mirrors the Child tab bar ids). */
 export type ImageTagCategory =
   | 'pronoun'
@@ -137,7 +100,7 @@ const VALID_TAG_CATEGORIES: readonly string[] = [
  */
 const NO_CONFIDENCE_TAG: ImageTagResult = { id: 'Benda', en: 'Thing', zh: '东西', ms: 'Barang', category: 'noun' };
 
-const isNoConfidenceTag = (t: ImageTagResult): boolean =>
+export const isNoConfidenceTag = (t: ImageTagResult): boolean =>
   t.id === 'Benda' && t.en === 'Thing' && t.zh === '东西' && t.ms === 'Barang';
 
 export const tagImageWithBilingualNames = async (imageUri: string): Promise<ImageTagResult> => {
@@ -186,46 +149,6 @@ export const tagImageWithBilingualNames = async (imageUri: string): Promise<Imag
         action: 'ai_image_tagging',
       });
       return NO_CONFIDENCE_TAG;
-    }
-  });
-};
-
-export { isNoConfidenceTag };
-
-/**
- * Background one-shot translation used by the frictionless quad-lingual flow:
- * after a manual fallback save (all four labels = the user's typed word),
- * this fills the three missing languages. Fire-and-forget — NEVER awaited by
- * the UI path. `from` is the language the user actually typed.
- */
-export const translateWordBilingual = async (
-  word: string,
-  from: 'id' | 'en' | 'zh' | 'ms'
-): Promise<{ id: string; en: string; zh: string; ms: string }> => {
-  return executeWithFallback(async (ai) => {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            {
-              text: `Translate the word "${word}" (it is written in ${from === 'id' ? 'Indonesian' : from === 'en' ? 'English' : from === 'zh' ? 'Mandarin' : 'Bahasa Melayu / Malay'}) into the other three languages. Use a single, simple, child-friendly word for each, and use proper Malaysian vocabulary for the Malay translation (not Indonesian). Return ONLY a JSON object in this exact format, with no markdown formatting or backticks: {"id": "indonesian", "en": "english", "zh": "mandarin", "ms": "malay"}`,
-            },
-          ],
-        },
-      ],
-    });
-
-    try {
-      const result = JSON.parse(response.text || '{}');
-      if (result.id && result.en && result.zh && result.ms) {
-        return { id: result.id, en: result.en, zh: result.zh, ms: result.ms };
-      }
-      throw new Error('Translation response missing fields');
-    } catch (error) {
-      logger.logError(error, { action: 'ai_background_translation' });
-      throw error;
     }
   });
 };

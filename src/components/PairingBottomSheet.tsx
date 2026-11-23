@@ -10,6 +10,8 @@ import { TextInput, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Sc
 import Toast from 'react-native-toast-message';
 import { fetchChildSlotState, fetchActiveSlotPlans, type SlotPackRow } from '../services/db/slots';
 import { createQrisCheckout, checkQrisStatus } from '../services/db/paywall';
+import { formatRupiah } from '../utils/format';
+import { buildChildProfileFromRow } from '../utils/childProfileHelpers';
 
 interface Props {
   isVisible: boolean;
@@ -18,10 +20,6 @@ interface Props {
 
 /** Stages of the in-sheet slot purchase flow (null = flow closed). */
 type SlotFlowStage = 'plans' | 'requesting' | 'qr' | 'verifying';
-
-/** Rp 1.234.567 — Indonesian thousands separator (mirrors PaywallScreen). */
-const formatRupiah = (value: number) =>
-  `Rp${Math.round(value).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')}`;
 
 export default function PairingBottomSheet({ isVisible, onClose }: Props) {
   const { t } = useTranslation();
@@ -128,17 +126,7 @@ export default function PairingBottomSheet({ isVisible, onClose }: Props) {
           if (cancelled) return;
           setParentChildName(profile?.nickname || profile?.full_name || null);
           if (profile) {
-            setChildProfile({
-              device_id: link.child_device_id,
-              fullName: profile.full_name,
-              nickname: profile.nickname,
-              gender:
-                (profile.settings?.childProfileGender || profile.settings?.childVoiceGender || '')
-                  .toLowerCase() === 'girl'
-                  ? 'Girl'
-                  : 'Boy',
-              settings: profile.settings,
-            });
+            setChildProfile(buildChildProfileFromRow(profile, childProfile, link.child_device_id));
             // Mirror the child's saved settings into THIS device's store too:
             // otherwise a fresh parent install shows the parent's old defaults
             // in Appearance/Voice while the child already has different values
@@ -344,13 +332,8 @@ export default function PairingBottomSheet({ isVisible, onClose }: Props) {
         .single();
         
       if (profile) {
-        setChildProfile({
-          device_id: childDevice.id,
-          fullName: profile.full_name,
-          nickname: profile.nickname,
-          gender: profile.settings?.childVoiceGender?.toLowerCase() === 'girl' ? 'Girl' : 'Boy',
-          settings: profile.settings
-        });
+        setChildProfile(buildChildProfileFromRow(profile, childProfile, childDevice.id));
+        useAACStore.getState().applySettingsPatch(profile.settings ?? {});
       }
 
       setPairingCode(inputCode);

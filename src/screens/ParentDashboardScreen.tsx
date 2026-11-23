@@ -9,8 +9,6 @@ import { evaluateAccess } from '../services/db/entitlement';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { supabase } from '../services/db/supabase';
 import { useAACStore } from '../store/useAACStore';
-import { playTTS } from '../services/ai/audioManager';
-import * as Haptics from 'expo-haptics';
 import { useTranslation } from '../i18n';
 
 import ParentHomeScreen from './parent/ParentHomeScreen';
@@ -23,7 +21,7 @@ const Tab = createBottomTabNavigator();
 
 export default function ParentDashboardScreen() {
   const { t } = useTranslation();
-  const { pairingCode, language, deviceId, setChildStatus } = useAACStore();
+  const { deviceId, setChildStatus } = useAACStore();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const premium = useAACStore((s) => s.premium);
@@ -53,30 +51,10 @@ export default function ParentDashboardScreen() {
     }
   }, [parentLocked, parentOffline, navigation]);
 
-  useEffect(() => {
-    if (parentLocked) return; // locked parents must not keep live channels
-    if (!pairingCode) return;
-
-    // Global Real-Time TTS Pager
-    const subscription = supabase.channel('global_parent_tts_pager')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'messages',
-        filter: `channel_id=eq.${pairingCode}`
-      }, (payload) => {
-        // Ensure we only speak messages from the child
-        if (payload.new.sender_role === 'Child') {
-          playTTS(payload.new.text_content, language, 'Child');
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        }
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(subscription); // Safeguard against memory leaks
-    };
-  }, [pairingCode, language, parentLocked]);
+  // NOTE: Incoming message TTS & silent OS banner on Parent mode are owned by
+  // the app-level `MessageAlertBridge` (with alertDedupe against headless push).
+  // Keeping a second `messages` INSERT listener here caused double-TTS playback
+  // whenever the parent dashboard was open in the foreground.
 
   // Re-target trigger: any family_links change bumps the epoch so the presence
   // effect below re-resolves the link and re-subscribes against the CURRENT

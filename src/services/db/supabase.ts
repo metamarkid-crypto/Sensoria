@@ -321,26 +321,6 @@ export const deleteCustomWordFromCloud = async (
 };
 
 /**
- * Menarik 50 pesan terakhir dari tabel (Optimasi Cerdas untuk Load Awal)
- */
-export const getAACMessagesHistory = async (channelId: string) => {
-  if (!supabaseUrl || !supabaseAnonKey) return [];
-  
-  const { data, error } = await supabase
-    .from('messages')
-    .select('*')
-    .eq('channel_id', channelId)
-    .order('timestamp', { ascending: false })
-    .limit(50);
-    
-  if (error) {
-    console.error('Gagal memuat history pesan:', error);
-    return [];
-  }
-  return data;
-};
-
-/**
  * Mendengarkan pesan baru secara realtime menggunakan Realtime Postgres Changes
  */
 export const subscribeToAACMessages = (

@@ -4,7 +4,6 @@ import { NavigationContainer, createNavigationContainerRef } from '@react-naviga
 import RoleSelectionScreen from '../screens/RoleSelectionScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
 import ChildAACScreen from '../screens/ChildAACScreen';
-import ParentDashboardScreen from '../screens/ParentDashboardScreen';
 import WelcomeSliderScreen from '../screens/WelcomeSliderScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import UserProfileScreen from '../screens/UserProfileScreen';

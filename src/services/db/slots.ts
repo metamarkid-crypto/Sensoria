@@ -1,5 +1,4 @@
 import { supabase } from './supabase';
-import type { DeviceRow } from './types';
 
 /** Row shape of `public.plans` WHERE kind = 'slots' (one-time slot packs). */
 export interface SlotPackRow {

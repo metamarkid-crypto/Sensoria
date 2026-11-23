@@ -5,7 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontAwesome5 } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { supabase } from '../../services/db/supabase';
-import { useAACStore } from '../../store/useAACStore';
+import { queueCloudOp } from '../../services/db/sqlite';
+import { useAACStore, resolveChildDeviceId } from '../../store/useAACStore';
 import { useTranslation, translate } from '../../i18n';
 import AvatarPin from '../../components/parent/AvatarPin';
 import LocationBottomSheet from '../../components/parent/LocationBottomSheet';
@@ -284,7 +285,8 @@ export default function ParentLocationScreen() {
       return;
     }
 
-    if (!childProfile?.device_id) {
+    const targetChildId = childIdRef.current ?? resolveChildDeviceId(childProfile, deviceId, role);
+    if (!targetChildId) {
       Alert.alert(t('common.error'), t('location.childProfileMissing'));
       return;
     }
@@ -300,23 +302,28 @@ export default function ParentLocationScreen() {
     };
 
     const updatedSafeZones = [...safeZones, newZone];
-    const mergedSettings = { ...(childProfile.settings || {}), safeZones: updatedSafeZones };
+    const mergedSettings = { ...(childProfile?.settings || {}), safeZones: updatedSafeZones };
+
+    // Optimistic local update (Offline-First SSOT)
+    useAACStore.setState({
+      childProfile: childProfile
+        ? { ...childProfile, device_id: targetChildId, settings: mergedSettings }
+        : { device_id: targetChildId, nickname: '', settings: mergedSettings }
+    });
 
     try {
       const { error } = await supabase
         .from('child_profiles')
         .update({ settings: mergedSettings })
-        .eq('device_id', childProfile.device_id);
+        .eq('device_id', targetChildId);
 
       if (error) throw error;
-
-      useAACStore.setState({
-        childProfile: { ...childProfile, settings: mergedSettings }
-      });
-
     } catch (error) {
-      console.error('Failed to sync Safe Zones:', error);
-      Alert.alert(t('common.failed'), t('location.saveFailedDesc'));
+      console.warn('Safe Zone cloud write failed (queued for replay):', error);
+      await queueCloudOp('child_profiles.settings', {
+        device_id: targetChildId,
+        settings: { safeZones: updatedSafeZones },
+      });
     }
 
     setAddModalVisible(false);
@@ -332,27 +339,30 @@ export default function ParentLocationScreen() {
           text: t('location.delete'),
           style: 'destructive',
           onPress: async () => {
-            if (!childProfile?.device_id) return;
+            const targetChildId = childIdRef.current ?? resolveChildDeviceId(childProfile, deviceId, role);
+            if (!targetChildId || !childProfile) return;
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
             const updatedSafeZones = safeZones.filter((z: any) => z.id !== zoneId);
             const mergedSettings = { ...(childProfile.settings || {}), safeZones: updatedSafeZones };
 
+            useAACStore.setState({
+              childProfile: { ...childProfile, device_id: targetChildId, settings: mergedSettings }
+            });
+
             try {
               const { error } = await supabase
                 .from('child_profiles')
                 .update({ settings: mergedSettings })
-                .eq('device_id', childProfile.device_id);
+                .eq('device_id', targetChildId);
 
               if (error) throw error;
-
-              useAACStore.setState({
-                childProfile: { ...childProfile, settings: mergedSettings }
-              });
-
             } catch (error) {
-              console.error('Failed to delete Safe Zone:', error);
-              Alert.alert(t('common.failed'), t('location.deleteFailedDesc'));
+              console.warn('Safe Zone delete failed (queued for replay):', error);
+              await queueCloudOp('child_profiles.settings', {
+                device_id: targetChildId,
+                settings: { safeZones: updatedSafeZones },
+              });
             }
           }
         }

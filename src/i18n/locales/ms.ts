@@ -308,6 +308,9 @@ export const ms: Record<TranslationKey, string> = {
   'about.title': 'Tentang Sensoria',
   'about.defaultDescription': 'Sensoria AAC ialah aplikasi komunikasi tambahan dan alternatif yang direka khas untuk memudahkan kanak-kanak dengan spektrum autisme atau cabaran komunikasi lain. Kami percaya setiap suara patut didengar.',
   'about.missions': 'Misi Kami',
+  'about.contactUs': 'Hubungi Kami',
+  'about.socialMedia': 'Media Sosial',
+  'about.whatsappSupport': 'Sokongan WhatsApp',
   'about.privacyPolicy': 'Dasar Privasi',
   'about.developedIn': 'Dibangunkan di Medan, Indonesia 🇮🇩',
 

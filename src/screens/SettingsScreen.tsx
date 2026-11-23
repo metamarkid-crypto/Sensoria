@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FontAwesome5, Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import Toast from 'react-native-toast-message';
 import PairingBottomSheet from '../components/PairingBottomSheet';
 import LanguagePickerModal from '../components/i18n/LanguagePickerModal';
 import { useAACStore } from '../store/useAACStore';
@@ -54,15 +53,6 @@ export default function SettingsScreen() {
     { id: 'accessibility', titleKey: 'settings.accessibility' as const, icon: 'accessibility', type: 'Ionicons', action: () => navigation.navigate('AccessibilitySettings') },
     { id: 'pairing', titleKey: 'settings.connection' as const, icon: 'link', type: 'Ionicons', action: () => setShowPairing(true) },
   ];
-
-  const showComingSoon = () => {
-    Toast.show({
-      type: 'info',
-      text1: t('settings.soonComing'),
-      text2: t('settings.soonToastDesc'),
-      position: 'bottom',
-    });
-  };
 
   const renderIcon = (type: string, name: string) => {
     if (type === 'Ionicons') return <Ionicons name={name as any} size={22} color="#2488FF" />;
@@ -161,8 +151,6 @@ export default function SettingsScreen() {
 
       {/* Global trilingual language picker */}
       <LanguagePickerModal visible={showLanguage} onClose={() => setShowLanguage(false)} />
-      
-      <Toast />
     </SafeAreaView>
   );
 }
@@ -241,25 +229,8 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     marginTop: 2,
   },
-  menuItemTitleDisabled: {
-    color: '#94A3B8',
-  },
   iconBoxPremium: {
     backgroundColor: '#FFFBEB', // amber-50 behind the amber-600 crown
-  },
-  iconBoxLocked: {
-    backgroundColor: '#F8FAFC',
-  },
-  soonBadge: {
-    backgroundColor: '#F1F5F9',
-    borderRadius: 10,
-    paddingVertical: 3,
-    paddingHorizontal: 10,
-  },
-  soonBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#94A3B8',
   },
   groupGap: {
     marginTop: 16,

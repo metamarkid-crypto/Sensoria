@@ -1,31 +1,31 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, Image, TextInput, KeyboardAvoidingView, Platform, ImageBackground, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Image, TextInput, KeyboardAvoidingView, Platform, ImageBackground, ActivityIndicator } from 'react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { useAACStore, UserRole } from '../store/useAACStore';
 import { queueCloudOp } from '../services/db/sqlite';
 import * as Haptics from 'expo-haptics';
-import SettingsScreen from './SettingsScreen';
-import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../services/db/supabase';
 import { ensureTrialSubscription } from '../services/db/subscriptions';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import Toast from 'react-native-toast-message';
-import { LANGUAGES, useTranslation } from '../i18n';
+import { useTranslation } from '../i18n';
+import LanguagePickerModal from '../components/i18n/LanguagePickerModal';
+import { buildChildProfileFromRow } from '../utils/childProfileHelpers';
 
 export default function RoleSelectionScreen() {
-  const { t, language: currentLanguage, setLanguage } = useTranslation();
+  const { t } = useTranslation();
   const setRole = useAACStore((state) => state.setRole);
   const deviceId = useAACStore((state) => state.deviceId);
   const setDeviceId = useAACStore((state) => state.setDeviceId);
   const setPairingCode = useAACStore((state) => state.setPairingCode);
   const setChildProfile = useAACStore((state) => state.setChildProfile);
   
-  const [showSettings, setShowSettings] = useState(false);
   const [showRecovery, setShowRecovery] = useState(false);
   const [recoveryCode, setRecoveryCode] = useState('');
   const [loadingRole, setLoadingRole] = useState<UserRole | null>(null);
   const [isRecovering, setIsRecovering] = useState(false);
+  const [showLanguageModal, setShowLanguageModal] = useState(false);
 
   // Helper UUID for Secure Store initial generation
   const generateUUID = () => {
@@ -137,21 +137,21 @@ export default function RoleSelectionScreen() {
         await SecureStore.setItemAsync('SENSORIA_DEVICE_ID', recoveredId);
         setDeviceId(recoveredId);
         setPairingCode(recoveryCode);
-        setChildProfile({
-          device_id: recoveredId,
-          fullName: profile.full_name,
-          nickname: profile.nickname,
-          gender: profile.settings?.childProfileGender || 'Boy'
-        });
+        const normalizedProfile = buildChildProfileFromRow(profile, null, recoveredId);
+        setChildProfile(normalizedProfile);
         
-        // Load remote settings to Zustand
+        // Load remote settings to Zustand via whitelisted patch + default voice fallback
         if (profile.settings) {
-          useAACStore.getState().setSpeechRate(profile.settings.speechRate || 1.0);
-          useAACStore.getState().setVolume(typeof profile.settings.volume === 'number' ? profile.settings.volume : 1.0);
-          // childVoiceGender is deprecated (see UserProfileScreen); childProfileGender is the source of truth.
-          // Map the recovered gender to a matching default voice preset.
-          const recoveredGender = profile.settings.childProfileGender || profile.settings.childVoiceGender || 'Boy';
-          useAACStore.getState().setSelectedVoice(recoveredGender === 'Girl' ? 'id-female-1' : 'id-male-1');
+          useAACStore.getState().applySettingsPatch(profile.settings);
+          if (!profile.settings.selectedVoice) {
+            useAACStore.getState().setSelectedVoice(
+              normalizedProfile.gender === 'Girl' ? 'id-female-1' : 'id-male-1',
+            );
+          }
+        } else {
+          useAACStore.getState().setSelectedVoice(
+            normalizedProfile.gender === 'Girl' ? 'id-female-1' : 'id-male-1',
+          );
         }
         
         Toast.show({ type: 'success', text1: t('common.success'), text2: t('role.recoverySuccess'), position: 'top' });
@@ -165,13 +165,6 @@ export default function RoleSelectionScreen() {
     } finally {
       setIsRecovering(false);
     }
-  };
-
-  const [showLanguageModal, setShowLanguageModal] = useState(false);
-
-  const handleLanguageSelect = (lang: 'id' | 'en' | 'zh' | 'ms') => {
-    setLanguage(lang);
-    setShowLanguageModal(false);
   };
 
   return (
@@ -258,29 +251,7 @@ export default function RoleSelectionScreen() {
         </View>
       </SafeAreaView>
 
-      <Modal visible={showLanguageModal} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.languageContainer}>
-            <Text style={styles.languageTitle}>{t('role.languageTitle')}</Text>
-
-            {LANGUAGES.map((lang) => (
-              <TouchableOpacity
-                key={lang.code}
-                style={[styles.langBtn, currentLanguage === lang.code && styles.langBtnActive]}
-                onPress={() => handleLanguageSelect(lang.code)}
-              >
-                <Text style={[styles.langBtnText, currentLanguage === lang.code && styles.langBtnTextActive]}>
-                  {lang.flag} {lang.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-
-            <TouchableOpacity style={styles.languageCancel} onPress={() => setShowLanguageModal(false)}>
-              <Text style={styles.languageCancelText}>{t('common.cancel')}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+      <LanguagePickerModal visible={showLanguageModal} onClose={() => setShowLanguageModal(false)} />
 
       <Modal visible={showRecovery} transparent animationType="slide">
         <KeyboardAvoidingView 
@@ -308,7 +279,6 @@ export default function RoleSelectionScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-      <Toast />
     </ImageBackground>
   );
 }
@@ -397,11 +367,6 @@ const styles = StyleSheet.create({
   titleSection: {
     alignItems: 'center',
   },
-  helloText: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: '#11427B',
-  },
   titleText: {
     fontSize: 26,
     fontWeight: '900',
@@ -472,49 +437,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     paddingHorizontal: 20,
-  },
-  languageContainer: {
-    backgroundColor: '#FFF',
-    padding: 24,
-    borderRadius: 20,
-    elevation: 5,
-  },
-  languageTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#334155',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  langBtn: {
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    marginBottom: 12,
-    alignItems: 'center',
-  },
-  langBtnActive: {
-    borderColor: '#2488FF',
-    backgroundColor: '#EFF6FF',
-  },
-  langBtnText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#64748B',
-  },
-  langBtnTextActive: {
-    color: '#2488FF',
-  },
-  languageCancel: {
-    marginTop: 8,
-    alignItems: 'center',
-    padding: 10,
-  },
-  languageCancelText: {
-    color: '#94A3B8',
-    fontWeight: 'bold',
-    fontSize: 16,
   },
   recoveryContainer: {
     backgroundColor: '#FFF',

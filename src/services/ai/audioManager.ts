@@ -41,16 +41,46 @@ const VOICE_PRESETS: Record<string, { referenceId: string; isMale: boolean; offl
   'id-male-2': { referenceId: process.env.EXPO_PUBLIC_VOICE_BOY_2 as string, isMale: true },
 };
 
-// Resolve which voice to use. Explicit user pick (store.selectedVoice) wins for Child speech;
+const MALE_ROLE_KEYWORDS = ['ayah', 'papa', 'papi', 'abi', 'bapak', 'kakek', 'paman', 'om'];
+
+// Keep a single module-scoped player reference so rapid consecutive taps
+// cleanly pause/replace the previous clip instead of leaking or overlapping.
+let activePlayer: ReturnType<typeof createAudioPlayer> | null = null;
+
+const playWithManagedPlayer = (source: any, volume: number) => {
+  if (activePlayer) {
+    try {
+      activePlayer.pause();
+      activePlayer.remove();
+    } catch {
+      /* previous player already released */
+    }
+  }
+  const player = createAudioPlayer(source);
+  activePlayer = player;
+  player.volume = volume;
+  player.play();
+};
+
+// Resolve which voice and offline asset profile to use.
+// Explicit user pick (store.selectedVoice) wins for Child speech;
 // parents keep the smart role-based keyword mapping so defaults are unchanged.
-const resolveVoice = (role: string): { voiceId: string; isMale: boolean; offlineProfile?: 'pria' | 'wanita' } => {
+const resolveVoice = (role: string): {
+  voiceId: string;
+  isMale: boolean;
+  offlineProfile: 'pria' | 'wanita' | 'ayah' | 'ibu' | null;
+} => {
   const store = useAACStore.getState();
 
   const preset = store.selectedVoice && VOICE_PRESETS[store.selectedVoice];
   if (role === 'Child' && preset) {
-    // Preset 2 has no offlineProfile → offlineProfile stays undefined and the
-    // offline tier is deliberately skipped (see resolveAudioProfile).
-    return { voiceId: preset.referenceId, isMale: preset.isMale, offlineProfile: preset.offlineProfile };
+    // Preset 2 has no offlineProfile → offlineProfile is null and the
+    // offline tier is deliberately skipped (forced Fish Audio route).
+    return {
+      voiceId: preset.referenceId,
+      isMale: preset.isMale,
+      offlineProfile: preset.offlineProfile ?? null,
+    };
   }
 
   if (role === 'Child') {
@@ -66,39 +96,25 @@ const resolveVoice = (role: string): { voiceId: string; isMale: boolean; offline
 
   // Smart Role-to-Voice Mapping for Parents/Others
   const lowerRole = role.toLowerCase();
-  const maleKeywords = ['ayah', 'papa', 'papi', 'abi', 'bapak', 'kakek', 'paman', 'om'];
-
-  // Male keywords (Ayah/Papa/...) use the Dad model; everything else uses the Mom model.
-  if (maleKeywords.some(kw => lowerRole.includes(kw))) {
-    return { voiceId: process.env.EXPO_PUBLIC_VOICE_DAD as string, isMale: true };
+  if (MALE_ROLE_KEYWORDS.some(kw => lowerRole.includes(kw))) {
+    return {
+      voiceId: process.env.EXPO_PUBLIC_VOICE_DAD as string,
+      isMale: true,
+      offlineProfile: 'ayah',
+    };
   }
-  return { voiceId: process.env.EXPO_PUBLIC_VOICE_MOM as string, isMale: false };
+  return {
+    voiceId: process.env.EXPO_PUBLIC_VOICE_MOM as string,
+    isMale: false,
+    offlineProfile: 'ibu',
+  };
 };
 
 // Map the speaking role (and the child's gender for Child speech) to the
-// pre-recorded asset profile folder: ayah (dad) / ibu (mom) / pria (male
-// child) / wanita (female child).
-//
-// Returns null when the offline tier must be SKIPPED entirely:
-//   • Child + preset 2 selected → forced Fish Audio route (per user decision).
-// Parents keep the smart role-based keyword mapping so defaults are unchanged.
-const resolveAudioProfile = (role: string): string | null => {
-  const store = useAACStore.getState();
-
-  if (role === 'Child') {
-    // Explicit preset wins: preset 1 → its bundled clip folder, preset 2 →
-    // null (all speech via Fish Audio). Without a valid preset, fall back to
-    // the child profile gender (legacy behavior, default offline tier).
-    const preset = store.selectedVoice && VOICE_PRESETS[store.selectedVoice];
-    if (preset) return preset.offlineProfile ?? null;
-    return store.childProfile?.gender === 'Boy' ? 'pria' : 'wanita';
-  }
-
-  const lowerRole = role.toLowerCase();
-  const maleKeywords = ['ayah', 'papa', 'papi', 'abi', 'bapak', 'kakek', 'paman', 'om'];
-  if (maleKeywords.some(kw => lowerRole.includes(kw))) return 'ayah';
-  return 'ibu';
-};
+// pre-recorded asset profile folder: ayah / ibu / pria / wanita, or null
+// when the offline tier must be skipped (Child + preset 2 selected).
+const resolveAudioProfile = (role: string): string | null =>
+  resolveVoice(role).offlineProfile;
 
 // STEP 1 — Local Asset Check: resolve a bundled pre-recorded voice file for
 // the active language (id | en | zh), gender/profile and word key. The map is
@@ -136,7 +152,6 @@ const ensureCacheLimit = async () => {
   try {
     const files = await FileSystem.readDirectoryAsync(CACHE_DIR);
     let totalSize = 0;
-    const fileStats = [];
 
     // Get stats for all files
     for (const file of files) {
@@ -144,7 +159,6 @@ const ensureCacheLimit = async () => {
       const stat = await FileSystem.getInfoAsync(uri);
       if (stat.exists && !stat.isDirectory) {
         totalSize += stat.size || 0;
-        fileStats.push({ uri, size: stat.size || 0, modificationTime: stat.modificationTime || 0 });
       }
     }
 
@@ -192,6 +206,7 @@ export const clearAudioCache = async (text: string, language: 'id' | 'en' | 'zh'
   const fileInfo = await FileSystem.getInfoAsync(fileUri);
   if (fileInfo.exists) {
     await FileSystem.deleteAsync(fileUri);
+    await removeAudioMetadata(fileUri);
     console.log(`Deleted cached audio for: ${text}`);
   }
 };
@@ -206,9 +221,7 @@ export const playTTS = async (text: string, language: 'id' | 'en' | 'zh' | 'ms',
   const localAsset = resolveLocalAudio(text, language, role);
   if (localAsset) {
     try {
-      const player = createAudioPlayer(localAsset);
-      player.volume = store.volume;
-      player.play();
+      playWithManagedPlayer(localAsset, store.volume);
       return;
     } catch (e) {
       console.log('Local asset playback failed, falling back to TTS:', e);
@@ -220,7 +233,7 @@ export const playTTS = async (text: string, language: 'id' | 'en' | 'zh' | 'ms',
   const apiKey = process.env.EXPO_PUBLIC_FISH_AUDIO_API_KEY;
   const { voiceId, isMale } = resolveVoice(role);
 
-  // Jika API key LMNT tersedia, coba fetch
+  // Jika API key Fish Audio tersedia, coba fetch
   if (apiKey) {
     try {
       await ensureCacheLimit();
@@ -292,9 +305,7 @@ export const playTTS = async (text: string, language: 'id' | 'en' | 'zh' | 'ms',
         }
 
       // Play cached/downloaded file (volume applied at playback, not baked into the cached file)
-      const player = createAudioPlayer(fileUri);
-      player.volume = store.volume;
-      player.play();
+      playWithManagedPlayer(fileUri, store.volume);
       return;
 
     } catch (error) {

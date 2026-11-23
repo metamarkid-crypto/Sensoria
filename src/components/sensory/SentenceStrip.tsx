@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, LayoutAnimation, UIManager, Platform, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, LayoutAnimation, Image } from 'react-native';
 import { useAACStore, resolveWordText } from '../../store/useAACStore';
 import * as Haptics from 'expo-haptics';
 import { playTTS } from '../../services/ai/audioManager';

@@ -46,3 +46,7 @@ export const formatTime = (ts: unknown): string => {
   if (Number.isNaN(ms)) return '';
   return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 };
+
+/** "Rp25.000" — Indonesian thousands separator without Intl dependency. */
+export const formatRupiah = (value: number): string =>
+  `Rp${Math.round(value).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')}`;

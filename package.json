@@ -53,7 +53,7 @@
     "brand": "node scripts/generate-brand-assets.js",
     "android": "node scripts/sync-audio.js && node scripts/sync-images.js && expo run:android",
     "ios": "node scripts/sync-audio.js && node scripts/sync-images.js && expo run:ios",
-    "web": "expo start --web",
+    "test": "node scripts/verify-alert-policy.mjs && node scripts/verify-push-payload.mjs && node scripts/verify-settings-mirror.mjs && node scripts/verify-core-logic.mjs",
     "push:verify": "node scripts/verify-push-setup.mjs",
     "push:doctor": "node scripts/push-doctor.mjs",
     "push:fcm": "node scripts/upload-fcm-key.mjs --check",

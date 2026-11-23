@@ -299,6 +299,9 @@ export const zh: Record<TranslationKey, string> = {
   'about.title': '关于 Sensoria',
   'about.defaultDescription': 'Sensoria AAC 是一款专为自闭症谱系或有其他沟通障碍的儿童设计的辅助与替代沟通应用。我们相信每个声音都值得被倾听。',
   'about.missions': '我们的使命',
+  'about.contactUs': '联系我们',
+  'about.socialMedia': '社交媒体',
+  'about.whatsappSupport': 'WhatsApp 客服',
   'about.privacyPolicy': '隐私政策',
   'about.developedIn': '在印度尼西亚棉兰开发 🇮🇩',
 

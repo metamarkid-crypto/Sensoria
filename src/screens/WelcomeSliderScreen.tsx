@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, Dimensions, TouchableOpacity, Image, ActivityIndicator, Platform } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet, FlatList, Dimensions, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAACStore } from '../store/useAACStore';
 import { useTranslation, type TranslationKey } from '../i18n';
 import { logger } from '../utils/logger';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
 interface Slide {
   id: string;
@@ -31,7 +31,7 @@ const SLIDES: Slide[] = [
   }
 ];
 
-export default function WelcomeSliderScreen({ navigation }: any) {
+export default function WelcomeSliderScreen() {
   const { t } = useTranslation();
   const { setHasSeenOnboarding } = useAACStore();
   const [currentIndex, setCurrentIndex] = useState(0);

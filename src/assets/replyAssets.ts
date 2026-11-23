@@ -22,12 +22,12 @@ const REPLY_ASSETS: Record<VisualReplyKind, ImageSourcePropType> = {
 export const getVisualReplyImage = (kind: VisualReplyKind): ImageSourcePropType =>
   REPLY_ASSETS[kind];
 
-// Kata kunci per kategori (id + en + zh dasar). Dibandingkan per-token pada
+// Kata kunci per kategori (id + en + zh + ms dasar). Dibandingkan per-token pada
 // teks yang dinormalisasi, sehingga frasa seperti "Oke deh", "Tunggu sebentar
 // ya" atau "Tidak boleh" tetap terdeteksi.
-const OKE_WORDS = ['oke', 'ok', 'okey', 'okay', 'iya', 'ya', 'yes', 'baik', 'boleh', 'sip', 'siap', 'noted', '好的', '可以', '行', '嗯'];
-const TIDAK_WORDS = ['tidak', 'tdk', 'gak', 'nggak', 'ga', 'jangan', 'no', 'nope', 'belum', 'jangan dulu', '不', '不要', '不可以'];
-const TUNGGU_WORDS = ['tunggu', 'sebentar', 'wait', 'sabar', 'nanti', '等等', '等一下', '稍等'];
+const OKE_WORDS = ['oke', 'ok', 'okey', 'okay', 'iya', 'ya', 'yes', 'baik', 'baiklah', 'boleh', 'sip', 'siap', 'noted', 'setuju', '好的', '可以', '行', '嗯'];
+const TIDAK_WORDS = ['tidak', 'tak', 'tdk', 'gak', 'nggak', 'ga', 'jangan', 'no', 'nope', 'belum', 'jangan dulu', '不', '不要', '不可以'];
+const TUNGGU_WORDS = ['tunggu', 'sebentar', 'sekejap', 'kejap', 'wait', 'sabar', 'nanti', '等等', '等一下', '稍等'];
 
 /**
  * Memetakan teks balasan parent ke kategori gambar. Urutan cek disengaja
